@@ -1,0 +1,24 @@
+# permissions for end users to edit managedclusteraddons.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: managedclusteraddon-editor-role
+rules:
+- apiGroups:
+  - addon.open-cluster-management.io
+  resources:
+  - managedclusteraddons
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - addon.open-cluster-management.io
+  resources:
+  - managedclusteraddons/status
+  verbs:
+  - get

@@ -1,0 +1,7 @@
+apiVersion: addon.open-cluster-management.io/v1alpha1
+kind: ManagedClusterAddon
+metadata:
+  name: managedclusteraddon-sample
+spec:
+  # Add fields here
+  foo: bar
