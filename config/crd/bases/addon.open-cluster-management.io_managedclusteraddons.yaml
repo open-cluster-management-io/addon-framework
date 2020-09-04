@@ -177,7 +177,6 @@ spec:
               type: array
           type: object
       required:
-      - metadata
       - spec
       type: object
   version: v1alpha1

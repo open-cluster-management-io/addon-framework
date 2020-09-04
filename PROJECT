@@ -4,4 +4,7 @@ resources:
 - group: addon
   kind: ManagedClusterAddon
   version: v1alpha1
+- group: addon
+  kind: ClusterManagementAddon
+  version: v1alpha1
 version: "2"
