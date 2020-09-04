@@ -23,6 +23,7 @@ type ClusterManagementAddOn struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// spec represents a desired configuration for the agent on the cluster management add-on.
+	// +required
 	Spec ClusterManagementAddOnSpec `json:"spec"`
 
 	// status represents the current status of cluster management add-on.
