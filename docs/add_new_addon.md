@@ -1,13 +1,7 @@
-# Adding New Addon to RedHat Advanced Cluster Management
+# Adding a New Addon to RedHat Advanced Cluster Management
 
 For adding a new addon in Advanced Cluster Management, the addon controller on hub have to create a custome resource [ClusterManagementAddOn](https://github.com/open-cluster-management/addon-framework/blob/add-doc/api/v1alpha1/types_clustermanagementaddon.go).
-This Resource is a cluster scoped and it helps ACM to identify which addon is installed on the hub and are available to install on a managed cluster
-
-The ClusterManagementAddon Resource has following fields
-- DisplayName - the name of addon
-- Description - the detailed description of the add-on
-- CRDName - the name of the CRD used to configure instances of the managed addon
-- CRName - the name of the CR used to configure instances of the managed addon
+This Resource is a cluster scoped and it helps ACM to identify which addon is installed on the hub and are available to install on a managed cluster.
 
 Example of ClusterManagementAddOn CR
 
@@ -29,6 +23,7 @@ spec:
 
 For status reporting of addon on hub, the addon controller have to create a custome resource [ManagedClusterAddOn](https://github.com/open-cluster-management/addon-framework/blob/add-doc/api/v1alpha1/types_managedclusteraddon.go).
 This resource is a namespaced scoped and it provide interface for addon to report status.
+ClusterManagementAddOn name and ManagedClusterAddOn name should be same.
 
 Example of ManagedClusterAddOn CR
 
@@ -64,7 +59,6 @@ status:
 ```
 
 
-
 - Addon status conditions
 
     | Type | Description |
@@ -78,7 +72,7 @@ status:
 
 This describes the mechanism on how hub cluster check the availability of addon running on managed cluster. The `Available` condition in status of ManagedClusterAddOn resource describes whether addon on managed cluster is available.
 
-Availability check
+One way to update Addon status
 
 - When the managed cluster is imported and available, the addons installation starts.
 
