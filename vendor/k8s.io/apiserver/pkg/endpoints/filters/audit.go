@@ -18,7 +18,6 @@ package filters
 
 import (
 	"bufio"
-	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -57,8 +56,8 @@ func WithAudit(handler http.Handler, sink audit.Sink, policy policy.Checker, lon
 		}
 
 		ev.Stage = auditinternal.StageRequestReceived
-		if processed := processAuditEvent(ctx, sink, ev, omitStages); !processed {
-			audit.ApiserverAuditDroppedCounter.WithContext(ctx).Inc()
+		if processed := processAuditEvent(sink, ev, omitStages); !processed {
+			audit.ApiserverAuditDroppedCounter.Inc()
 			responsewriters.InternalError(w, req, errors.New("failed to store audit event"))
 			return
 		}
@@ -71,7 +70,7 @@ func WithAudit(handler http.Handler, sink audit.Sink, policy policy.Checker, lon
 				longRunningSink = sink
 			}
 		}
-		respWriter := decorateResponseWriter(ctx, w, ev, longRunningSink, omitStages)
+		respWriter := decorateResponseWriter(w, ev, longRunningSink, omitStages)
 
 		// send audit event when we leave this func, either via a panic or cleanly. In the case of long
 		// running requests, this will be the second audit event.
@@ -85,7 +84,7 @@ func WithAudit(handler http.Handler, sink audit.Sink, policy policy.Checker, lon
 					Reason:  metav1.StatusReasonInternalError,
 					Message: fmt.Sprintf("APIServer panic'd: %v", r),
 				}
-				processAuditEvent(ctx, sink, ev, omitStages)
+				processAuditEvent(sink, ev, omitStages)
 				return
 			}
 
@@ -99,14 +98,14 @@ func WithAudit(handler http.Handler, sink audit.Sink, policy policy.Checker, lon
 			if ev.ResponseStatus == nil && longRunningSink != nil {
 				ev.ResponseStatus = fakedSuccessStatus
 				ev.Stage = auditinternal.StageResponseStarted
-				processAuditEvent(ctx, longRunningSink, ev, omitStages)
+				processAuditEvent(longRunningSink, ev, omitStages)
 			}
 
 			ev.Stage = auditinternal.StageResponseComplete
 			if ev.ResponseStatus == nil {
 				ev.ResponseStatus = fakedSuccessStatus
 			}
-			processAuditEvent(ctx, sink, ev, omitStages)
+			processAuditEvent(sink, ev, omitStages)
 		}()
 		handler.ServeHTTP(respWriter, req)
 	})
@@ -126,7 +125,7 @@ func createAuditEventAndAttachToContext(req *http.Request, policy policy.Checker
 	}
 
 	level, omitStages := policy.LevelAndStages(attribs)
-	audit.ObservePolicyLevel(ctx, level)
+	audit.ObservePolicyLevel(level)
 	if level == auditinternal.LevelNone {
 		// Don't audit.
 		return req, nil, nil, nil
@@ -146,7 +145,7 @@ func createAuditEventAndAttachToContext(req *http.Request, policy policy.Checker
 	return req, ev, omitStages, nil
 }
 
-func processAuditEvent(ctx context.Context, sink audit.Sink, ev *auditinternal.Event, omitStages []auditinternal.Stage) bool {
+func processAuditEvent(sink audit.Sink, ev *auditinternal.Event, omitStages []auditinternal.Stage) bool {
 	for _, stage := range omitStages {
 		if ev.Stage == stage {
 			return true
@@ -158,13 +157,12 @@ func processAuditEvent(ctx context.Context, sink audit.Sink, ev *auditinternal.E
 	} else {
 		ev.StageTimestamp = metav1.NewMicroTime(time.Now())
 	}
-	audit.ObserveEvent(ctx)
+	audit.ObserveEvent()
 	return sink.ProcessEvents(ev)
 }
 
-func decorateResponseWriter(ctx context.Context, responseWriter http.ResponseWriter, ev *auditinternal.Event, sink audit.Sink, omitStages []auditinternal.Stage) http.ResponseWriter {
+func decorateResponseWriter(responseWriter http.ResponseWriter, ev *auditinternal.Event, sink audit.Sink, omitStages []auditinternal.Stage) http.ResponseWriter {
 	delegate := &auditResponseWriter{
-		ctx:            ctx,
 		ResponseWriter: responseWriter,
 		event:          ev,
 		sink:           sink,
@@ -188,7 +186,6 @@ var _ http.ResponseWriter = &auditResponseWriter{}
 // create immediately an event (for long running requests).
 type auditResponseWriter struct {
 	http.ResponseWriter
-	ctx        context.Context
 	event      *auditinternal.Event
 	once       sync.Once
 	sink       audit.Sink
@@ -208,7 +205,7 @@ func (a *auditResponseWriter) processCode(code int) {
 		a.event.Stage = auditinternal.StageResponseStarted
 
 		if a.sink != nil {
-			processAuditEvent(a.ctx, a.sink, a.event, a.omitStages)
+			processAuditEvent(a.sink, a.event, a.omitStages)
 		}
 	})
 }

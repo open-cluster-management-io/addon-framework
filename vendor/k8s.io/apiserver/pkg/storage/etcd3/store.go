@@ -83,11 +83,11 @@ type objState struct {
 }
 
 // New returns an etcd3 implementation of storage.Interface.
-func New(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Object, prefix string, transformer value.Transformer, pagingEnabled bool, leaseManagerConfig LeaseManagerConfig) storage.Interface {
-	return newStore(c, codec, newFunc, prefix, transformer, pagingEnabled, leaseManagerConfig)
+func New(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Object, prefix string, transformer value.Transformer, pagingEnabled bool) storage.Interface {
+	return newStore(c, newFunc, pagingEnabled, codec, prefix, transformer)
 }
 
-func newStore(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Object, prefix string, transformer value.Transformer, pagingEnabled bool, leaseManagerConfig LeaseManagerConfig) *store {
+func newStore(c *clientv3.Client, newFunc func() runtime.Object, pagingEnabled bool, codec runtime.Codec, prefix string, transformer value.Transformer) *store {
 	versioner := APIObjectVersioner{}
 	result := &store{
 		client:        c,
@@ -100,7 +100,7 @@ func newStore(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Ob
 		// keeps compatibility with etcd2 impl for custom prefixes that don't start with '/'
 		pathPrefix:   path.Join("/", prefix),
 		watcher:      newWatcher(c, codec, newFunc, versioner, transformer),
-		leaseManager: newDefaultLeaseManager(c, leaseManagerConfig),
+		leaseManager: newDefaultLeaseManager(c),
 	}
 	return result
 }
@@ -185,77 +185,35 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 }
 
 // Delete implements storage.Interface.Delete.
-func (s *store) Delete(
-	ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions,
-	validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object) error {
+func (s *store) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc) error {
 	v, err := conversion.EnforcePtr(out)
 	if err != nil {
 		return fmt.Errorf("unable to convert output object to pointer: %v", err)
 	}
 	key = path.Join(s.pathPrefix, key)
-	return s.conditionalDelete(ctx, key, out, v, preconditions, validateDeletion, cachedExistingObject)
+	return s.conditionalDelete(ctx, key, out, v, preconditions, validateDeletion)
 }
 
-func (s *store) conditionalDelete(
-	ctx context.Context, key string, out runtime.Object, v reflect.Value, preconditions *storage.Preconditions,
-	validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object) error {
-	getCurrentState := func() (*objState, error) {
-		startTime := time.Now()
-		getResp, err := s.client.KV.Get(ctx, key)
-		metrics.RecordEtcdRequestLatency("get", getTypeName(out), startTime)
-		if err != nil {
-			return nil, err
-		}
-		return s.getState(getResp, key, v, false)
-	}
-
-	var origState *objState
-	var err error
-	var origStateIsCurrent bool
-	if cachedExistingObject != nil {
-		origState, err = s.getStateFromObject(cachedExistingObject)
-	} else {
-		origState, err = getCurrentState()
-		origStateIsCurrent = true
-	}
+func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.Object, v reflect.Value, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc) error {
+	startTime := time.Now()
+	getResp, err := s.client.KV.Get(ctx, key)
+	metrics.RecordEtcdRequestLatency("get", getTypeName(out), startTime)
 	if err != nil {
 		return err
 	}
-
 	for {
+		origState, err := s.getState(getResp, key, v, false)
+		if err != nil {
+			return err
+		}
 		if preconditions != nil {
 			if err := preconditions.Check(key, origState.obj); err != nil {
-				if origStateIsCurrent {
-					return err
-				}
-
-				// It's possible we're working with stale data.
-				// Actually fetch
-				origState, err = getCurrentState()
-				if err != nil {
-					return err
-				}
-				origStateIsCurrent = true
-				// Retry
-				continue
+				return err
 			}
 		}
 		if err := validateDeletion(ctx, origState.obj); err != nil {
-			if origStateIsCurrent {
-				return err
-			}
-
-			// It's possible we're working with stale data.
-			// Actually fetch
-			origState, err = getCurrentState()
-			if err != nil {
-				return err
-			}
-			origStateIsCurrent = true
-			// Retry
-			continue
+			return err
 		}
-
 		startTime := time.Now()
 		txnResp, err := s.client.KV.Txn(ctx).If(
 			clientv3.Compare(clientv3.ModRevision(key), "=", origState.rev),
@@ -269,13 +227,8 @@ func (s *store) conditionalDelete(
 			return err
 		}
 		if !txnResp.Succeeded {
-			getResp := (*clientv3.GetResponse)(txnResp.Responses[0].GetResponseRange())
+			getResp = (*clientv3.GetResponse)(txnResp.Responses[0].GetResponseRange())
 			klog.V(4).Infof("deletion of %s failed because of a conflict, going to retry", key)
-			origState, err = s.getState(getResp, key, v, false)
-			if err != nil {
-				return err
-			}
-			origStateIsCurrent = true
 			continue
 		}
 		return decode(s.codec, s.versioner, origState.data, out, origState.rev)
@@ -285,7 +238,7 @@ func (s *store) conditionalDelete(
 // GuaranteedUpdate implements storage.Interface.GuaranteedUpdate.
 func (s *store) GuaranteedUpdate(
 	ctx context.Context, key string, out runtime.Object, ignoreNotFound bool,
-	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
+	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, suggestion runtime.Object) error {
 	trace := utiltrace.New("GuaranteedUpdate etcd3", utiltrace.Field{"type", getTypeName(out)})
 	defer trace.LogIfLong(500 * time.Millisecond)
 
@@ -306,15 +259,18 @@ func (s *store) GuaranteedUpdate(
 	}
 
 	var origState *objState
-	var origStateIsCurrent bool
-	if cachedExistingObject != nil {
-		origState, err = s.getStateFromObject(cachedExistingObject)
+	var mustCheckData bool
+	if suggestion != nil {
+		origState, err = s.getStateFromObject(suggestion)
+		if err != nil {
+			return err
+		}
+		mustCheckData = true
 	} else {
 		origState, err = getCurrentState()
-		origStateIsCurrent = true
-	}
-	if err != nil {
-		return err
+		if err != nil {
+			return err
+		}
 	}
 	trace.Step("initial value restored")
 
@@ -322,7 +278,7 @@ func (s *store) GuaranteedUpdate(
 	for {
 		if err := preconditions.Check(key, origState.obj); err != nil {
 			// If our data is already up to date, return the error
-			if origStateIsCurrent {
+			if !mustCheckData {
 				return err
 			}
 
@@ -332,7 +288,7 @@ func (s *store) GuaranteedUpdate(
 			if err != nil {
 				return err
 			}
-			origStateIsCurrent = true
+			mustCheckData = false
 			// Retry
 			continue
 		}
@@ -340,7 +296,7 @@ func (s *store) GuaranteedUpdate(
 		ret, ttl, err := s.updateState(origState, tryUpdate)
 		if err != nil {
 			// If our data is already up to date, return the error
-			if origStateIsCurrent {
+			if !mustCheckData {
 				return err
 			}
 
@@ -350,7 +306,7 @@ func (s *store) GuaranteedUpdate(
 			if err != nil {
 				return err
 			}
-			origStateIsCurrent = true
+			mustCheckData = false
 			// Retry
 			continue
 		}
@@ -363,12 +319,12 @@ func (s *store) GuaranteedUpdate(
 			// if we skipped the original Get in this loop, we must refresh from
 			// etcd in order to be sure the data in the store is equivalent to
 			// our desired serialization
-			if !origStateIsCurrent {
+			if mustCheckData {
 				origState, err = getCurrentState()
 				if err != nil {
 					return err
 				}
-				origStateIsCurrent = true
+				mustCheckData = false
 				if !bytes.Equal(data, origState.data) {
 					// original data changed, restart loop
 					continue
@@ -412,7 +368,7 @@ func (s *store) GuaranteedUpdate(
 				return err
 			}
 			trace.Step("Retry value restored")
-			origStateIsCurrent = true
+			mustCheckData = false
 			continue
 		}
 		putResp := txnResp.Responses[0].GetResponsePut()

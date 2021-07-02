@@ -17,7 +17,6 @@ limitations under the License.
 package metrics
 
 import (
-	"context"
 	"strings"
 	"sync"
 	"time"
@@ -222,12 +221,12 @@ var (
 )
 
 // AddRequestsInQueues adds the given delta to the gauge of the # of requests in the queues of the specified flowSchema and priorityLevel
-func AddRequestsInQueues(ctx context.Context, priorityLevel, flowSchema string, delta int) {
+func AddRequestsInQueues(priorityLevel, flowSchema string, delta int) {
 	apiserverCurrentInqueueRequests.WithLabelValues(priorityLevel, flowSchema).Add(float64(delta))
 }
 
 // AddRequestsExecuting adds the given delta to the gauge of executing requests of the given flowSchema and priorityLevel
-func AddRequestsExecuting(ctx context.Context, priorityLevel, flowSchema string, delta int) {
+func AddRequestsExecuting(priorityLevel, flowSchema string, delta int) {
 	apiserverCurrentExecutingRequests.WithLabelValues(priorityLevel, flowSchema).Add(float64(delta))
 }
 
@@ -237,26 +236,26 @@ func UpdateSharedConcurrencyLimit(priorityLevel string, limit int) {
 }
 
 // AddReject increments the # of rejected requests for flow control
-func AddReject(ctx context.Context, priorityLevel, flowSchema, reason string) {
-	apiserverRejectedRequestsTotal.WithContext(ctx).WithLabelValues(priorityLevel, flowSchema, reason).Add(1)
+func AddReject(priorityLevel, flowSchema, reason string) {
+	apiserverRejectedRequestsTotal.WithLabelValues(priorityLevel, flowSchema, reason).Add(1)
 }
 
 // AddDispatch increments the # of dispatched requests for flow control
-func AddDispatch(ctx context.Context, priorityLevel, flowSchema string) {
-	apiserverDispatchedRequestsTotal.WithContext(ctx).WithLabelValues(priorityLevel, flowSchema).Add(1)
+func AddDispatch(priorityLevel, flowSchema string) {
+	apiserverDispatchedRequestsTotal.WithLabelValues(priorityLevel, flowSchema).Add(1)
 }
 
 // ObserveQueueLength observes the queue length for flow control
-func ObserveQueueLength(ctx context.Context, priorityLevel, flowSchema string, length int) {
-	apiserverRequestQueueLength.WithContext(ctx).WithLabelValues(priorityLevel, flowSchema).Observe(float64(length))
+func ObserveQueueLength(priorityLevel, flowSchema string, length int) {
+	apiserverRequestQueueLength.WithLabelValues(priorityLevel, flowSchema).Observe(float64(length))
 }
 
 // ObserveWaitingDuration observes the queue length for flow control
-func ObserveWaitingDuration(ctx context.Context, priorityLevel, flowSchema, execute string, waitTime time.Duration) {
-	apiserverRequestWaitingSeconds.WithContext(ctx).WithLabelValues(priorityLevel, flowSchema, execute).Observe(waitTime.Seconds())
+func ObserveWaitingDuration(priorityLevel, flowSchema, execute string, waitTime time.Duration) {
+	apiserverRequestWaitingSeconds.WithLabelValues(priorityLevel, flowSchema, execute).Observe(waitTime.Seconds())
 }
 
 // ObserveExecutionDuration observes the execution duration for flow control
-func ObserveExecutionDuration(ctx context.Context, priorityLevel, flowSchema string, executionTime time.Duration) {
-	apiserverRequestExecutionSeconds.WithContext(ctx).WithLabelValues(priorityLevel, flowSchema).Observe(executionTime.Seconds())
+func ObserveExecutionDuration(priorityLevel, flowSchema string, executionTime time.Duration) {
+	apiserverRequestExecutionSeconds.WithLabelValues(priorityLevel, flowSchema).Observe(executionTime.Seconds())
 }

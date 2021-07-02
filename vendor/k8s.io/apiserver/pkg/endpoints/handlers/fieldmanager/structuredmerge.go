@@ -41,7 +41,7 @@ var _ Manager = &structuredMergeManager{}
 
 // NewStructuredMergeManager creates a new Manager that merges apply requests
 // and update managed fields for other types of requests.
-func NewStructuredMergeManager(typeConverter TypeConverter, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion, resetFields map[fieldpath.APIVersion]*fieldpath.Set) (Manager, error) {
+func NewStructuredMergeManager(typeConverter TypeConverter, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion) (Manager, error) {
 	return &structuredMergeManager{
 		typeConverter:   typeConverter,
 		objectConverter: objectConverter,
@@ -49,8 +49,7 @@ func NewStructuredMergeManager(typeConverter TypeConverter, objectConverter runt
 		groupVersion:    gv,
 		hubVersion:      hub,
 		updater: merge.Updater{
-			Converter:     newVersionConverter(typeConverter, objectConverter, hub), // This is the converter provided to SMD from k8s
-			IgnoredFields: resetFields,
+			Converter: newVersionConverter(typeConverter, objectConverter, hub), // This is the converter provided to SMD from k8s
 		},
 	}, nil
 }
@@ -58,7 +57,7 @@ func NewStructuredMergeManager(typeConverter TypeConverter, objectConverter runt
 // NewCRDStructuredMergeManager creates a new Manager specifically for
 // CRDs. This allows for the possibility of fields which are not defined
 // in models, as well as having no models defined at all.
-func NewCRDStructuredMergeManager(typeConverter TypeConverter, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion, resetFields map[fieldpath.APIVersion]*fieldpath.Set) (_ Manager, err error) {
+func NewCRDStructuredMergeManager(typeConverter TypeConverter, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion) (_ Manager, err error) {
 	return &structuredMergeManager{
 		typeConverter:   typeConverter,
 		objectConverter: objectConverter,
@@ -66,8 +65,7 @@ func NewCRDStructuredMergeManager(typeConverter TypeConverter, objectConverter r
 		groupVersion:    gv,
 		hubVersion:      hub,
 		updater: merge.Updater{
-			Converter:     newCRDVersionConverter(typeConverter, objectConverter, hub),
-			IgnoredFields: resetFields,
+			Converter: newCRDVersionConverter(typeConverter, objectConverter, hub),
 		},
 	}, nil
 }
@@ -118,7 +116,7 @@ func (f *structuredMergeManager) Apply(liveObj, patchObj runtime.Object, managed
 		return nil, nil, fmt.Errorf("couldn't get accessor: %v", err)
 	}
 	if patchObjMeta.GetManagedFields() != nil {
-		return nil, nil, errors.NewBadRequest("metadata.managedFields must be nil")
+		return nil, nil, errors.NewBadRequest(fmt.Sprintf("metadata.managedFields must be nil"))
 	}
 
 	liveObjVersioned, err := f.toVersioned(liveObj)

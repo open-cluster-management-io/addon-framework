@@ -133,14 +133,8 @@ type GenericAPIServer struct {
 	// Enable swagger and/or OpenAPI if these configs are non-nil.
 	openAPIConfig *openapicommon.Config
 
-	// SkipOpenAPIInstallation indicates not to install the OpenAPI handler
-	// during PrepareRun.
-	// Set this to true when the specific API Server has its own OpenAPI handler
-	// (e.g. kube-aggregator)
-	skipOpenAPIInstallation bool
-
 	// OpenAPIVersionedService controls the /openapi/v2 endpoint, and can be used to update the served spec.
-	// It is set during PrepareRun if `openAPIConfig` is non-nil unless `skipOpenAPIInstallation` is true.
+	// It is set during PrepareRun.
 	OpenAPIVersionedService *handler.OpenAPIService
 
 	// StaticOpenAPISpec is the spec derived from the restful container endpoints.
@@ -295,7 +289,7 @@ type preparedGenericAPIServer struct {
 func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	s.delegationTarget.PrepareRun()
 
-	if s.openAPIConfig != nil && !s.skipOpenAPIInstallation {
+	if s.openAPIConfig != nil {
 		s.OpenAPIVersionedService, s.StaticOpenAPISpec = routes.OpenAPI{
 			Config: s.openAPIConfig,
 		}.Install(s.Handler.GoRestfulContainer, s.Handler.NonGoRestfulMux)
@@ -555,15 +549,14 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 		GroupVersion:     groupVersion,
 		MetaGroupVersion: apiGroupInfo.MetaGroupVersion,
 
-		ParameterCodec:        apiGroupInfo.ParameterCodec,
-		Serializer:            apiGroupInfo.NegotiatedSerializer,
-		Creater:               apiGroupInfo.Scheme,
-		Convertor:             apiGroupInfo.Scheme,
-		ConvertabilityChecker: apiGroupInfo.Scheme,
-		UnsafeConvertor:       runtime.UnsafeObjectConvertor(apiGroupInfo.Scheme),
-		Defaulter:             apiGroupInfo.Scheme,
-		Typer:                 apiGroupInfo.Scheme,
-		Linker:                runtime.SelfLinker(meta.NewAccessor()),
+		ParameterCodec:  apiGroupInfo.ParameterCodec,
+		Serializer:      apiGroupInfo.NegotiatedSerializer,
+		Creater:         apiGroupInfo.Scheme,
+		Convertor:       apiGroupInfo.Scheme,
+		UnsafeConvertor: runtime.UnsafeObjectConvertor(apiGroupInfo.Scheme),
+		Defaulter:       apiGroupInfo.Scheme,
+		Typer:           apiGroupInfo.Scheme,
+		Linker:          runtime.SelfLinker(meta.NewAccessor()),
 
 		EquivalentResourceRegistry: s.EquivalentResourceRegistry,
 

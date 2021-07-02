@@ -64,7 +64,6 @@ var (
 	}
 	SuggestedFlowSchemas = []*flowcontrol.FlowSchema{
 		SuggestedFlowSchemaSystemNodes,               // references "system" priority-level
-		SuggestedFlowSchemaProbes,                    // references "exempt" priority-level
 		SuggestedFlowSchemaSystemLeaderElection,      // references "leader-election" priority-level
 		SuggestedFlowSchemaWorkloadLeaderElection,    // references "leader-election" priority-level
 		SuggestedFlowSchemaKubeControllerManager,     // references "workload-high" priority-level
@@ -84,7 +83,7 @@ var (
 		},
 	)
 	MandatoryPriorityLevelConfigurationCatchAll = newPriorityLevelConfiguration(
-		flowcontrol.PriorityLevelConfigurationNameCatchAll,
+		"catch-all",
 		flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
@@ -127,8 +126,8 @@ var (
 	// "catch-all" priority-level only gets a minimal positive share of concurrency and won't be reaching
 	// ideally unless you intentionally deleted the suggested "global-default".
 	MandatoryFlowSchemaCatchAll = newFlowSchema(
-		flowcontrol.FlowSchemaNameCatchAll,
-		flowcontrol.PriorityLevelConfigurationNameCatchAll,
+		"catch-all",
+		"catch-all",
 		10000, // matchingPrecedence
 		flowcontrol.FlowDistinguisherMethodByUserType, // distinguisherMethodType
 		flowcontrol.PolicyRulesWithSubjects{
@@ -392,19 +391,6 @@ var (
 				nonResourceRule(
 					[]string{flowcontrol.VerbAll},
 					[]string{flowcontrol.NonResourceAll}),
-			},
-		},
-	)
-	// the following flow schema exempts probes
-	SuggestedFlowSchemaProbes = newFlowSchema(
-		"probes", "exempt", 2,
-		"", // distinguisherMethodType
-		flowcontrol.PolicyRulesWithSubjects{
-			Subjects: groups(user.AllUnauthenticated, user.AllAuthenticated),
-			NonResourceRules: []flowcontrol.NonResourcePolicyRule{
-				nonResourceRule(
-					[]string{"get"},
-					[]string{"/healthz", "/readyz", "/livez"}),
 			},
 		},
 	)

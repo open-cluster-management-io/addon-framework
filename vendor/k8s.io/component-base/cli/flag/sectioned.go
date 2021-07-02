@@ -31,8 +31,6 @@ type NamedFlagSets struct {
 	Order []string
 	// FlagSets stores the flag sets by name.
 	FlagSets map[string]*pflag.FlagSet
-	// NormalizeNameFunc is the normalize function which used to initialize FlagSets created by NamedFlagSets.
-	NormalizeNameFunc func(f *pflag.FlagSet, name string) pflag.NormalizedName
 }
 
 // FlagSet returns the flag set with the given name and adds it to the
@@ -42,12 +40,7 @@ func (nfs *NamedFlagSets) FlagSet(name string) *pflag.FlagSet {
 		nfs.FlagSets = map[string]*pflag.FlagSet{}
 	}
 	if _, ok := nfs.FlagSets[name]; !ok {
-		flagSet := pflag.NewFlagSet(name, pflag.ExitOnError)
-		flagSet.SetNormalizeFunc(pflag.CommandLine.GetNormalizeFunc())
-		if nfs.NormalizeNameFunc != nil {
-			flagSet.SetNormalizeFunc(nfs.NormalizeNameFunc)
-		}
-		nfs.FlagSets[name] = flagSet
+		nfs.FlagSets[name] = pflag.NewFlagSet(name, pflag.ExitOnError)
 		nfs.Order = append(nfs.Order, name)
 	}
 	return nfs.FlagSets[name]

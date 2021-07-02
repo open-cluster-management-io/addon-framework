@@ -195,9 +195,9 @@ type DelegatingAuthenticationOptions struct {
 	// before we fail the webhook call in order to limit the fan out that ensues when the system is degraded.
 	WebhookRetryBackoff *wait.Backoff
 
-	// TokenRequestTimeout specifies a time limit for requests made by the authorization webhook client.
+	// ClientTimeout specifies a time limit for requests made by the authorization webhook client.
 	// The default value is set to 10 seconds.
-	TokenRequestTimeout time.Duration
+	ClientTimeout time.Duration
 }
 
 func NewDelegatingAuthenticationOptions() *DelegatingAuthenticationOptions {
@@ -211,7 +211,7 @@ func NewDelegatingAuthenticationOptions() *DelegatingAuthenticationOptions {
 			ExtraHeaderPrefixes: []string{"x-remote-extra-"},
 		},
 		WebhookRetryBackoff: DefaultAuthWebhookRetryBackoff(),
-		TokenRequestTimeout: 10 * time.Second,
+		ClientTimeout:       10 * time.Second,
 	}
 }
 
@@ -220,16 +220,12 @@ func (s *DelegatingAuthenticationOptions) WithCustomRetryBackoff(backoff wait.Ba
 	s.WebhookRetryBackoff = &backoff
 }
 
-// WithRequestTimeout sets the given timeout for requests made by the authentication webhook client.
-func (s *DelegatingAuthenticationOptions) WithRequestTimeout(timeout time.Duration) {
-	s.TokenRequestTimeout = timeout
+// WithClientTimeout sets the given timeout for the authentication webhook client.
+func (s *DelegatingAuthenticationOptions) WithClientTimeout(timeout time.Duration) {
+	s.ClientTimeout = timeout
 }
 
 func (s *DelegatingAuthenticationOptions) Validate() []error {
-	if s == nil {
-		return nil
-	}
-
 	allErrors := []error{}
 	allErrors = append(allErrors, s.RequestHeader.Validate()...)
 
@@ -274,10 +270,9 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(authenticationInfo *server.Aut
 	}
 
 	cfg := authenticatorfactory.DelegatingAuthenticatorConfig{
-		Anonymous:                true,
-		CacheTTL:                 s.CacheTTL,
-		WebhookRetryBackoff:      s.WebhookRetryBackoff,
-		TokenAccessReviewTimeout: s.TokenRequestTimeout,
+		Anonymous:           true,
+		CacheTTL:            s.CacheTTL,
+		WebhookRetryBackoff: s.WebhookRetryBackoff,
 	}
 
 	client, err := s.getClient()
@@ -291,16 +286,16 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(authenticationInfo *server.Aut
 	}
 
 	// get the clientCA information
-	clientCASpecified := s.ClientCert != ClientCertAuthenticationOptions{}
+	clientCAFileSpecified := len(s.ClientCert.ClientCA) > 0
 	var clientCAProvider dynamiccertificates.CAContentProvider
-	if clientCASpecified {
+	if clientCAFileSpecified {
 		clientCAProvider, err = s.ClientCert.GetClientCAContentProvider()
 		if err != nil {
-			return fmt.Errorf("unable to load client CA provider: %v", err)
+			return fmt.Errorf("unable to load client CA file %q: %v", s.ClientCert.ClientCA, err)
 		}
 		cfg.ClientCertificateCAContentProvider = clientCAProvider
 		if err = authenticationInfo.ApplyClientCert(cfg.ClientCertificateCAContentProvider, servingInfo); err != nil {
-			return fmt.Errorf("unable to assign client CA provider: %v", err)
+			return fmt.Errorf("unable to assign  client CA file: %v", err)
 		}
 
 	} else if !s.SkipInClusterLookup {
@@ -335,8 +330,8 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(authenticationInfo *server.Aut
 			if err != nil {
 				if s.TolerateInClusterLookupFailure {
 					klog.Warningf("Error looking up in-cluster authentication configuration: %v", err)
-					klog.Warning("Continuing without authentication configuration. This may treat all requests as anonymous.")
-					klog.Warning("To require authentication configuration lookup to succeed, set --authentication-tolerate-lookup-failure=false")
+					klog.Warningf("Continuing without authentication configuration. This may treat all requests as anonymous.")
+					klog.Warningf("To require authentication configuration lookup to succeed, set --authentication-tolerate-lookup-failure=false")
 				} else {
 					return fmt.Errorf("unable to load configmap based request-header-client-ca-file: %v", err)
 				}
@@ -420,10 +415,7 @@ func (s *DelegatingAuthenticationOptions) getClient() (kubernetes.Interface, err
 	// set high qps/burst limits since this will effectively limit API server responsiveness
 	clientConfig.QPS = 200
 	clientConfig.Burst = 400
-	// do not set a timeout on the http client, instead use context for cancellation
-	// if multiple timeouts were set, the request will pick the smaller timeout to be applied, leaving other useless.
-	//
-	// see https://github.com/golang/go/blob/a937729c2c2f6950a32bc5cd0f5b88700882f078/src/net/http/client.go#L364
+	clientConfig.Timeout = s.ClientTimeout
 
 	return kubernetes.NewForConfig(clientConfig)
 }
