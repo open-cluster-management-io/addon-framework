@@ -1,0 +1,30 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: addonplacementscorecollect-controller
+  labels:
+    app: addonplacementscorecollect-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: addonplacementscorecollect-controller
+  template:
+    metadata:
+      labels:
+        app: addonplacementscorecollect-controller
+    spec:
+      serviceAccountName: addonplacementscorecollect-sa
+      containers:
+      - name: addonplacementscorecollect-controller
+        image: example-addon-image
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: EXAMPLE_IMAGE_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: image-config
+              key: EXAMPLE_IMAGE_NAME
+        args:
+          - "/socre-collect"
+          - "controller"

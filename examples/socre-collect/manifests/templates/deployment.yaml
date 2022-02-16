@@ -1,0 +1,35 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: addonplacementscorecollect-agent
+  namespace: {{ .AddonInstallNamespace }}
+  labels:
+    app: addonplacementscorecollect-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: addonplacementscorecollect-agent
+  template:
+    metadata:
+      labels:
+        app: addonplacementscorecollect-agent
+    spec:
+      serviceAccountName: addonplacementscorecollect-agent-sa
+      volumes:
+      - name: hub-config
+        secret:
+          secretName: {{ .KubeConfigSecret }}
+      containers:
+      - name: addonplacementscorecollect-agent
+        image: {{ .Image }}
+        imagePullPolicy: IfNotPresent
+        args:
+          - "/socre-collect"
+          - "agent"
+          - "--hub-kubeconfig=/var/run/hub/kubeconfig"
+          - "--cluster-name={{ .ClusterName }}"
+          - "--addon-namespace={{ .AddonInstallNamespace }}"
+        volumeMounts:
+          - name: hub-config
+            mountPath: /var/run/hub
