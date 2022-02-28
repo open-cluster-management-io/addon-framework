@@ -158,16 +158,6 @@ func (c *addonHealthCheckController) probeAddonStatus(ctx context.Context, addon
 		return nil
 	}
 
-	if agentAddon.GetAgentAddonOptions().HealthProber.WorkProber == nil {
-		cond := metav1.Condition{
-			Type:    "Available",
-			Status:  metav1.ConditionUnknown,
-			Reason:  "ProbeNotImplemented",
-			Message: "Addon status probe not implemented",
-		}
-		return c.updateConditions(ctx, addon, cond)
-	}
-
 	addonWork, err := c.workLister.ManifestWorks(addon.Namespace).Get(constants.DeployWorkName(addon.Name))
 	if err != nil {
 		cond := metav1.Condition{
@@ -179,7 +169,7 @@ func (c *addonHealthCheckController) probeAddonStatus(ctx context.Context, addon
 		return c.updateConditions(ctx, addon, cond)
 	}
 
-	workCond := meta.FindStatusCondition(addon.Status.Conditions, "Applied")
+	workCond := meta.FindStatusCondition(addonWork.Status.Conditions, workapiv1.WorkAvailable)
 	switch {
 	case workCond == nil:
 		cond := metav1.Condition{
@@ -195,6 +185,16 @@ func (c *addonHealthCheckController) probeAddonStatus(ctx context.Context, addon
 			Status:  metav1.ConditionFalse,
 			Reason:  "WorkApplyFailed",
 			Message: workCond.Message,
+		}
+		return c.updateConditions(ctx, addon, cond)
+	}
+
+	if agentAddon.GetAgentAddonOptions().HealthProber.WorkProber == nil {
+		cond := metav1.Condition{
+			Type:    "Available",
+			Status:  metav1.ConditionTrue,
+			Reason:  "WorkApplied",
+			Message: "Addon work is applied",
 		}
 		return c.updateConditions(ctx, addon, cond)
 	}

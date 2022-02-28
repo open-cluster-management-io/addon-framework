@@ -153,7 +153,8 @@ const (
 	// HealthProberTypeWork indicates the healthiness of the addon is equal to the overall
 	// dispatching status of the corresponding ManifestWork resource.
 	// It's applicable to those addons that don't have a local agent instance in the managed
-	// clusters.
+	// clusters. The addon framework will check if the work is Available on the spoke. In addition
+	// user can define a prober to check more detailed status based on status feedback from work.
 	HealthProberTypeWork HealthProberType = "Work"
 )
 

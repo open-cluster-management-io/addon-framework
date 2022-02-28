@@ -48,7 +48,7 @@ func (d *DeploymentProber) HealthCheck(identifier workapiv1.ResourceIdentifier, 
 		return fmt.Errorf("no values are probed for deployment %s/%s", identifier.Namespace, identifier.Name)
 	}
 	for _, value := range result.Values {
-		if value.Name != "AvailableReplica" {
+		if value.Name != "ReadyReplicas" {
 			continue
 		}
 
@@ -56,7 +56,7 @@ func (d *DeploymentProber) HealthCheck(identifier workapiv1.ResourceIdentifier, 
 			return nil
 		}
 
-		return fmt.Errorf("availableReplica is %d for deployement %s/%s", *value.Value.Integer, identifier.Namespace, identifier.Name)
+		return fmt.Errorf("readyReplica is %d for deployement %s/%s", *value.Value.Integer, identifier.Namespace, identifier.Name)
 	}
-	return fmt.Errorf("availableReplica is not probed")
+	return fmt.Errorf("readyReplica is not probed")
 }
