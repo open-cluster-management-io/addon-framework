@@ -292,8 +292,11 @@ func TestReconcileWithProbe(t *testing.T) {
 	testaddon := &testAgent{
 		name: "test",
 		health: &agent.HealthProber{
-			Type:       agent.HealthProberTypeWork,
-			WorkProber: prober,
+			Type: agent.HealthProberTypeWork,
+			WorkProber: &agent.WorkHealthProber{
+				ProbeFields: prober.ProbeFields(),
+				HealthCheck: prober.HealthCheck,
+			},
 		},
 	}
 
@@ -329,7 +332,13 @@ func TestReconcileWithProbe(t *testing.T) {
 					Name:      "test",
 					Namespace: "testns",
 				},
-				StatusFeedbacks: workapiv1.StatusFeedbackResult{},
+				StatusFeedbacks: workapiv1.StatusFeedbackResult{
+					Values: []workapiv1.FeedbackValue{
+						{
+							Name: "noop",
+						},
+					},
+				},
 			},
 		},
 	}

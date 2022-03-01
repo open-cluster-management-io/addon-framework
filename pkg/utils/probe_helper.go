@@ -15,10 +15,27 @@ type DeploymentProber struct {
 }
 
 func NewDeploymentProber(deployments ...types.NamespacedName) *agent.HealthProber {
+	probeFields := []agent.ProbeField{}
+	for _, deploy := range deployments {
+		probeFields = append(probeFields, agent.ProbeField{
+			ResourceIdentifier: workapiv1.ResourceIdentifier{
+				Group:     "apps",
+				Resource:  "deployments",
+				Name:      deploy.Name,
+				Namespace: deploy.Namespace,
+			},
+			ProbeRules: []workapiv1.FeedbackRule{
+				{
+					Type: workapiv1.WellKnownStatusType,
+				},
+			},
+		})
+	}
 	return &agent.HealthProber{
 		Type: agent.HealthProberTypeWork,
-		WorkProber: &DeploymentProber{
-			deployments: deployments,
+		WorkProber: &agent.WorkHealthProber{
+			ProbeFields: probeFields,
+			HealthCheck: HealthCheck,
 		},
 	}
 }
@@ -43,7 +60,7 @@ func (d *DeploymentProber) ProbeFields() []agent.ProbeField {
 	return probeFields
 }
 
-func (d *DeploymentProber) HealthCheck(identifier workapiv1.ResourceIdentifier, result workapiv1.StatusFeedbackResult) error {
+func HealthCheck(identifier workapiv1.ResourceIdentifier, result workapiv1.StatusFeedbackResult) error {
 	if len(result.Values) == 0 {
 		return fmt.Errorf("no values are probed for deployment %s/%s", identifier.Namespace, identifier.Name)
 	}

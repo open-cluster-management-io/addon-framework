@@ -88,7 +88,7 @@ func TestDeploymentProbe(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			prober := NewDeploymentProber(types.NamespacedName{Name: "test", Namespace: "testns"})
 
-			fields := prober.WorkProber.ProbeFields()
+			fields := prober.WorkProber.ProbeFields
 
 			err := prober.WorkProber.HealthCheck(fields[0].ResourceIdentifier, c.result)
 			if err != nil && !c.expectedErr {

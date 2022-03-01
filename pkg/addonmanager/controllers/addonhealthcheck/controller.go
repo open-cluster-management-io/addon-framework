@@ -169,6 +169,7 @@ func (c *addonHealthCheckController) probeAddonStatus(ctx context.Context, addon
 		return c.updateConditions(ctx, addon, cond)
 	}
 
+	// Check the overall work available condition at first.
 	workCond := meta.FindStatusCondition(addonWork.Status.Conditions, workapiv1.WorkAvailable)
 	switch {
 	case workCond == nil:
@@ -199,10 +200,12 @@ func (c *addonHealthCheckController) probeAddonStatus(ctx context.Context, addon
 		return c.updateConditions(ctx, addon, cond)
 	}
 
-	probeFields := agentAddon.GetAgentAddonOptions().HealthProber.WorkProber.ProbeFields()
+	probeFields := agentAddon.GetAgentAddonOptions().HealthProber.WorkProber.ProbeFields
 
 	for _, field := range probeFields {
 		result := findResultByIdentifier(field.ResourceIdentifier, addonWork)
+		// if no results are returned. it is possible that work agent has not returned the feedback value.
+		// mark condition to unknown
 		if result == nil {
 			cond := metav1.Condition{
 				Type:    "Available",
@@ -262,6 +265,10 @@ func findResultByIdentifier(identifier workapiv1.ResourceIdentifier, work *worka
 		}
 		if identifier.Namespace != status.ResourceMeta.Namespace {
 			continue
+		}
+
+		if len(status.StatusFeedbacks.Values) == 0 {
+			return nil
 		}
 
 		return &status.StatusFeedbacks

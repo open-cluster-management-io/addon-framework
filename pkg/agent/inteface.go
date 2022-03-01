@@ -119,15 +119,17 @@ type InstallStrategy struct {
 type HealthProber struct {
 	Type HealthProberType
 
-	WorkProber WorkHealthProber
+	WorkProber *WorkHealthProber
 }
 
-type WorkHealthProber interface {
+type AddonHealthCheckFunc func(workapiv1.ResourceIdentifier, workapiv1.StatusFeedbackResult) error
+
+type WorkHealthProber struct {
 	// ProbeFields tells addon framework what field to probe
-	ProbeFields() []ProbeField
+	ProbeFields []ProbeField
 
 	// HealthCheck check status of the addon based on probe result.
-	HealthCheck(workapiv1.ResourceIdentifier, workapiv1.StatusFeedbackResult) error
+	HealthCheck AddonHealthCheckFunc
 }
 
 // ProbeField defines the field of a resource to be probed

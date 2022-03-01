@@ -218,7 +218,7 @@ func (c *addonDeployController) setStatusFeedbackRule(work *workapiv1.ManifestWo
 		return
 	}
 
-	probeRules := agentAddon.GetAgentAddonOptions().HealthProber.WorkProber.ProbeFields()
+	probeRules := agentAddon.GetAgentAddonOptions().HealthProber.WorkProber.ProbeFields
 
 	work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{}
 
