@@ -80,6 +80,11 @@ func (c *addonInstallController) sync(ctx context.Context, syncCtx factory.SyncC
 		return err
 	}
 
+	// if cluster is deleting, do not install addon
+	if !cluster.DeletionTimestamp.IsZero() {
+		return nil
+	}
+
 	for addonName, addon := range c.agentAddons {
 		if addon.GetAgentAddonOptions().InstallStrategy == nil {
 			continue
