@@ -82,6 +82,7 @@ func (c *addonInstallController) sync(ctx context.Context, syncCtx factory.SyncC
 
 	// if cluster is deleting, do not install addon
 	if !cluster.DeletionTimestamp.IsZero() {
+		klog.V(4).Infof("Cluster %q is deleting, skip addon deploy", clusterName)
 		return nil
 	}
 
