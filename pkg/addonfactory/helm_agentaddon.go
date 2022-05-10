@@ -183,10 +183,3 @@ func (a *HelmAgentAddon) releaseOptions(
 	}
 	return chartutil.ReleaseOptions{Name: a.agentAddonOptions.AddonName, Namespace: installNamespace}
 }
-
-// TODO: the function is not used currently.
-// validateChart validates chart by rendering and decoding chart with an empty cluster and addon
-// func (a *HelmAgentAddon) validateChart() error {
-// 	// TODO: validate chart
-// 	return nil
-// }
