@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+<<<<<<< HEAD:vendor/k8s.io/api/events/v1beta1/doc.go
 // +k8s:deepcopy-gen=package
 // +k8s:protobuf-gen=package
 // +k8s:openapi-gen=true
@@ -22,3 +23,34 @@ limitations under the License.
 // +groupName=events.k8s.io
 
 package v1beta1 // import "k8s.io/api/events/v1beta1"
+=======
+package cached
+
+import (
+	"sync"
+
+	openapi_v3 "github.com/google/gnostic/openapiv3"
+	"k8s.io/client-go/openapi"
+)
+
+type groupversion struct {
+	delegate openapi.GroupVersion
+	once     sync.Once
+	doc      *openapi_v3.Document
+	err      error
+}
+
+func newGroupVersion(delegate openapi.GroupVersion) *groupversion {
+	return &groupversion{
+		delegate: delegate,
+	}
+}
+
+func (g *groupversion) Schema() (*openapi_v3.Document, error) {
+	g.once.Do(func() {
+		g.doc, g.err = g.delegate.Schema()
+	})
+
+	return g.doc, g.err
+}
+>>>>>>> Update condition when call manifest failed:vendor/k8s.io/client-go/openapi/cached/groupversion.go

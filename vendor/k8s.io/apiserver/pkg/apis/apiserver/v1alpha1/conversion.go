@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+<<<<<<< HEAD:vendor/k8s.io/apiserver/pkg/apis/apiserver/v1alpha1/conversion.go
 package v1alpha1
 
 import (
@@ -30,3 +31,27 @@ func Convert_v1alpha1_EgressSelection_To_apiserver_EgressSelection(in *EgressSel
 	}
 	return nil
 }
+=======
+package klog
+
+import (
+	"github.com/go-logr/logr"
+)
+
+// The reason for providing these aliases is to allow code to work with logr
+// without directly importing it.
+
+// Logger in this package is exactly the same as logr.Logger.
+type Logger = logr.Logger
+
+// LogSink in this package is exactly the same as logr.LogSink.
+type LogSink = logr.LogSink
+
+// Runtimeinfo in this package is exactly the same as logr.RuntimeInfo.
+type RuntimeInfo = logr.RuntimeInfo
+
+var (
+	// New is an alias for logr.New.
+	New = logr.New
+)
+>>>>>>> Update condition when call manifest failed:vendor/k8s.io/klog/v2/imports.go
