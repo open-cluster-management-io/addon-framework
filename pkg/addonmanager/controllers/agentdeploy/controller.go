@@ -15,6 +15,7 @@ import (
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
+	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
@@ -24,6 +25,7 @@ import (
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
 	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
 
@@ -146,57 +148,101 @@ func (c *addonDeployController) sync(ctx context.Context, syncCtx factory.SyncCo
 		return nil
 	}
 
-	owner := metav1.NewControllerRef(managedClusterAddon, addonapiv1alpha1.GroupVersion.WithKind("ManagedClusterAddOn"))
+	// Check if the addon is in Hosted mode
+	installMode := utils.GetAddonInstallMode(managedClusterAddon)
+	hostingClusterName := utils.GetHostingCluster(managedClusterAddon)
+	if installMode == "Hosted" && len(hostingClusterName) == 0 {
+		return fmt.Errorf("annotation addon.open-cluster-management.io/hosting-cluster-name is required in Hosted mode")
+	}
+
+	var hostingCluster *clusterv1.ManagedCluster
+	if installMode == "Hosted" {
+		// Get hosting ManagedCluster
+		hostingCluster, err = c.managedClusterLister.Get(hostingClusterName)
+		if errors.IsNotFound(err) {
+			c.cache.removeCache(constants.DeployWorkName(addonName), hostingClusterName)
+			return fmt.Errorf("hosting cluster must be one of the managed cluster for the hub, %v", err)
+		}
+		if err != nil {
+			return err
+		}
+
+		if !hostingCluster.DeletionTimestamp.IsZero() {
+			// hosting cluster is deleting, do nothing
+			return nil
+		}
+	}
+
+	// owner := metav1.NewControllerRef(managedClusterAddon, addonapiv1alpha1.GroupVersion.WithKind("ManagedClusterAddOn"))
 
 	managedClusterAddonCopy := managedClusterAddon.DeepCopy()
-	objects, err := agentAddon.Manifests(managedCluster, managedClusterAddon)
+	// objects, err := agentAddon.Manifests(managedCluster, managedClusterAddon)
+	// if err != nil {
+	// 	return err
+	// }
+	// if len(objects) == 0 {
+	// 	return nil
+	// }
+
+	err = c.applyManifestWork(ctx, agentAddon, managedClusterAddonCopy, managedCluster,
+		clusterName, "", agentAddon.Manifests)
 	if err != nil {
 		return err
 	}
-	if len(objects) == 0 {
-		return nil
-	}
 
-	work, _, err := buildManifestWorkFromObject(clusterName, addonName, objects)
-	if err != nil {
-		return err
-	}
-	work.OwnerReferences = []metav1.OwnerReference{*owner}
-
-	c.setStatusFeedbackRule(work, agentAddon)
-
-	// apply work
-	work, err = applyWork(ctx, c.workClient, c.workLister, c.cache, c.eventRecorder, work)
-	if err != nil {
-		meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
-			Type:    "ManifestApplied",
-			Status:  metav1.ConditionFalse,
-			Reason:  "ManifestWorkApplyFailed",
-			Message: fmt.Sprintf("failed to apply manifestwork: %v", err),
-		})
-		if _, updateErr := c.addonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterAddonCopy.Namespace).UpdateStatus(
-			ctx, managedClusterAddonCopy, metav1.UpdateOptions{}); err != nil {
-			return fmt.Errorf("failed to update managedclusteraddon status: %v; the err should be %v", updateErr, err)
+	if installMode == "Hosted" {
+		hostedAgentAddon, ok := agentAddon.(agent.HostedAgentAddon)
+		if !ok {
+			return fmt.Errorf("hosted mode addon must implement the HostedAgentAddon interface")
 		}
-		return err
+
+		err = c.applyManifestWork(ctx, agentAddon, managedClusterAddonCopy, managedCluster,
+			hostingClusterName, "Management", hostedAgentAddon.ManagementManifests)
+		if err != nil {
+			return err
+		}
 	}
 
-	// Update addon status based on work's status
-	if meta.IsStatusConditionTrue(work.Status.Conditions, workapiv1.WorkApplied) {
-		meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
-			Type:    "ManifestApplied",
-			Status:  metav1.ConditionTrue,
-			Reason:  "AddonManifestApplied",
-			Message: "manifest of addon applied successfully",
-		})
-	} else {
-		meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
-			Type:    "ManifestApplied",
-			Status:  metav1.ConditionFalse,
-			Reason:  "AddonManifestAppliedFailed",
-			Message: fmt.Sprintf("work %s apply failed", work.Name),
-		})
-	}
+	// work, _, err := buildManifestWorkFromObject(clusterName, addonName, objects)
+	// if err != nil {
+	// 	return err
+	// }
+	// work.OwnerReferences = []metav1.OwnerReference{*owner}
+
+	// c.setStatusFeedbackRule(work, agentAddon)
+
+	// // apply work
+	// work, err = applyWork(ctx, c.workClient, c.workLister, c.cache, c.eventRecorder, work)
+	// if err != nil {
+	// 	meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
+	// 		Type:    "ManifestApplied",
+	// 		Status:  metav1.ConditionFalse,
+	// 		Reason:  "ManifestWorkApplyFailed",
+	// 		Message: fmt.Sprintf("failed to apply manifestwork: %v", err),
+	// 	})
+	// 	if _, updateErr := c.addonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterAddonCopy.Namespace).UpdateStatus(
+	// 		ctx, managedClusterAddonCopy, metav1.UpdateOptions{}); err != nil {
+	// 		return fmt.Errorf("failed to update managedclusteraddon status: %v; the err should be %v", updateErr, err)
+	// 	}
+	// 	return err
+	// }
+
+	// // Update addon status based on work's status
+	// if meta.IsStatusConditionTrue(work.Status.Conditions, workapiv1.WorkApplied) {
+	// 	meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
+	// 		Type:    "ManifestApplied",
+	// 		Status:  metav1.ConditionTrue,
+	// 		Reason:  "AddonManifestApplied",
+	// 		Message: "manifest of addon applied successfully",
+	// 	})
+	// } else {
+	// 	meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
+	// 		Type:    "ManifestApplied",
+	// 		Status:  metav1.ConditionFalse,
+	// 		Reason:  "AddonManifestAppliedFailed",
+	// 		Message: fmt.Sprintf("work %s apply failed", work.Name),
+	// 	})
+	// }
 
 	if equality.Semantic.DeepEqual(managedClusterAddonCopy.Status, managedClusterAddon.Status) {
 		return nil
@@ -205,6 +251,72 @@ func (c *addonDeployController) sync(ctx context.Context, syncCtx factory.SyncCo
 	_, err = c.addonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterAddonCopy.Namespace).UpdateStatus(
 		ctx, managedClusterAddonCopy, metav1.UpdateOptions{})
 	return err
+}
+
+func (c *addonDeployController) applyManifestWork(ctx context.Context, agentAddon agent.AgentAddon,
+	managedClusterAddon *addonapiv1alpha1.ManagedClusterAddOn,
+	managedCluster *clusterv1.ManagedCluster,
+	manifestworkNamespace string,
+	conditionTypePrefix string,
+	getManifests func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error)) error {
+
+	owner := metav1.NewControllerRef(managedClusterAddon, addonapiv1alpha1.GroupVersion.WithKind("ManagedClusterAddOn"))
+
+	objects, err := getManifests(managedCluster, managedClusterAddon.DeepCopy())
+	if err != nil {
+		return err
+	}
+	if len(objects) == 0 {
+		return nil
+	}
+
+	work, _, err := buildManifestWorkFromObject(manifestworkNamespace, managedClusterAddon.Name, objects)
+	if err != nil {
+		return err
+	}
+
+	// FIXME: the ManagedClusterAddon can NOT be the owner as management manifests(different namespace), delete them
+	// manually when the ManagedClusterAddon is deleted.
+	if len(conditionTypePrefix) == 0 {
+		work.OwnerReferences = []metav1.OwnerReference{*owner}
+	}
+
+	c.setStatusFeedbackRule(work, agentAddon)
+
+	// apply work
+	work, err = applyWork(ctx, c.workClient, c.workLister, c.cache, c.eventRecorder, work)
+	if err != nil {
+		meta.SetStatusCondition(&managedClusterAddon.Status.Conditions, metav1.Condition{
+			Type:    conditionTypePrefix + "ManifestApplied",
+			Status:  metav1.ConditionFalse,
+			Reason:  "ManifestWorkApplyFailed",
+			Message: fmt.Sprintf("failed to apply manifestwork: %v", err),
+		})
+		if _, updateErr := c.addonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterAddon.Namespace).UpdateStatus(
+			ctx, managedClusterAddon, metav1.UpdateOptions{}); err != nil {
+			return fmt.Errorf("failed to update managedclusteraddon status: %v; the err should be %v", updateErr, err)
+		}
+		return err
+	}
+
+	// Update addon status based on work's status
+	if meta.IsStatusConditionTrue(work.Status.Conditions, workapiv1.WorkApplied) {
+		meta.SetStatusCondition(&managedClusterAddon.Status.Conditions, metav1.Condition{
+			Type:    conditionTypePrefix + "ManifestApplied",
+			Status:  metav1.ConditionTrue,
+			Reason:  "AddonManifestApplied",
+			Message: "manifest of addon applied successfully",
+		})
+	} else {
+		meta.SetStatusCondition(&managedClusterAddon.Status.Conditions, metav1.Condition{
+			Type:    conditionTypePrefix + "ManifestApplied",
+			Status:  metav1.ConditionFalse,
+			Reason:  "AddonManifestAppliedFailed",
+			Message: fmt.Sprintf("work %s apply failed", work.Name),
+		})
+	}
+
+	return nil
 }
 
 func (c *addonDeployController) setStatusFeedbackRule(work *workapiv1.ManifestWork, agentAddon agent.AgentAddon) {

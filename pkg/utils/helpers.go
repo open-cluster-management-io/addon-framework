@@ -16,3 +16,20 @@ func MergeRelatedObjects(modified *bool, objs *[]addonapiv1alpha1.ObjectReferenc
 	*objs = append(*objs, obj)
 	*modified = true
 }
+
+// GetAddonInstallMode returns addon installation mode, mode could be `Default` or `Hosted`
+// TODO: Consider changing the ManagedClusterAddon API to identify the hosted mode installation
+func GetAddonInstallMode(addOn *addonapiv1alpha1.ManagedClusterAddOn) string {
+	if mode, ok := addOn.Annotations["addon.open-cluster-management.io/agent-deploy-mode"]; ok {
+		if mode == "Default" || mode == "Hosted" {
+			return mode
+		}
+	}
+	return "Default"
+}
+
+// GetHostingCluster returns addon hosting cluster name, it is only used in Hosed mode.
+// TODO: Consider changing the ManagedClusterAddon API to identify the hosting cluster name
+func GetHostingCluster(addOn *addonapiv1alpha1.ManagedClusterAddOn) string {
+	return addOn.Annotations["addon.open-cluster-management.io/hosting-cluster-name"]
+}

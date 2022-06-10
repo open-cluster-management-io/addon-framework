@@ -4,10 +4,14 @@ import (
 	"fmt"
 
 	"github.com/openshift/library-go/pkg/assets"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/agent"
+	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
@@ -18,6 +22,9 @@ type templateBuiltinValues struct {
 	ClusterName           string
 	AddonInstallNamespace string
 	HubKubeConfigSecret   string
+	// TODO: Consider whether we need this
+	ExternalManagedConfigSecret string
+	InstallMode                 string
 }
 
 type templateFile struct {
@@ -26,20 +33,65 @@ type templateFile struct {
 }
 
 type TemplateAgentAddon struct {
-	decoder            runtime.Decoder
-	templateFiles      []templateFile
-	getValuesFuncs     []GetValuesFunc
-	agentAddonOptions  agent.AgentAddonOptions
-	trimCRDDescription bool
+	decoder                 runtime.Decoder
+	templateFiles           []templateFile
+	managementTemplateFiles []templateFile
+	getValuesFuncs          []GetValuesFunc
+	agentAddonOptions       agent.AgentAddonOptions
+	trimCRDDescription      bool
 }
 
 func newTemplateAgentAddon(factory *AgentAddonFactory) *TemplateAgentAddon {
+	_ = scheme.AddToScheme(factory.scheme)
+	_ = apiextensionsv1.AddToScheme(factory.scheme)
+	_ = apiextensionsv1beta1.AddToScheme(factory.scheme)
 	return &TemplateAgentAddon{
 		decoder:            serializer.NewCodecFactory(factory.scheme).UniversalDeserializer(),
 		getValuesFuncs:     factory.getValuesFuncs,
 		agentAddonOptions:  factory.agentAddonOptions,
 		trimCRDDescription: factory.trimCRDDescription,
 	}
+}
+
+func (a *TemplateAgentAddon) ManagementManifests(
+	cluster *clusterv1.ManagedCluster,
+	addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
+	return a.getManifestsInner(cluster, addon, a.managementTemplateFiles)
+}
+
+func (a *TemplateAgentAddon) getManifestsInner(
+	cluster *clusterv1.ManagedCluster,
+	addon *addonapiv1alpha1.ManagedClusterAddOn,
+	templateFiles []templateFile) ([]runtime.Object, error) {
+	var objects []runtime.Object
+
+	configValues, err := a.getValues(cluster, addon)
+	if err != nil {
+		return objects, err
+	}
+
+	for _, file := range templateFiles {
+		klog.V(4).Infof("rendered template: %v", file.content)
+		if len(file.content) == 0 {
+			continue
+		}
+		klog.V(4).Infof("rendered template: %v", file.content)
+		raw := assets.MustCreateAssetFromTemplate(file.name, file.content, configValues).Data
+		object, _, err := a.decoder.Decode(raw, nil, nil)
+		if err != nil {
+			if runtime.IsMissingKind(err) {
+				klog.V(4).Infof("Skipping template %v, reason: %v", file.name, err)
+				continue
+			}
+			return nil, err
+		}
+		objects = append(objects, object)
+	}
+
+	if a.trimCRDDescription {
+		objects = trimCRDDescription(objects)
+	}
+	return objects, nil
 }
 
 func (a *TemplateAgentAddon) Manifests(
@@ -116,15 +168,19 @@ func (a *TemplateAgentAddon) getBuiltinValues(
 		builtinValues.HubKubeConfigSecret = fmt.Sprintf("%s-hub-kubeconfig", a.agentAddonOptions.AddonName)
 	}
 
+	builtinValues.ExternalManagedConfigSecret = fmt.Sprintf("external-managed-%s-kubeconfig", a.agentAddonOptions.AddonName)
+	builtinValues.InstallMode = utils.GetAddonInstallMode(addon)
+
 	return StructToValues(builtinValues)
 }
 
 // validateTemplateData validate template render and object decoder using  an empty cluster and addon
-func (a *TemplateAgentAddon) validateTemplateData(file string, data []byte) error {
+func (a *TemplateAgentAddon) validateTemplateData(file string, data []byte, installMode string) error {
 	configValues, err := a.getValues(&clusterv1.ManagedCluster{}, &addonapiv1alpha1.ManagedClusterAddOn{})
 	if err != nil {
 		return err
 	}
+	configValues["InstallMode"] = installMode
 	raw := assets.MustCreateAssetFromTemplate(file, data, configValues).Data
 	_, _, err = a.decoder.Decode(raw, nil, nil)
 	return err
@@ -132,4 +188,8 @@ func (a *TemplateAgentAddon) validateTemplateData(file string, data []byte) erro
 
 func (a *TemplateAgentAddon) addTemplateData(file string, data []byte) {
 	a.templateFiles = append(a.templateFiles, templateFile{name: file, content: data})
+}
+
+func (a *TemplateAgentAddon) addManagementTemplateData(file string, data []byte) {
+	a.managementTemplateFiles = append(a.managementTemplateFiles, templateFile{name: file, content: data})
 }

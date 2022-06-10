@@ -1,0 +1,15 @@
+{{- if eq .InstallMode "Hosted" }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: helloworld-agent
+  namespace: {{ .AddonInstallNamespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: helloworld-agent
+subjects:
+  - kind: ServiceAccount
+    name: helloworld-agent-sa
+    namespace: {{ .AddonInstallNamespace }}
+{{- end }}

@@ -17,7 +17,6 @@ import (
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/examples/helloworld/agent"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
-	addonagent "open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/version"
 
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
@@ -86,8 +85,10 @@ func runController(ctx context.Context, controllerContext *controllercmd.Control
 	agentAddon, err := addonfactory.NewAgentAddonFactory(addonName, fs, "manifests/templates").
 		WithGetValuesFuncs(getValues, addonfactory.GetValuesFromAddonAnnotation).
 		WithAgentRegistrationOption(registrationOption).
-		WithInstallStrategy(addonagent.InstallAllStrategy(agent.HelloworldAgentInstallationNamespace)).
-		BuildTemplateAgentAddon()
+		// WithInstallStrategy(addonagent.InstallAllStrategy(agent.HelloworldAgentInstallationNamespace)).
+		// BuildTemplateAgentAddon()
+		WithManagementDir("manifests/management").
+		BuildTemplateHostedAgentAddon()
 	if err != nil {
 		klog.Errorf("failed to build agent %v", err)
 		return err

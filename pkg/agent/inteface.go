@@ -24,7 +24,7 @@ type AgentAddon interface {
 	// here will be:
 	//   - the hosting namespace of the addon-agents.
 	//   - a deployment of the addon agents.
-	//   - the configurations (e.g. configmaps) mounted by the deployement.
+	//   - the configurations (e.g. configmaps) mounted by the deployment.
 	//   - the RBAC permission bond to the addon agents *in the managed cluster*. (the hub cluster's RBAC
 	//     setup shall be done at GetAgentAddonOptions below.)
 	// NB for dispatching namespaced resources, it's recommended to include the namespace in the list.
@@ -33,6 +33,20 @@ type AgentAddon interface {
 	// GetAgentAddonOptions returns the agent options for advanced agent customization.
 	// A minimal option is merely setting a unique addon name in the AgentAddonOptions.
 	GetAgentAddonOptions() AgentAddonOptions
+}
+
+type HostedAgentAddon interface {
+	AgentAddon
+	// ManagementManifests returns a list of manifest resources to be deployed on the management cluster for this addon.
+	// The resources in this list are required to explicitly clarify their TypeMta (i.e. apiVersion, kind)
+	// otherwise the addon deploying will fail constantly. A recommended set of addon component returned
+	// here will be:
+	//   - the hosting namespace of the addon-agents.
+	//   - a deployment of the addon agents.
+	//   - the configurations (e.g. configmaps) mounted by the deployment.
+	// NB for dispatching namespaced resources, it's recommended to include the namespace in the list.
+	ManagementManifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (
+		[]runtime.Object, error)
 }
 
 // AgentAddonOptions prescribes the future customization for the addon.

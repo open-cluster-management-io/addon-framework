@@ -34,6 +34,7 @@ const (
 
 //go:embed manifests
 //go:embed manifests/templates
+//go:embed manifests/management
 var fs embed.FS
 
 var agentPermissionFiles = []string{

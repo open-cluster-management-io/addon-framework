@@ -44,10 +44,11 @@ func NewAgentCommand(addonName string) *cobra.Command {
 
 // AgentOptions defines the flags for workload agent
 type AgentOptions struct {
-	HubKubeconfigFile string
-	SpokeClusterName  string
-	AddonName         string
-	AddonNamespace    string
+	HubKubeconfigFile     string
+	ManagedKubeconfigFile string
+	SpokeClusterName      string
+	AddonName             string
+	AddonNamespace        string
 }
 
 // NewWorkloadAgentOptions returns the flags with default value set
@@ -58,7 +59,10 @@ func NewAgentOptions(addonName string) *AgentOptions {
 func (o *AgentOptions) AddFlags(cmd *cobra.Command) {
 	flags := cmd.Flags()
 	// This command only supports reading from config
-	flags.StringVar(&o.HubKubeconfigFile, "hub-kubeconfig", o.HubKubeconfigFile, "Location of kubeconfig file to connect to hub cluster.")
+	flags.StringVar(&o.HubKubeconfigFile, "hub-kubeconfig", o.HubKubeconfigFile,
+		"Location of kubeconfig file to connect to hub cluster.")
+	flags.StringVar(&o.ManagedKubeconfigFile, "managed-kubeconfig", o.ManagedKubeconfigFile,
+		"Location of kubeconfig file to connect to the managed cluster.")
 	flags.StringVar(&o.SpokeClusterName, "cluster-name", o.SpokeClusterName, "Name of spoke cluster.")
 	flags.StringVar(&o.AddonNamespace, "addon-namespace", o.AddonNamespace, "Installation namespace of addon.")
 }
@@ -71,6 +75,17 @@ func (o *AgentOptions) RunAgent(ctx context.Context, controllerContext *controll
 		return err
 	}
 
+	// var managedKubeClient kubernetes.Interface
+	if len(o.ManagedKubeconfigFile) != 0 {
+		managedRestConfig, err := clientcmd.BuildConfigFromFlags("" /* leave masterurl as empty */, o.ManagedKubeconfigFile)
+		if err != nil {
+			return err
+		}
+		spokeKubeClient, err = kubernetes.NewForConfig(managedRestConfig)
+		if err != nil {
+			return err
+		}
+	}
 	// build kubeinformerfactory of hub cluster
 	hubRestConfig, err := clientcmd.BuildConfigFromFlags("" /* leave masterurl as empty */, o.HubKubeconfigFile)
 	if err != nil {
