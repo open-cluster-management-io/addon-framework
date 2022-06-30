@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -15,6 +13,7 @@ import (
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
+	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
@@ -30,7 +29,6 @@ type addonHealthCheckController struct {
 	managedClusterAddonLister addonlisterv1alpha1.ManagedClusterAddOnLister
 	workLister                worklister.ManifestWorkLister
 	agentAddons               map[string]agent.AgentAddon
-	eventRecorder             events.Recorder
 }
 
 func NewAddonHealthCheckController(
@@ -38,20 +36,18 @@ func NewAddonHealthCheckController(
 	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
 	workInformers workinformers.ManifestWorkInformer,
 	agentAddons map[string]agent.AgentAddon,
-	recorder events.Recorder,
 ) factory.Controller {
 	c := &addonHealthCheckController{
 		addonClient:               addonClient,
 		managedClusterAddonLister: addonInformers.Lister(),
 		workLister:                workInformers.Lister(),
 		agentAddons:               agentAddons,
-		eventRecorder:             recorder.WithComponentSuffix("addon-healthcheck-controller"),
 	}
 
-	return factory.New().WithFilteredEventsInformersQueueKeyFunc(
-		func(obj runtime.Object) string {
+	return factory.New().WithFilteredEventsInformersQueueKeysFunc(
+		func(obj runtime.Object) []string {
 			key, _ := cache.MetaNamespaceKeyFunc(obj)
-			return key
+			return []string{key}
 		},
 		func(obj interface{}) bool {
 			accessor, _ := meta.Accessor(obj)
@@ -61,10 +57,10 @@ func NewAddonHealthCheckController(
 			return true
 		},
 		addonInformers.Informer()).
-		WithFilteredEventsInformersQueueKeyFunc(
-			func(obj runtime.Object) string {
+		WithFilteredEventsInformersQueueKeysFunc(
+			func(obj runtime.Object) []string {
 				accessor, _ := meta.Accessor(obj)
-				return fmt.Sprintf("%s/%s", accessor.GetNamespace(), accessor.GetLabels()[constants.AddonLabel])
+				return []string{fmt.Sprintf("%s/%s", accessor.GetNamespace(), accessor.GetLabels()[constants.AddonLabel])}
 			},
 			func(obj interface{}) bool {
 				accessor, _ := meta.Accessor(obj)
@@ -88,11 +84,11 @@ func NewAddonHealthCheckController(
 			workInformers.Informer(),
 		).
 		WithSync(c.sync).
-		ToController("addon-healthcheck-controller", recorder)
+		ToController("addon-healthcheck-controller")
 }
 
-func (c *addonHealthCheckController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	clusterName, addonName, err := cache.SplitMetaNamespaceKey(syncCtx.QueueKey())
+func (c *addonHealthCheckController) sync(ctx context.Context, syncCtx factory.SyncContext, key string) error {
+	clusterName, addonName, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		// ignore addon whose key is not in format: namespace/name
 		return nil
@@ -138,7 +134,6 @@ func (c *addonHealthCheckController) syncAddonHealthChecker(ctx context.Context,
 
 	if expectedHealthCheckMode != addon.Status.HealthCheck.Mode {
 		addon.Status.HealthCheck.Mode = expectedHealthCheckMode
-		c.eventRecorder.Eventf("HealthCheckModeUpdated", "Updated health check mode to %s", expectedHealthCheckMode)
 		_, err := c.addonClient.AddonV1alpha1().ManagedClusterAddOns(addon.Namespace).
 			UpdateStatus(ctx, addon, metav1.UpdateOptions{})
 		if err != nil {

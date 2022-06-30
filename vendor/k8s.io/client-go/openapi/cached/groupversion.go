@@ -14,19 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD:vendor/k8s.io/api/events/v1beta1/doc.go
-// +k8s:deepcopy-gen=package
-// +k8s:protobuf-gen=package
-// +k8s:openapi-gen=true
-// +k8s:prerelease-lifecycle-gen=true
-
-// +groupName=events.k8s.io
-
-package v1beta1 // import "k8s.io/api/events/v1beta1"
-=======
->>>>>>> Update condition when call manifest failed
 package cached
 
 import (
@@ -56,7 +43,3 @@ func (g *groupversion) Schema() (*openapi_v3.Document, error) {
 
 	return g.doc, g.err
 }
-<<<<<<< HEAD
-=======
->>>>>>> Update condition when call manifest failed:vendor/k8s.io/client-go/openapi/cached/groupversion.go
->>>>>>> Update condition when call manifest failed

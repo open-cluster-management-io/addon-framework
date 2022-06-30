@@ -16,11 +16,10 @@ func TestApplyWork(t *testing.T) {
 	cache := newWorkCache()
 	fakeWorkClient := fakework.NewSimpleClientset()
 	workInformerFactory := workinformers.NewSharedInformerFactory(fakeWorkClient, 10*time.Minute)
-	syncContext := addontesting.NewFakeSyncContext(t, "test")
 
 	work, _, _ := buildManifestWorkFromObject("cluster1", "addon1", []runtime.Object{addontesting.NewUnstructured("batch/v1", "Job", "default", "test")})
 
-	_, err := applyWork(context.TODO(), fakeWorkClient, workInformerFactory.Work().V1().ManifestWorks().Lister(), cache, syncContext.Recorder(), work)
+	_, err := applyWork(context.TODO(), fakeWorkClient, workInformerFactory.Work().V1().ManifestWorks().Lister(), cache, work)
 	if err != nil {
 		t.Errorf("failed to apply work with err %v", err)
 	}
@@ -33,7 +32,7 @@ func TestApplyWork(t *testing.T) {
 	if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Add(work); err != nil {
 		t.Errorf("failed to add work to store with err %v", err)
 	}
-	_, err = applyWork(context.TODO(), fakeWorkClient, workInformerFactory.Work().V1().ManifestWorks().Lister(), cache, syncContext.Recorder(), newWorkCopy)
+	_, err = applyWork(context.TODO(), fakeWorkClient, workInformerFactory.Work().V1().ManifestWorks().Lister(), cache, newWorkCopy)
 	if err != nil {
 		t.Errorf("failed to apply work with err %v", err)
 	}
@@ -43,7 +42,7 @@ func TestApplyWork(t *testing.T) {
 	newWork, _, _ := buildManifestWorkFromObject("cluster1", "addon1", []runtime.Object{addontesting.NewUnstructured("batch/v1", "Job", "default", "test")})
 	newWork.Spec.DeleteOption = &workapiv1.DeleteOption{PropagationPolicy: workapiv1.DeletePropagationPolicyTypeOrphan}
 	fakeWorkClient.ClearActions()
-	_, err = applyWork(context.TODO(), fakeWorkClient, workInformerFactory.Work().V1().ManifestWorks().Lister(), cache, syncContext.Recorder(), newWork)
+	_, err = applyWork(context.TODO(), fakeWorkClient, workInformerFactory.Work().V1().ManifestWorks().Lister(), cache, newWork)
 	if err != nil {
 		t.Errorf("failed to apply work with err %v", err)
 	}
@@ -59,7 +58,7 @@ func TestApplyWork(t *testing.T) {
 	if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Update(work); err != nil {
 		t.Errorf("failed to update work with err %v", err)
 	}
-	_, err = applyWork(context.TODO(), fakeWorkClient, workInformerFactory.Work().V1().ManifestWorks().Lister(), cache, syncContext.Recorder(), newWork)
+	_, err = applyWork(context.TODO(), fakeWorkClient, workInformerFactory.Work().V1().ManifestWorks().Lister(), cache, newWork)
 	if err != nil {
 		t.Errorf("failed to apply work with err %v", err)
 	}
@@ -75,7 +74,7 @@ func TestApplyWork(t *testing.T) {
 	if err := workInformerFactory.Work().V1().ManifestWorks().Informer().GetStore().Update(work); err != nil {
 		t.Errorf("failed to update work with err %v", err)
 	}
-	_, err = applyWork(context.TODO(), fakeWorkClient, workInformerFactory.Work().V1().ManifestWorks().Lister(), cache, syncContext.Recorder(), newWork)
+	_, err = applyWork(context.TODO(), fakeWorkClient, workInformerFactory.Work().V1().ManifestWorks().Lister(), cache, newWork)
 	if err != nil {
 		t.Errorf("failed to apply work with err %v", err)
 	}

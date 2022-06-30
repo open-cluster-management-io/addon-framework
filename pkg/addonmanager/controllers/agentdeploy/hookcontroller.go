@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/openshift/library-go/pkg/controller/factory"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -14,6 +12,7 @@ import (
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
+	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
@@ -35,7 +34,6 @@ type addonHookDeployController struct {
 	workLister                worklister.ManifestWorkLister
 	agentAddons               map[string]agent.AgentAddon
 	cache                     *workCache
-	eventRecorder             events.Recorder
 }
 
 func NewAddonHookDeployController(
@@ -45,7 +43,6 @@ func NewAddonHookDeployController(
 	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
 	workInformers workinformers.ManifestWorkInformer,
 	agentAddons map[string]agent.AgentAddon,
-	recorder events.Recorder,
 ) factory.Controller {
 	c := &addonHookDeployController{
 		workClient:                workClient,
@@ -55,13 +52,12 @@ func NewAddonHookDeployController(
 		workLister:                workInformers.Lister(),
 		agentAddons:               agentAddons,
 		cache:                     newWorkCache(),
-		eventRecorder:             recorder.WithComponentSuffix("addon-hook-deploy-controller"),
 	}
 
-	return factory.New().WithFilteredEventsInformersQueueKeyFunc(
-		func(obj runtime.Object) string {
+	return factory.New().WithFilteredEventsInformersQueueKeysFunc(
+		func(obj runtime.Object) []string {
 			key, _ := cache.MetaNamespaceKeyFunc(obj)
-			return key
+			return []string{key}
 		},
 		func(obj interface{}) bool {
 			accessor, _ := meta.Accessor(obj)
@@ -72,10 +68,10 @@ func NewAddonHookDeployController(
 			return true
 		},
 		addonInformers.Informer()).
-		WithFilteredEventsInformersQueueKeyFunc(
-			func(obj runtime.Object) string {
+		WithFilteredEventsInformersQueueKeysFunc(
+			func(obj runtime.Object) []string {
 				accessor, _ := meta.Accessor(obj)
-				return fmt.Sprintf("%s/%s", accessor.GetNamespace(), accessor.GetLabels()[constants.AddonLabel])
+				return []string{fmt.Sprintf("%s/%s", accessor.GetNamespace(), accessor.GetLabels()[constants.AddonLabel])}
 			},
 			func(obj interface{}) bool {
 				accessor, _ := meta.Accessor(obj)
@@ -99,11 +95,10 @@ func NewAddonHookDeployController(
 			},
 			workInformers.Informer(),
 		).
-		WithSync(c.sync).ToController("addon-hook-deploy-controller", recorder)
+		WithSync(c.sync).ToController("addon-hook-deploy-controller")
 }
 
-func (c *addonHookDeployController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	key := syncCtx.QueueKey()
+func (c *addonHookDeployController) sync(ctx context.Context, syncCtx factory.SyncContext, key string) error {
 	klog.V(4).Infof("Reconciling addon hook deploy %q", key)
 
 	clusterName, addonName, err := cache.SplitMetaNamespaceKey(key)
@@ -195,7 +190,7 @@ func (c *addonHookDeployController) sync(ctx context.Context, syncCtx factory.Sy
 
 	// apply hookWork when addon is deleting
 	hookWork.OwnerReferences = []metav1.OwnerReference{*owner}
-	hookWork, err = applyWork(ctx, c.workClient, c.workLister, c.cache, c.eventRecorder, hookWork)
+	hookWork, err = applyWork(ctx, c.workClient, c.workLister, c.cache, hookWork)
 	if err != nil {
 		meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
 			Type:    constants.AddonManifestApplied,

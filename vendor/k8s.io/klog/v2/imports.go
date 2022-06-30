@@ -14,27 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD:vendor/k8s.io/apiserver/pkg/apis/apiserver/v1alpha1/conversion.go
-package v1alpha1
-
-import (
-	conversion "k8s.io/apimachinery/pkg/conversion"
-	apiserver "k8s.io/apiserver/pkg/apis/apiserver"
-)
-
-func Convert_v1alpha1_EgressSelection_To_apiserver_EgressSelection(in *EgressSelection, out *apiserver.EgressSelection, s conversion.Scope) error {
-	if err := autoConvert_v1alpha1_EgressSelection_To_apiserver_EgressSelection(in, out, s); err != nil {
-		return err
-	}
-	if out.Name == "master" {
-		out.Name = "controlplane"
-	}
-	return nil
-}
-=======
->>>>>>> Update condition when call manifest failed
 package klog
 
 import (
@@ -57,7 +36,3 @@ var (
 	// New is an alias for logr.New.
 	New = logr.New
 )
-<<<<<<< HEAD
-=======
->>>>>>> Update condition when call manifest failed:vendor/k8s.io/klog/v2/imports.go
->>>>>>> Update condition when call manifest failed

@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	jsonpatch "github.com/evanphx/json-patch"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -169,7 +168,6 @@ func applyWork(
 	workClient workv1client.Interface,
 	workLister worklister.ManifestWorkLister,
 	cache *workCache,
-	eventRecorder events.Recorder,
 	required *workapiv1.ManifestWork) (*workapiv1.ManifestWork, error) {
 	existingWork, err := workLister.ManifestWorks(required.Namespace).Get(required.Name)
 	existingWork = existingWork.DeepCopy()
@@ -177,11 +175,9 @@ func applyWork(
 		if errors.IsNotFound(err) {
 			existingWork, err = workClient.WorkV1().ManifestWorks(required.Namespace).Create(ctx, required, metav1.CreateOptions{})
 			if err == nil {
-				eventRecorder.Eventf("ManifestWorkCreated", "Created %s/%s because it was missing", required.Namespace, required.Name)
 				cache.updateCache(required, existingWork)
 				return existingWork, nil
 			}
-			eventRecorder.Warningf("ManifestWorkCreateFailed", "Failed to create ManifestWork %s/%s: %v", required.Namespace, required.Name, err)
 			return nil, err
 		}
 		return nil, err
@@ -199,10 +195,8 @@ func applyWork(
 	existingWork, err = workClient.WorkV1().ManifestWorks(existingWork.Namespace).Update(ctx, existingWork, metav1.UpdateOptions{})
 	if err == nil {
 		cache.updateCache(required, existingWork)
-		eventRecorder.Eventf("ManifestWorkUpdate", "Updated %s/%s because it was changing", required.Namespace, required.Name)
 		return existingWork, nil
 	}
-	eventRecorder.Warningf("ManifestWorkUpdateFailed", "Failed to update ManifestWork %s/%s: %v", required.Namespace, required.Name, err)
 	return nil, err
 }
 

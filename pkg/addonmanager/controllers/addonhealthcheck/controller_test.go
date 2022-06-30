@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/operator/events/eventstesting"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -121,13 +120,12 @@ func TestReconcile(t *testing.T) {
 				addonClient:               fakeAddonClient,
 				managedClusterAddonLister: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
 				agentAddons:               map[string]agent.AgentAddon{c.testaddon.name: c.testaddon},
-				eventRecorder:             eventstesting.NewTestingEventRecorder(t),
 			}
 
 			for _, addon := range c.addon {
 				key, _ := cache.MetaNamespaceKeyFunc(addon)
-				syncContext := addontesting.NewFakeSyncContext(t, key)
-				err := controller.sync(context.TODO(), syncContext)
+				syncContext := addontesting.NewFakeSyncContext(t)
+				err := controller.sync(context.TODO(), syncContext, key)
 				if err != nil {
 					t.Errorf("expected no error when sync: %v", err)
 				}
@@ -169,12 +167,11 @@ func TestReconcileWithWork(t *testing.T) {
 		managedClusterAddonLister: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
 		workLister:                workInformers.Work().V1().ManifestWorks().Lister(),
 		agentAddons:               map[string]agent.AgentAddon{testaddon.name: testaddon},
-		eventRecorder:             eventstesting.NewTestingEventRecorder(t),
 	}
 
 	key, _ := cache.MetaNamespaceKeyFunc(addon)
-	syncContext := addontesting.NewFakeSyncContext(t, key)
-	err := controller.sync(context.TODO(), syncContext)
+	syncContext := addontesting.NewFakeSyncContext(t)
+	err := controller.sync(context.TODO(), syncContext, key)
 	if err != nil {
 		t.Errorf("expected no error when sync: %v", err)
 	}
@@ -198,7 +195,7 @@ func TestReconcileWithWork(t *testing.T) {
 		t.Errorf("failed to add work to informer: %v", err)
 	}
 
-	err = controller.sync(context.TODO(), syncContext)
+	err = controller.sync(context.TODO(), syncContext, key)
 	if err != nil {
 		t.Errorf("expected no error when sync: %v", err)
 	}
@@ -226,7 +223,7 @@ func TestReconcileWithWork(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = controller.sync(context.TODO(), syncContext)
+	err = controller.sync(context.TODO(), syncContext, key)
 	if err != nil {
 		t.Errorf("expected no error when sync: %v", err)
 	}
@@ -317,12 +314,11 @@ func TestReconcileWithProbe(t *testing.T) {
 		managedClusterAddonLister: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
 		workLister:                workInformers.Work().V1().ManifestWorks().Lister(),
 		agentAddons:               map[string]agent.AgentAddon{testaddon.name: testaddon},
-		eventRecorder:             eventstesting.NewTestingEventRecorder(t),
 	}
 
 	key, _ := cache.MetaNamespaceKeyFunc(addon)
-	syncContext := addontesting.NewFakeSyncContext(t, key)
-	err := controller.sync(context.TODO(), syncContext)
+	syncContext := addontesting.NewFakeSyncContext(t)
+	err := controller.sync(context.TODO(), syncContext, key)
 	if err != nil {
 		t.Errorf("expected no error when sync: %v", err)
 	}
@@ -360,7 +356,7 @@ func TestReconcileWithProbe(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = controller.sync(context.TODO(), syncContext)
+	err = controller.sync(context.TODO(), syncContext, key)
 	if err != nil {
 		t.Errorf("expected no error when sync: %v", err)
 	}
@@ -376,7 +372,7 @@ func TestReconcileWithProbe(t *testing.T) {
 
 	prober.checkError = nil
 	fakeAddonClient.ClearActions()
-	err = controller.sync(context.TODO(), syncContext)
+	err = controller.sync(context.TODO(), syncContext, key)
 	if err != nil {
 		t.Errorf("expected no error when sync: %v", err)
 	}
