@@ -245,9 +245,6 @@ func hookWorkIsCompleted(hookWork *workapiv1.ManifestWork) bool {
 	if hookWork == nil {
 		return false
 	}
-	if !meta.IsStatusConditionTrue(hookWork.Status.Conditions, workapiv1.WorkApplied) {
-		return false
-	}
 	if !meta.IsStatusConditionTrue(hookWork.Status.Conditions, workapiv1.WorkAvailable) {
 		return false
 	}

@@ -2,6 +2,7 @@ package rbac
 
 import (
 	"context"
+	"fmt"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -24,7 +25,7 @@ func AddonRBAC(kubeConfig *rest.Config) agent.PermissionConfigFunc {
 
 		role := &rbacv1.Role{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "open-cluster-management:helloworldhelm:agent",
+				Name:      fmt.Sprintf("open-cluster-management:%s:agent", addon.Name),
 				Namespace: cluster.Name,
 			},
 			Rules: []rbacv1.PolicyRule{
@@ -35,13 +36,13 @@ func AddonRBAC(kubeConfig *rest.Config) agent.PermissionConfigFunc {
 
 		binding := &rbacv1.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "open-cluster-management:helloworldhelm:agent",
+				Name:      fmt.Sprintf("open-cluster-management:%s:agent", addon.Name),
 				Namespace: cluster.Name,
 			},
 			RoleRef: rbacv1.RoleRef{
 				APIGroup: "rbac.authorization.k8s.io",
 				Kind:     "Role",
-				Name:     "open-cluster-management:helloworldhelm:agent",
+				Name:     fmt.Sprintf("open-cluster-management:%s:agent", addon.Name),
 			},
 			Subjects: []rbacv1.Subject{
 				{Kind: "Group", APIGroup: "rbac.authorization.k8s.io", Name: groups[0]},

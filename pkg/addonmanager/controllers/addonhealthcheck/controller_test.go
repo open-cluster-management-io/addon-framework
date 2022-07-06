@@ -2,6 +2,7 @@ package addonhealthcheck
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -176,9 +177,13 @@ func TestReconcileWithWork(t *testing.T) {
 		t.Errorf("expected no error when sync: %v", err)
 	}
 
-	addontesting.AssertActions(t, fakeAddonClient.Actions(), "update")
-	actual := fakeAddonClient.Actions()[0].(clienttesting.UpdateActionImpl).Object
-	addOn := actual.(*addonapiv1alpha1.ManagedClusterAddOn)
+	addontesting.AssertActions(t, fakeAddonClient.Actions(), "patch")
+	actual := fakeAddonClient.Actions()[0].(clienttesting.PatchActionImpl).Patch
+	addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+	err = json.Unmarshal(actual, addOn)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if meta.IsStatusConditionTrue(addOn.Status.Conditions, "Available") {
 		t.Errorf("addon condition should be unavailable: %v", addOn.Status.Conditions)
 	}
@@ -200,9 +205,13 @@ func TestReconcileWithWork(t *testing.T) {
 		t.Errorf("expected no error when sync: %v", err)
 	}
 
-	addontesting.AssertActions(t, fakeAddonClient.Actions(), "update")
-	actual = fakeAddonClient.Actions()[0].(clienttesting.UpdateActionImpl).Object
-	addOn = actual.(*addonapiv1alpha1.ManagedClusterAddOn)
+	addontesting.AssertActions(t, fakeAddonClient.Actions(), "patch")
+	actual = fakeAddonClient.Actions()[0].(clienttesting.PatchActionImpl).Patch
+	addOn = &addonapiv1alpha1.ManagedClusterAddOn{}
+	err = json.Unmarshal(actual, addOn)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	cond := meta.FindStatusCondition(addOn.Status.Conditions, "Available")
 	if cond == nil && cond.Status != metav1.ConditionUnknown {
@@ -228,9 +237,13 @@ func TestReconcileWithWork(t *testing.T) {
 		t.Errorf("expected no error when sync: %v", err)
 	}
 
-	addontesting.AssertActions(t, fakeAddonClient.Actions(), "update")
-	actual = fakeAddonClient.Actions()[0].(clienttesting.UpdateActionImpl).Object
-	addOn = actual.(*addonapiv1alpha1.ManagedClusterAddOn)
+	addontesting.AssertActions(t, fakeAddonClient.Actions(), "patch")
+	actual = fakeAddonClient.Actions()[0].(clienttesting.PatchActionImpl).Patch
+	addOn = &addonapiv1alpha1.ManagedClusterAddOn{}
+	err = json.Unmarshal(actual, addOn)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	cond = meta.FindStatusCondition(addOn.Status.Conditions, "Available")
 	if cond == nil && cond.Status != metav1.ConditionTrue {
@@ -324,9 +337,13 @@ func TestReconcileWithProbe(t *testing.T) {
 	}
 
 	// return unknown if no status are found
-	addontesting.AssertActions(t, fakeAddonClient.Actions(), "update")
-	actual := fakeAddonClient.Actions()[0].(clienttesting.UpdateActionImpl).Object
-	addOn := actual.(*addonapiv1alpha1.ManagedClusterAddOn)
+	addontesting.AssertActions(t, fakeAddonClient.Actions(), "patch")
+	actual := fakeAddonClient.Actions()[0].(clienttesting.PatchActionImpl).Patch
+	addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+	err = json.Unmarshal(actual, addOn)
+	if err != nil {
+		t.Fatal(err)
+	}
 	cond := meta.FindStatusCondition(addOn.Status.Conditions, "Available")
 	if cond == nil && cond.Status != metav1.ConditionUnknown {
 		t.Errorf("addon condition should be unknown: %v", addOn.Status.Conditions)
@@ -362,9 +379,13 @@ func TestReconcileWithProbe(t *testing.T) {
 	}
 
 	// return unavailable if check returns err
-	addontesting.AssertActions(t, fakeAddonClient.Actions(), "update")
-	actual = fakeAddonClient.Actions()[0].(clienttesting.UpdateActionImpl).Object
-	addOn = actual.(*addonapiv1alpha1.ManagedClusterAddOn)
+	addontesting.AssertActions(t, fakeAddonClient.Actions(), "patch")
+	actual = fakeAddonClient.Actions()[0].(clienttesting.PatchActionImpl).Patch
+	addOn = &addonapiv1alpha1.ManagedClusterAddOn{}
+	err = json.Unmarshal(actual, addOn)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if !meta.IsStatusConditionFalse(addOn.Status.Conditions, "Available") {
 		t.Errorf("addon condition should be unavailable: %v", addOn.Status.Conditions)
@@ -378,9 +399,13 @@ func TestReconcileWithProbe(t *testing.T) {
 	}
 
 	// return available if check returns nil
-	addontesting.AssertActions(t, fakeAddonClient.Actions(), "update")
-	actual = fakeAddonClient.Actions()[0].(clienttesting.UpdateActionImpl).Object
-	addOn = actual.(*addonapiv1alpha1.ManagedClusterAddOn)
+	addontesting.AssertActions(t, fakeAddonClient.Actions(), "patch")
+	actual = fakeAddonClient.Actions()[0].(clienttesting.PatchActionImpl).Patch
+	addOn = &addonapiv1alpha1.ManagedClusterAddOn{}
+	err = json.Unmarshal(actual, addOn)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !meta.IsStatusConditionTrue(addOn.Status.Conditions, "Available") {
 		t.Errorf("addon condition should be available: %v", addOn.Status.Conditions)
 	}

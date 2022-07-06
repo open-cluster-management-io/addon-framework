@@ -278,7 +278,7 @@ func PatchAddonCondition(ctx context.Context, addonClient addonv1alpha1client.In
 		return fmt.Errorf("failed to create patch for addon %s: %w", new.Name, err)
 	}
 
-	klog.Infof("Patching addon %s/%s condition with %s", new.Namespace, new.Name, string(patchBytes))
+	klog.V(2).Infof("Patching addon %s/%s condition with %s", new.Namespace, new.Name, string(patchBytes))
 	_, err = addonClient.AddonV1alpha1().ManagedClusterAddOns(new.Namespace).Patch(ctx, new.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 	return err
 }

@@ -2,6 +2,7 @@ package registration
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -86,9 +87,13 @@ func TestReconcile(t *testing.T) {
 				}(),
 			},
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "update")
-				actual := actions[0].(clienttesting.UpdateActionImpl).Object
-				addOn := actual.(*addonapiv1alpha1.ManagedClusterAddOn)
+				addontesting.AssertActions(t, actions, "patch")
+				actual := actions[0].(clienttesting.PatchActionImpl).Patch
+				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				err := json.Unmarshal(actual, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
 				if addOn.Status.Registrations[0].SignerName != "test" {
 					t.Errorf("Registration config is not updated")
 				}
