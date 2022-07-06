@@ -82,6 +82,7 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 	}
 	registrationOption := helloworld.NewRegistrationOption(
 		kubeConfig,
+		helloworld.AddonName,
 		utilrand.String(5))
 
 	agentAddon, err := addonfactory.NewAgentAddonFactory(helloworld.AddonName, helloworld.FS, "manifests/templates").

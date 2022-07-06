@@ -3,10 +3,12 @@ package utils
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
 
+	jsonpatch "github.com/evanphx/json-patch"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 
 	corev1 "k8s.io/api/core/v1"
@@ -14,7 +16,10 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	coreclientv1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/klog/v2"
+	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 )
 
 func MergeRelatedObjects(modified *bool, objs *[]addonapiv1alpha1.ObjectReference, obj addonapiv1alpha1.ObjectReference) {
@@ -32,7 +37,7 @@ func MergeRelatedObjects(modified *bool, objs *[]addonapiv1alpha1.ObjectReferenc
 	*modified = true
 }
 
-// ApplyConfigMap merges objectmeta, requires data
+// ApplyConfigMap merges objectmeta, requires data, ref from openshift/library-go
 func ApplyConfigMap(ctx context.Context, client coreclientv1.ConfigMapsGetter, required *corev1.ConfigMap) (*corev1.ConfigMap, bool, error) {
 	existing, err := client.ConfigMaps(required.Namespace).Get(ctx, required.Name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
@@ -84,7 +89,7 @@ func ApplyConfigMap(ctx context.Context, client coreclientv1.ConfigMapsGetter, r
 	return actual, true, err
 }
 
-// ApplySecret merges objectmeta, requires data
+// ApplySecret merges objectmeta, requires data. ref from openshift/library-go
 func ApplySecret(ctx context.Context, client coreclientv1.SecretsGetter, requiredInput *corev1.Secret) (*corev1.Secret, bool, error) {
 	// copy the stringData to data.  Error on a data content conflict inside required.  This is usually a bug.
 
@@ -239,4 +244,41 @@ func ownerRefMatched(existing, required metav1.OwnerReference) bool {
 	}
 
 	return true
+}
+
+func PatchAddonCondition(ctx context.Context, addonClient addonv1alpha1client.Interface, new, old *addonapiv1alpha1.ManagedClusterAddOn) error {
+	if equality.Semantic.DeepEqual(new.Status.Conditions, old.Status.Conditions) {
+		return nil
+	}
+
+	oldData, err := json.Marshal(&addonapiv1alpha1.ManagedClusterAddOn{
+		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
+			Conditions: old.Status.Conditions,
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	newData, err := json.Marshal(&addonapiv1alpha1.ManagedClusterAddOn{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:             new.UID,
+			ResourceVersion: new.ResourceVersion,
+		},
+		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
+			Conditions: new.Status.Conditions,
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
+	if err != nil {
+		return fmt.Errorf("failed to create patch for addon %s: %w", new.Name, err)
+	}
+
+	klog.Infof("Patching addon %s/%s condition with %s", new.Namespace, new.Name, string(patchBytes))
+	_, err = addonClient.AddonV1alpha1().ManagedClusterAddOns(new.Namespace).Patch(ctx, new.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status")
+	return err
 }

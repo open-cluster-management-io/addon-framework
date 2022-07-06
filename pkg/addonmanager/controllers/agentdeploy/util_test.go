@@ -46,7 +46,7 @@ func TestApplyWork(t *testing.T) {
 	if err != nil {
 		t.Errorf("failed to apply work with err %v", err)
 	}
-	addontesting.AssertActions(t, fakeWorkClient.Actions(), "update")
+	addontesting.AssertActions(t, fakeWorkClient.Actions(), "patch")
 
 	// Do not update if generation is not changed
 	work.Spec.DeleteOption = &workapiv1.DeleteOption{PropagationPolicy: workapiv1.DeletePropagationPolicyTypeForeground}
@@ -78,5 +78,5 @@ func TestApplyWork(t *testing.T) {
 	if err != nil {
 		t.Errorf("failed to apply work with err %v", err)
 	}
-	addontesting.AssertActions(t, fakeWorkClient.Actions(), "update")
+	addontesting.AssertActions(t, fakeWorkClient.Actions(), "patch")
 }

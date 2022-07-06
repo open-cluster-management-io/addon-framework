@@ -17,7 +17,7 @@ import (
 )
 
 func newAgentAddon(t *testing.T) (agent.AgentAddon, error) {
-	registrationOption := helloworld.NewRegistrationOption(nil, utilrand.String(5))
+	registrationOption := helloworld.NewRegistrationOption(nil, AddonName, utilrand.String(5))
 
 	agentAddon, err := addonfactory.NewAgentAddonFactory(AddonName, FS, "manifests/charts/helloworld").
 		WithGetValuesFuncs(GetValues, addonfactory.GetValuesFromAddonAnnotation).

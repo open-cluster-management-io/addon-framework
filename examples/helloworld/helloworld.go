@@ -24,9 +24,9 @@ const (
 //go:embed manifests/templates
 var FS embed.FS
 
-func NewRegistrationOption(kubeConfig *rest.Config, agentName string) *agent.RegistrationOption {
+func NewRegistrationOption(kubeConfig *rest.Config, addonName, agentName string) *agent.RegistrationOption {
 	return &agent.RegistrationOption{
-		CSRConfigurations: agent.KubeClientSignerConfigurations(AddonName, agentName),
+		CSRConfigurations: agent.KubeClientSignerConfigurations(addonName, agentName),
 		CSRApproveCheck:   utils.DefaultCSRApprover(agentName),
 		PermissionConfig:  rbac.AddonRBAC(kubeConfig),
 	}

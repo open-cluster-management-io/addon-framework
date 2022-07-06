@@ -8,13 +8,13 @@ import (
 	jsonpatch "github.com/evanphx/json-patch"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned"
 	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
@@ -93,9 +93,9 @@ func newManifestWork(workName, addonName, clusterName string, manifests []workap
 // isPreDeleteHookObject check the object is a pre-delete hook resources.
 // currently, we only support job and pod as hook resources.
 // we use WellKnownStatus here to get the job/pad status fields to check if the job/pod is completed.
-func isPreDeleteHookObject(obj *unstructured.Unstructured) (bool, *workapiv1.ManifestConfigOption) {
+func isPreDeleteHookObject(obj runtime.Object) (bool, *workapiv1.ManifestConfigOption) {
 	var resource string
-	gvk := obj.GroupVersionKind()
+	gvk := obj.GetObjectKind().GroupVersionKind()
 	switch gvk.Kind {
 	case "Job":
 		resource = "jobs"
@@ -104,7 +104,12 @@ func isPreDeleteHookObject(obj *unstructured.Unstructured) (bool, *workapiv1.Man
 	default:
 		return false, nil
 	}
-	labels := obj.GetLabels()
+
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return false, nil
+	}
+	labels := accessor.GetLabels()
 	if _, ok := labels[constants.PreDeleteHookLabel]; !ok {
 		return false, nil
 	}
@@ -113,8 +118,8 @@ func isPreDeleteHookObject(obj *unstructured.Unstructured) (bool, *workapiv1.Man
 		ResourceIdentifier: workapiv1.ResourceIdentifier{
 			Group:     gvk.Group,
 			Resource:  resource,
-			Name:      obj.GetName(),
-			Namespace: obj.GetNamespace(),
+			Name:      accessor.GetName(),
+			Namespace: accessor.GetNamespace(),
 		},
 		FeedbackRules: []workapiv1.FeedbackRule{
 			{
@@ -136,12 +141,7 @@ func buildManifestWorkFromObject(
 		if err != nil {
 			return nil, nil, err
 		}
-		unstructuredObj := &unstructured.Unstructured{}
-		err = unstructuredObj.UnmarshalJSON(rawObject)
-		if err != nil {
-			return nil, nil, err
-		}
-		isHookObject, manifestConfig := isPreDeleteHookObject(unstructuredObj)
+		isHookObject, manifestConfig := isPreDeleteHookObject(object)
 		if isHookObject {
 			hookManifests = append(hookManifests, workapiv1.Manifest{
 				RawExtension: runtime.RawExtension{Raw: rawObject},
@@ -191,11 +191,34 @@ func applyWork(
 		return existingWork, nil
 	}
 
-	existingWork.Spec = required.Spec
-	existingWork, err = workClient.WorkV1().ManifestWorks(existingWork.Namespace).Update(ctx, existingWork, metav1.UpdateOptions{})
+	oldData, err := json.Marshal(&workapiv1.ManifestWork{
+		Spec: existingWork.Spec,
+	})
+	if err != nil {
+		return existingWork, err
+	}
+
+	newData, err := json.Marshal(&workapiv1.ManifestWork{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:             existingWork.UID,
+			ResourceVersion: existingWork.ResourceVersion,
+		},
+		Spec: required.Spec,
+	})
+	if err != nil {
+		return existingWork, err
+	}
+
+	patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
+	if err != nil {
+		return existingWork, fmt.Errorf("failed to create patch for addon %s: %w", existingWork.Name, err)
+	}
+
+	klog.V(2).Infof("Patching work %s/%s with %s", existingWork.Namespace, existingWork.Name, string(patchBytes))
+	updated, err := workClient.WorkV1().ManifestWorks(existingWork.Namespace).Patch(ctx, existingWork.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
 	if err == nil {
 		cache.updateCache(required, existingWork)
-		return existingWork, nil
+		return updated, nil
 	}
 	return nil, err
 }
@@ -222,43 +245,4 @@ func FindManifestValue(
 		}
 	}
 	return workapiv1.FieldValue{}
-}
-
-func patchCondition(ctx context.Context, addonClient addonv1alpha1client.Interface, new, old *addonapiv1alpha1.ManagedClusterAddOn) error {
-	if equality.Semantic.DeepEqual(new.Status.Conditions, old.Status.Conditions) {
-		return nil
-	}
-
-	oldData, err := json.Marshal(&addonapiv1alpha1.ManagedClusterAddOn{
-		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
-			Conditions: old.Status.Conditions,
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	newData, err := json.Marshal(&addonapiv1alpha1.ManagedClusterAddOn{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:             new.UID,
-			ResourceVersion: new.ResourceVersion,
-		},
-		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
-			Conditions: new.Status.Conditions,
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
-	if err != nil {
-		return fmt.Errorf("failed to create patch for addon %s: %w", new.Name, err)
-	}
-	if err != nil {
-		return err
-	}
-
-	_, err = addonClient.AddonV1alpha1().ManagedClusterAddOns(new.Namespace).Patch(ctx, new.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status")
-	return err
 }
