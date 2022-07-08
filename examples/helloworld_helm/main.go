@@ -19,6 +19,7 @@ import (
 	"open-cluster-management.io/addon-framework/examples/helloworld_helm/cleanup_agent"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/version"
+	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
@@ -62,8 +63,8 @@ func newCommand() *cobra.Command {
 	}
 
 	cmd.AddCommand(newControllerCommand())
-	cmd.AddCommand(helloworldagent.NewAgentCommand(addonName))
-	cmd.AddCommand(cleanup_agent.NewAgentCommand(addonName))
+	cmd.AddCommand(helloworldagent.NewAgentCommand("helloworld"))
+	cmd.AddCommand(cleanup_agent.NewAgentCommand("helloworld"))
 	return cmd
 }
 
@@ -78,7 +79,12 @@ func newControllerCommand() *cobra.Command {
 }
 
 func runController(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
-	var mgr, err = addonmanager.New(controllerContext.KubeConfig)
+	addonClient, err := addonv1alpha1client.NewForConfig(controllerContext.KubeConfig)
+	if err != nil {
+		return err
+	}
+
+	mgr, err := addonmanager.New(controllerContext.KubeConfig)
 	if err != nil {
 		klog.Errorf("failed to new addon manager %v", err)
 		return err
@@ -89,8 +95,8 @@ func runController(ctx context.Context, controllerContext *controllercmd.Control
 		controllerContext.EventRecorder,
 		utilrand.String(5))
 
-	agentAddon, err := addonfactory.NewAgentAddonFactory(addonName, FS, "manifests/charts/helloworld").
-		WithGetValuesFuncs(getValues, addonfactory.GetValuesFromAddonAnnotation).
+	agentAddon, err := addonfactory.NewAgentAddonFactory("helloworld", FS, "manifests/charts/helloworld").
+		WithGetValuesFuncs(getValuesFromAddOnDeploymentConfig(addonClient)).
 		WithAgentRegistrationOption(registrationOption).
 		BuildHelmAgentAddon()
 	if err != nil {

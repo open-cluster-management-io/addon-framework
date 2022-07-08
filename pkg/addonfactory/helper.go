@@ -1,6 +1,7 @@
 package addonfactory
 
 import (
+	"context"
 	"embed"
 	"encoding/json"
 	"io/fs"
@@ -10,8 +11,11 @@ import (
 	"github.com/fatih/structs"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
@@ -33,6 +37,31 @@ func GetValuesFromAddonAnnotation(
 	}
 
 	return values, nil
+}
+
+func GetValuesFromAddOnDeploymentConfig(addonClient addonv1alpha1client.Interface) GetValuesFunc {
+	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
+		values := map[string]interface{}{}
+		configName := addon.Status.ConfigReference.Config.Name
+		if configName == "" {
+			return values, nil
+		}
+
+		config, err := addonClient.AddonV1alpha1().AddOnDeploymentConfigs().Get(context.TODO(), configName, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			return values, nil
+		}
+		if err != nil {
+			return values, err
+		}
+
+		for _, customizedVariable := range config.Spec.CustomizedVariables {
+			values[customizedVariable.Name] = customizedVariable.Value
+		}
+		values["NodeSelector"] = config.Spec.NodePlacement.NodeSelector
+		values["Tolerations"] = config.Spec.NodePlacement.Tolerations
+		return values, nil
+	}
 }
 
 // MergeValues merges the 2 given Values to a Values.

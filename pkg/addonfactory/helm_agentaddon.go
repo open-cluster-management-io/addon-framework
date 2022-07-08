@@ -81,6 +81,8 @@ func (a *HelmAgentAddon) Manifests(
 	for _, k := range keys {
 		data := templates[k]
 
+		klog.Info(k, data)
+
 		if len(data) == 0 {
 			continue
 		}
@@ -128,6 +130,8 @@ func (a *HelmAgentAddon) getValues(
 	}
 
 	overrideValues = MergeValues(overrideValues, builtinValues)
+
+	klog.Info("values::", overrideValues)
 
 	values, err := chartutil.ToRenderValues(a.chart, overrideValues,
 		a.releaseOptions(cluster, addon), a.capabilities(cluster, addon))

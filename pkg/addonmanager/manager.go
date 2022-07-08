@@ -9,11 +9,13 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/dynamic"
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/addonconfig"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/addonhealthcheck"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/addoninstall"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/agentdeploy"
@@ -59,6 +61,11 @@ func (a *addonManager) AddAgent(addon agent.AgentAddon) error {
 
 func (a *addonManager) Start(ctx context.Context) error {
 	kubeClient, err := kubernetes.NewForConfig(a.config)
+	if err != nil {
+		return err
+	}
+
+	dynamicClient, err := dynamic.NewForConfig(a.config)
 	if err != nil {
 		return err
 	}
@@ -181,6 +188,14 @@ func (a *addonManager) Start(ctx context.Context) error {
 		a.addonAgents,
 		eventRecorder)
 
+	addonConfigController := addonconfig.NewAddonConfigController(
+		dynamicClient,
+		addonClient,
+		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+		a.addonAgents,
+		eventRecorder,
+	)
+
 	var csrApproveController factory.Controller
 	var csrSignController factory.Controller
 	// Spawn the following controllers only if v1 CSR api is supported in the
@@ -228,6 +243,7 @@ func (a *addonManager) Start(ctx context.Context) error {
 	go clusterManagementController.Run(ctx, 1)
 	go addonInstallController.Run(ctx, 1)
 	go addonHealthCheckController.Run(ctx, 1)
+	go addonConfigController.Run(ctx, 1)
 	if csrApproveController != nil {
 		go csrApproveController.Run(ctx, 1)
 	}

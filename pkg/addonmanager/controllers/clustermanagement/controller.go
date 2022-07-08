@@ -112,17 +112,47 @@ func (c *clusterManagementController) sync(ctx context.Context, syncCtx factory.
 	}
 
 	expectedCoordinate := addonapiv1alpha1.ConfigCoordinates{
+		//lint:ignore SA1019 Ignore the deprecation warnings
 		CRDName: clusterManagementAddon.Spec.AddOnConfiguration.CRDName,
-		CRName:  clusterManagementAddon.Spec.AddOnConfiguration.CRName,
+		//lint:ignore SA1019 Ignore the deprecation warnings
+		CRName: clusterManagementAddon.Spec.AddOnConfiguration.CRName,
 	}
 	actualCoordinate := addonapiv1alpha1.ConfigCoordinates{
+		//lint:ignore SA1019 Ignore the deprecation warnings
 		CRDName: addon.Status.AddOnConfiguration.CRDName,
-		CRName:  addon.Status.AddOnConfiguration.CRName,
+		//lint:ignore SA1019 Ignore the deprecation warnings
+		CRName: addon.Status.AddOnConfiguration.CRName,
 	}
 
 	if !equality.Semantic.DeepEqual(expectedCoordinate, actualCoordinate) {
+		//lint:ignore SA1019 Ignore the deprecation warnings
 		addon.Status.AddOnConfiguration.CRDName = expectedCoordinate.CRDName
+		//lint:ignore SA1019 Ignore the deprecation warnings
 		addon.Status.AddOnConfiguration.CRName = expectedCoordinate.CRName
+		*modified = true
+	}
+
+	actualConfigReference := addonapiv1alpha1.ConfigReference{
+		ConfigGVR: addon.Status.ConfigReference.ConfigGVR,
+		Config:    addon.Status.ConfigReference.Config,
+	}
+
+	expectedConfigReference := addonapiv1alpha1.ConfigReference{
+		ConfigGVR: clusterManagementAddon.Spec.AddOnConfiguration.ConfigGVR,
+		Config:    clusterManagementAddon.Spec.AddOnConfiguration.DefaultConfig,
+	}
+
+	if addon.Spec.Config.Namespace != "" {
+		expectedConfigReference.Config.Name = addon.Spec.Config.Namespace
+	}
+
+	if addon.Spec.Config.Name != "" {
+		expectedConfigReference.Config.Name = addon.Spec.Config.Name
+	}
+
+	if !equality.Semantic.DeepEqual(actualConfigReference, expectedConfigReference) {
+		addon.Status.ConfigReference.ConfigGVR = expectedConfigReference.ConfigGVR
+		addon.Status.ConfigReference.Config = expectedConfigReference.Config
 		*modified = true
 	}
 

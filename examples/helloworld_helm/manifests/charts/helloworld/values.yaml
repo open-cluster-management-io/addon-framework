@@ -18,7 +18,4 @@ global:
   imageOverrides:
     helloWorldHelm: quay.io/open-cluster-management/helloworld-addon:latest
   nodeSelector: {}
-  proxyConfig:
-    HTTP_PROXY: null
-    HTTPS_PROXY: null
-    NO_PROXY: null
+  tolerations: []

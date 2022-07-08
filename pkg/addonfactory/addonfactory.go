@@ -8,6 +8,7 @@ import (
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -24,13 +25,17 @@ type Values map[string]interface{}
 type GetValuesFunc func(cluster *clusterv1.ManagedCluster,
 	addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error)
 
+type GetAddonConfigFunc func(cluster *clusterv1.ManagedCluster,
+	addon *addonapiv1alpha1.ManagedClusterAddOn, config interface{}) (Values, error)
+
 // AgentAddonFactory includes the common fields for building different agentAddon instances.
 type AgentAddonFactory struct {
-	scheme            *runtime.Scheme
-	fs                embed.FS
-	dir               string
-	getValuesFuncs    []GetValuesFunc
-	agentAddonOptions agent.AgentAddonOptions
+	scheme             *runtime.Scheme
+	fs                 embed.FS
+	dir                string
+	getValuesFuncs     []GetValuesFunc
+	getAddonConfigFunc GetAddonConfigFunc
+	agentAddonOptions  agent.AgentAddonOptions
 	// trimCRDDescription flag is used to trim the description of CRDs in manifestWork. disabled by default.
 	trimCRDDescription bool
 }
@@ -82,6 +87,13 @@ func (f *AgentAddonFactory) WithAgentRegistrationOption(option *agent.Registrati
 // WithTrimCRDDescription is to enable trim the description of CRDs in manifestWork.
 func (f *AgentAddonFactory) WithTrimCRDDescription() *AgentAddonFactory {
 	f.trimCRDDescription = true
+	return f
+}
+
+// WithGetAddonConfigFunc is to enable trim the description of CRDs in manifestWork.
+func (f *AgentAddonFactory) WithGetAddonConfigFunc(
+	kubeConfig *rest.Config, getAddonConfigFunc GetAddonConfigFunc) *AgentAddonFactory {
+	f.getAddonConfigFunc = getAddonConfigFunc
 	return f
 }
 

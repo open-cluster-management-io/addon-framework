@@ -57,19 +57,54 @@ type AddOnMeta struct {
 
 // ConfigCoordinates represents the information for locating the CRD and CR that configures the add-on.
 type ConfigCoordinates struct {
+	// Deprecated: Use configGVR filed instead
 	// crdName is the name of the CRD used to configure instances of the managed add-on.
 	// This field should be configured if the add-on have a CRD that controls the configuration of the add-on.
 	// +optional
 	CRDName string `json:"crdName"`
 
+	// Deprecated: Use configGVR filed instead
 	// crName is the name of the CR used to configure instances of the managed add-on.
 	// This field should be configured if add-on CR have a consistent name across the all of the ManagedCluster instaces.
 	// +optional
 	CRName string `json:"crName"`
 
+	// Deprecated: This will be removed
 	// lastObservedGeneration is the observed generation of the custom resource for the configuration of the addon.
 	// +optional
 	LastObservedGeneration int64 `json:"lastObservedGeneration,omitempty"`
+
+	// configGVR represents the GroupVersionResource of the add-on configuration.
+	// +optional
+	ConfigGVR ConfigGVR `json:"configGVR,omitempty"`
+
+	// defaultConfig represents the namespace and name of the default add-on configuration.
+	// In scenario where all add-ons have a same configuration.
+	// +optional
+	DefaultConfig ConfigReferent `json:"defaultConfig,omitempty"`
+}
+
+// ConfigGVR represents the GroupVersionResource of the add-on configuration
+type ConfigGVR struct {
+	// group of the add-on configuration.
+	Group string `json:"group"`
+
+	// version of the add-on configuration.
+	Version string `json:"version"`
+
+	// resource of the add-on configuration.
+	Resource string `json:"resource"`
+}
+
+// ConfigReferent represents the namespace and name for an add-on configuration.
+type ConfigReferent struct {
+	// namespace of the add-on configuration.
+	// If this field is not set, the configuration is in the cluster scope.
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+
+	// name of the add-on configuration.
+	Name string `json:"name"`
 }
 
 // ClusterManagementAddOnStatus represents the current status of cluster management add-on.

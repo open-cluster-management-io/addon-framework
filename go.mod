@@ -21,7 +21,7 @@ require (
 	k8s.io/klog/v2 v2.30.0
 	k8s.io/utils v0.0.0-20210930125809-cb0fa318a74b
 	open-cluster-management.io/api v0.5.1-0.20220112073018-2d280a97a052
-	sigs.k8s.io/controller-runtime v0.11.0
+	sigs.k8s.io/controller-runtime v0.11.1
 	sigs.k8s.io/yaml v1.3.0
 )
 
@@ -129,3 +129,5 @@ require (
 	sigs.k8s.io/kube-storage-version-migrator v0.0.4 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.0 // indirect
 )
+
+replace open-cluster-management.io/api => github.com/skeeey/api v0.5.1-0.20220708115748-33f9e5a770c8

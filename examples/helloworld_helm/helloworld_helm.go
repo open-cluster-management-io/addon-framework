@@ -7,12 +7,16 @@ import (
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
@@ -32,7 +36,7 @@ var agentPermissionFiles = []string{
 
 func newRegistrationOption(kubeConfig *rest.Config, recorder events.Recorder, agentName string) *agent.RegistrationOption {
 	return &agent.RegistrationOption{
-		CSRConfigurations: agent.KubeClientSignerConfigurations(addonName, agentName),
+		CSRConfigurations: agent.KubeClientSignerConfigurations("helloworld", agentName),
 		CSRApproveCheck:   utils.DefaultCSRApprover(agentName),
 		PermissionConfig: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
 			kubeclient, err := kubernetes.NewForConfig(kubeConfig)
@@ -85,11 +89,11 @@ func applyManifestFromFile(file, clusterName, addonName string, kubeclient *kube
 }
 
 type global struct {
-	ImagePullPolicy string            `json:"imagePullPolicy"`
-	ImagePullSecret string            `json:"imagePullSecret"`
-	ImageOverrides  map[string]string `json:"imageOverrides"`
-	NodeSelector    map[string]string `json:"nodeSelector"`
-	ProxyConfig     map[string]string `json:"proxyConfig"`
+	ImagePullPolicy string              `json:"imagePullPolicy"`
+	ImagePullSecret string              `json:"imagePullSecret"`
+	ImageOverrides  map[string]string   `json:"imageOverrides"`
+	NodeSelector    map[string]string   `json:"nodeSelector"`
+	Tolerations     []corev1.Toleration `json:"tolerations"`
 }
 type userValues struct {
 	ClusterNamespace string `json:"clusterNamespace"`
@@ -112,4 +116,42 @@ func getValues(cluster *clusterv1.ManagedCluster,
 		return nil, err
 	}
 	return values, nil
+}
+
+func getValuesFromAddOnDeploymentConfig(addonClient addonv1alpha1client.Interface) addonfactory.GetValuesFunc {
+	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (addonfactory.Values, error) {
+		configName := addon.Status.ConfigReference.Config.Name
+		if configName == "" {
+			return nil, nil
+		}
+
+		config, err := addonClient.AddonV1alpha1().AddOnDeploymentConfigs().Get(context.TODO(), configName, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			return nil, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		userJsonValues := userValues{
+			ClusterNamespace: cluster.GetName(),
+			Global: global{
+				ImagePullPolicy: "IfNotPresent",
+				ImageOverrides: map[string]string{
+					"helloWorldHelm": defaultExampleImage,
+				},
+				NodeSelector: map[string]string{},
+			},
+		}
+
+		if len(config.Spec.NodePlacement.NodeSelector) != 0 {
+			userJsonValues.Global.NodeSelector = config.Spec.NodePlacement.NodeSelector
+		}
+
+		if len(config.Spec.NodePlacement.Tolerations) != 0 {
+			userJsonValues.Global.Tolerations = config.Spec.NodePlacement.Tolerations
+		}
+
+		return addonfactory.JsonStructToValues(userJsonValues)
+	}
 }
