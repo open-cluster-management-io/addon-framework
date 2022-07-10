@@ -7,6 +7,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
+	"open-cluster-management.io/addon-framework/pkg/agent"
 	fakework "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	workapiv1 "open-cluster-management.io/api/work/v1"
@@ -16,8 +17,26 @@ func TestApplyWork(t *testing.T) {
 	cache := newWorkCache()
 	fakeWorkClient := fakework.NewSimpleClientset()
 	workInformerFactory := workinformers.NewSharedInformerFactory(fakeWorkClient, 10*time.Minute)
+	workHealthProber := &agent.WorkHealthProber{
+		ProbeFields: []agent.ProbeField{{
+			ResourceIdentifier: workapiv1.ResourceIdentifier{
+				Group:     "",
+				Resource:  "jobs",
+				Name:      "test",
+				Namespace: "default",
+			},
+			ProbeRules: []workapiv1.FeedbackRule{{
+				Type: workapiv1.WellKnownStatusType,
+			}},
+		}},
+		HealthCheck: nil,
+	}
 
-	work, _, _ := buildManifestWorkFromObject("cluster1", "addon1", []runtime.Object{addontesting.NewUnstructured("batch/v1", "Job", "default", "test")})
+	work, _, _ := buildManifestWorkFromObject("cluster1", "addon1", workHealthProber, []runtime.Object{addontesting.NewUnstructured("batch/v1", "Job", "default", "test")})
+
+	if work.Spec.ManifestConfigs == nil {
+		t.Errorf("failed to add work health probe fields to the work")
+	}
 
 	_, err := applyWork(context.TODO(), fakeWorkClient, workInformerFactory.Work().V1().ManifestWorks().Lister(), cache, work)
 	if err != nil {
@@ -39,7 +58,7 @@ func TestApplyWork(t *testing.T) {
 	addontesting.AssertNoActions(t, fakeWorkClient.Actions())
 
 	// Update work spec to update it
-	newWork, _, _ := buildManifestWorkFromObject("cluster1", "addon1", []runtime.Object{addontesting.NewUnstructured("batch/v1", "Job", "default", "test")})
+	newWork, _, _ := buildManifestWorkFromObject("cluster1", "addon1", workHealthProber, []runtime.Object{addontesting.NewUnstructured("batch/v1", "Job", "default", "test")})
 	newWork.Spec.DeleteOption = &workapiv1.DeleteOption{PropagationPolicy: workapiv1.DeletePropagationPolicyTypeOrphan}
 	fakeWorkClient.ClearActions()
 	_, err = applyWork(context.TODO(), fakeWorkClient, workInformerFactory.Work().V1().ManifestWorks().Lister(), cache, newWork)

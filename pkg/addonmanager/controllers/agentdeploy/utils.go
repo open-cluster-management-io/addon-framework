@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
+	"open-cluster-management.io/addon-framework/pkg/agent"
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned"
 	worklister "open-cluster-management.io/api/client/work/listers/work/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
@@ -131,10 +132,11 @@ func isPreDeleteHookObject(obj runtime.Object) (bool, *workapiv1.ManifestConfigO
 
 func buildManifestWorkFromObject(
 	cluster, addonName string,
+	workHealthProber *agent.WorkHealthProber,
 	objects []runtime.Object) (deployManifestWork, hookManifestWork *workapiv1.ManifestWork, err error) {
 	var deployManifests []workapiv1.Manifest
 	var hookManifests []workapiv1.Manifest
-	var manifestConfigs []workapiv1.ManifestConfigOption
+	var hookManifestConfigs []workapiv1.ManifestConfigOption
 
 	for _, object := range objects {
 		rawObject, err := runtime.Encode(unstructured.UnstructuredJSONScheme, object)
@@ -146,7 +148,7 @@ func buildManifestWorkFromObject(
 			hookManifests = append(hookManifests, workapiv1.Manifest{
 				RawExtension: runtime.RawExtension{Raw: rawObject},
 			})
-			manifestConfigs = append(manifestConfigs, *manifestConfig)
+			hookManifestConfigs = append(hookManifestConfigs, *manifestConfig)
 		} else {
 			deployManifests = append(deployManifests, workapiv1.Manifest{
 				RawExtension: runtime.RawExtension{Raw: rawObject},
@@ -155,9 +157,18 @@ func buildManifestWorkFromObject(
 	}
 
 	deployManifestWork = newManifestWork(constants.DeployWorkName(addonName), addonName, cluster, deployManifests)
+	if deployManifestWork != nil && workHealthProber != nil {
+		for _, probeField := range workHealthProber.ProbeFields {
+			deployManifestWork.Spec.ManifestConfigs = append(deployManifestWork.Spec.ManifestConfigs, workapiv1.ManifestConfigOption{
+				ResourceIdentifier: probeField.ResourceIdentifier,
+				FeedbackRules:      probeField.ProbeRules,
+			})
+		}
+	}
+
 	hookManifestWork = newManifestWork(preDeleteHookWorkName(addonName), addonName, cluster, hookManifests)
 	if hookManifestWork != nil {
-		hookManifestWork.Spec.ManifestConfigs = manifestConfigs
+		hookManifestWork.Spec.ManifestConfigs = hookManifestConfigs
 	}
 
 	return deployManifestWork, hookManifestWork, nil

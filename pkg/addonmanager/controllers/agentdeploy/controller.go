@@ -161,7 +161,13 @@ func (c *addonDeployController) sync(ctx context.Context, syncCtx factory.SyncCo
 		return nil
 	}
 
-	work, _, err := buildManifestWorkFromObject(clusterName, addonName, objects)
+	var workHealthProber *agent.WorkHealthProber
+	healthProber := agentAddon.GetAgentAddonOptions().HealthProber
+	if healthProber != nil && healthProber.Type == agent.HealthProberTypeWork {
+		workHealthProber = healthProber.WorkProber
+	}
+
+	work, _, err := buildManifestWorkFromObject(clusterName, addonName, workHealthProber, objects)
 	if err != nil {
 		meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
 			Type:    constants.AddonManifestApplied,

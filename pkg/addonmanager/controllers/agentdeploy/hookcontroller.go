@@ -154,7 +154,7 @@ func (c *addonHookDeployController) sync(ctx context.Context, syncCtx factory.Sy
 		return nil
 	}
 
-	_, hookWork, err := buildManifestWorkFromObject(clusterName, addonName, objects)
+	_, hookWork, err := buildManifestWorkFromObject(clusterName, addonName, nil, objects)
 	if err != nil {
 		meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
 			Type:    constants.AddonManifestApplied,
