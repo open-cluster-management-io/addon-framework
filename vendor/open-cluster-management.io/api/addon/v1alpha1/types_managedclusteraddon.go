@@ -160,15 +160,16 @@ type ObjectReference struct {
 // ConfigReference is a reference to the current add-on configuration.
 // This resource is used to locate the configuration resource for the current add-on.
 type ConfigReference struct {
-	// configGVR represents the add-on configuration GroupVersionResource for current add-on.
 	// This field is synced from ClusterManagementAddOn configGVR field.
-	ConfigGVR ConfigGVR `json:"configGVR"`
+	ConfigGR `json:",inline"`
 
-	// config represents the add-on configuration namespace and name for current add-on.
 	// This field is synced from ClusterManagementAddOn defaultConfig and ManagedClusterAddOn config fields.
 	// If both them are defined, the ManagedClusterAddOn config will overwrite the ClusterManagementAddOn
 	// defaultConfig.
-	Config ConfigReferent `json:"config"`
+	ConfigReferent `json:",inline"`
+
+	// version of the add-on configuration.
+	Version string `json:"version"`
 
 	// lastObservedGeneration is the observed generation of the add-on configuration.
 	LastObservedGeneration int64 `json:"lastObservedGeneration"`

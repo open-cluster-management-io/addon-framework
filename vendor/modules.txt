@@ -1243,7 +1243,7 @@ k8s.io/utils/net
 k8s.io/utils/path
 k8s.io/utils/pointer
 k8s.io/utils/trace
-# open-cluster-management.io/api v0.5.1-0.20220112073018-2d280a97a052 => github.com/skeeey/api v0.5.1-0.20220708115748-33f9e5a770c8
+# open-cluster-management.io/api v0.5.1-0.20220112073018-2d280a97a052 => github.com/skeeey/api v0.5.1-0.20220713083550-28e1ecb42be7
 ## explicit; go 1.18
 open-cluster-management.io/api/addon/v1alpha1
 open-cluster-management.io/api/client/addon/clientset/versioned
@@ -1328,4 +1328,4 @@ sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.3.0
 ## explicit; go 1.12
 sigs.k8s.io/yaml
-# open-cluster-management.io/api => github.com/skeeey/api v0.5.1-0.20220708115748-33f9e5a770c8
+# open-cluster-management.io/api => github.com/skeeey/api v0.5.1-0.20220713083550-28e1ecb42be7

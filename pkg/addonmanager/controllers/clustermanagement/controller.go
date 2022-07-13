@@ -2,6 +2,7 @@ package clustermanagement
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -12,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -28,6 +30,7 @@ import (
 // based on the clustermanagementaddon.
 type clusterManagementController struct {
 	addonClient                  addonv1alpha1client.Interface
+	mapper                       meta.RESTMapper
 	managedClusterLister         clusterlister.ManagedClusterLister
 	managedClusterAddonLister    addonlisterv1alpha1.ManagedClusterAddOnLister
 	clusterManagementAddonLister addonlisterv1alpha1.ClusterManagementAddOnLister
@@ -37,6 +40,7 @@ type clusterManagementController struct {
 
 func NewClusterManagementController(
 	addonClient addonv1alpha1client.Interface,
+	mapper meta.RESTMapper,
 	clusterInformers clusterinformers.ManagedClusterInformer,
 	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
 	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
@@ -45,6 +49,7 @@ func NewClusterManagementController(
 ) factory.Controller {
 	c := &clusterManagementController{
 		addonClient:                  addonClient,
+		mapper:                       mapper,
 		managedClusterLister:         clusterInformers.Lister(),
 		managedClusterAddonLister:    addonInformers.Lister(),
 		clusterManagementAddonLister: clusterManagementAddonInformers.Lister(),
@@ -111,49 +116,8 @@ func (c *clusterManagementController) sync(ctx context.Context, syncCtx factory.
 		return err
 	}
 
-	expectedCoordinate := addonapiv1alpha1.ConfigCoordinates{
-		//lint:ignore SA1019 Ignore the deprecation warnings
-		CRDName: clusterManagementAddon.Spec.AddOnConfiguration.CRDName,
-		//lint:ignore SA1019 Ignore the deprecation warnings
-		CRName: clusterManagementAddon.Spec.AddOnConfiguration.CRName,
-	}
-	actualCoordinate := addonapiv1alpha1.ConfigCoordinates{
-		//lint:ignore SA1019 Ignore the deprecation warnings
-		CRDName: addon.Status.AddOnConfiguration.CRDName,
-		//lint:ignore SA1019 Ignore the deprecation warnings
-		CRName: addon.Status.AddOnConfiguration.CRName,
-	}
-
-	if !equality.Semantic.DeepEqual(expectedCoordinate, actualCoordinate) {
-		//lint:ignore SA1019 Ignore the deprecation warnings
-		addon.Status.AddOnConfiguration.CRDName = expectedCoordinate.CRDName
-		//lint:ignore SA1019 Ignore the deprecation warnings
-		addon.Status.AddOnConfiguration.CRName = expectedCoordinate.CRName
-		*modified = true
-	}
-
-	actualConfigReference := addonapiv1alpha1.ConfigReference{
-		ConfigGVR: addon.Status.ConfigReference.ConfigGVR,
-		Config:    addon.Status.ConfigReference.Config,
-	}
-
-	expectedConfigReference := addonapiv1alpha1.ConfigReference{
-		ConfigGVR: clusterManagementAddon.Spec.AddOnConfiguration.ConfigGVR,
-		Config:    clusterManagementAddon.Spec.AddOnConfiguration.DefaultConfig,
-	}
-
-	if addon.Spec.Config.Namespace != "" {
-		expectedConfigReference.Config.Name = addon.Spec.Config.Namespace
-	}
-
-	if addon.Spec.Config.Name != "" {
-		expectedConfigReference.Config.Name = addon.Spec.Config.Name
-	}
-
-	if !equality.Semantic.DeepEqual(actualConfigReference, expectedConfigReference) {
-		addon.Status.ConfigReference.ConfigGVR = expectedConfigReference.ConfigGVR
-		addon.Status.ConfigReference.Config = expectedConfigReference.Config
-		*modified = true
+	if err := c.mergeConfigReference(modified, clusterManagementAddon, addon); err != nil {
+		return err
 	}
 
 	utils.MergeRelatedObjects(modified, &addon.Status.RelatedObjects, addonapiv1alpha1.ObjectReference{
@@ -191,4 +155,82 @@ func (c *clusterManagementController) syncAllAddon(syncCtx factory.SyncContext, 
 	}
 
 	return nil
+}
+
+func (c *clusterManagementController) mergeConfigReference(modified *bool,
+	clusterManagementAddon *addonapiv1alpha1.ClusterManagementAddOn, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+	if clusterManagementAddon.Spec.AddOnConfiguration.ConfigGR.Group == "" {
+		// keep this in the next few releases for compatibility
+		mergeOldConfigCoordinates(modified, clusterManagementAddon, addon)
+		return nil
+	}
+
+	if clusterManagementAddon.Spec.AddOnConfiguration.DefaultConfig.Name == "" && addon.Spec.Config.Name == "" {
+		// keep this in the next few releases for compatibility
+		mergeOldConfigCoordinates(modified, clusterManagementAddon, addon)
+		return nil
+	}
+
+	configGVR, err := c.mapper.ResourceFor(schema.GroupVersionResource{
+		Group:    clusterManagementAddon.Spec.AddOnConfiguration.ConfigGR.Group,
+		Resource: clusterManagementAddon.Spec.AddOnConfiguration.ConfigGR.Resource,
+	})
+	if err != nil {
+		return fmt.Errorf("the server doesn't have a resource type %v", err)
+	}
+
+	klog.Infof("version:: %s", configGVR.Version)
+
+	actualConfigReference := addonapiv1alpha1.ConfigReference{
+		ConfigGR:       addon.Status.ConfigReference.ConfigGR,
+		ConfigReferent: addon.Status.ConfigReference.ConfigReferent,
+		Version:        addon.Status.ConfigReference.Version,
+	}
+
+	expectedConfigReference := addonapiv1alpha1.ConfigReference{
+		ConfigGR:       clusterManagementAddon.Spec.AddOnConfiguration.ConfigGR,
+		ConfigReferent: clusterManagementAddon.Spec.AddOnConfiguration.DefaultConfig,
+		Version:        configGVR.Version,
+	}
+
+	if addon.Spec.Config.Namespace != "" {
+		expectedConfigReference.ConfigReferent.Namespace = addon.Spec.Config.Namespace
+	}
+
+	if addon.Spec.Config.Name != "" {
+		expectedConfigReference.ConfigReferent.Name = addon.Spec.Config.Name
+	}
+
+	if !equality.Semantic.DeepEqual(actualConfigReference, expectedConfigReference) {
+		addon.Status.ConfigReference.ConfigGR = expectedConfigReference.ConfigGR
+		addon.Status.ConfigReference.ConfigReferent = expectedConfigReference.ConfigReferent
+		addon.Status.ConfigReference.Version = expectedConfigReference.Version
+		*modified = true
+	}
+
+	return nil
+}
+
+func mergeOldConfigCoordinates(modified *bool,
+	clusterManagementAddon *addonapiv1alpha1.ClusterManagementAddOn, addon *addonapiv1alpha1.ManagedClusterAddOn) {
+	expectedCoordinate := addonapiv1alpha1.ConfigCoordinates{
+		//lint:ignore SA1019 Ignore the deprecation warnings
+		CRDName: clusterManagementAddon.Spec.AddOnConfiguration.CRDName,
+		//lint:ignore SA1019 Ignore the deprecation warnings
+		CRName: clusterManagementAddon.Spec.AddOnConfiguration.CRName,
+	}
+	actualCoordinate := addonapiv1alpha1.ConfigCoordinates{
+		//lint:ignore SA1019 Ignore the deprecation warnings
+		CRDName: addon.Status.AddOnConfiguration.CRDName,
+		//lint:ignore SA1019 Ignore the deprecation warnings
+		CRName: addon.Status.AddOnConfiguration.CRName,
+	}
+
+	if !equality.Semantic.DeepEqual(expectedCoordinate, actualCoordinate) {
+		//lint:ignore SA1019 Ignore the deprecation warnings
+		addon.Status.AddOnConfiguration.CRDName = expectedCoordinate.CRDName
+		//lint:ignore SA1019 Ignore the deprecation warnings
+		addon.Status.AddOnConfiguration.CRName = expectedCoordinate.CRName
+		*modified = true
+	}
 }

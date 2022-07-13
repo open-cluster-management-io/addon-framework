@@ -120,7 +120,7 @@ func getValues(cluster *clusterv1.ManagedCluster,
 
 func getValuesFromAddOnDeploymentConfig(addonClient addonv1alpha1client.Interface) addonfactory.GetValuesFunc {
 	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (addonfactory.Values, error) {
-		configName := addon.Status.ConfigReference.Config.Name
+		configName := addon.Status.ConfigReference.Name
 		if configName == "" {
 			return nil, nil
 		}

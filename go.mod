@@ -130,4 +130,4 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.0 // indirect
 )
 
-replace open-cluster-management.io/api => github.com/skeeey/api v0.5.1-0.20220708115748-33f9e5a770c8
+replace open-cluster-management.io/api => github.com/skeeey/api v0.5.1-0.20220713083550-28e1ecb42be7

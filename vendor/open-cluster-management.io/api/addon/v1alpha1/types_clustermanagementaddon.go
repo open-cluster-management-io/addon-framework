@@ -74,9 +74,9 @@ type ConfigCoordinates struct {
 	// +optional
 	LastObservedGeneration int64 `json:"lastObservedGeneration,omitempty"`
 
-	// configGVR represents the GroupVersionResource of the add-on configuration.
+	// configGR represents the GroupResource of the add-on configuration.
 	// +optional
-	ConfigGVR ConfigGVR `json:"configGVR,omitempty"`
+	ConfigGR ConfigGR `json:"configGR,omitempty"`
 
 	// defaultConfig represents the namespace and name of the default add-on configuration.
 	// In scenario where all add-ons have a same configuration.
@@ -85,12 +85,9 @@ type ConfigCoordinates struct {
 }
 
 // ConfigGVR represents the GroupVersionResource of the add-on configuration
-type ConfigGVR struct {
+type ConfigGR struct {
 	// group of the add-on configuration.
 	Group string `json:"group"`
-
-	// version of the add-on configuration.
-	Version string `json:"version"`
 
 	// resource of the add-on configuration.
 	Resource string `json:"resource"`

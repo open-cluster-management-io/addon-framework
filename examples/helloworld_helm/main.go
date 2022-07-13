@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	addonName = "helloworldhelm"
+	addonName = "helloworld-helm"
 )
 
 func main() {

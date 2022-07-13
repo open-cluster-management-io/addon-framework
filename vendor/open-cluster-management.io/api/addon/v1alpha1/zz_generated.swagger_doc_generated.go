@@ -112,7 +112,7 @@ var map_ConfigCoordinates = map[string]string{
 	"crdName":                "Deprecated: Use configGVR filed instead crdName is the name of the CRD used to configure instances of the managed add-on. This field should be configured if the add-on have a CRD that controls the configuration of the add-on.",
 	"crName":                 "Deprecated: Use configGVR filed instead crName is the name of the CR used to configure instances of the managed add-on. This field should be configured if add-on CR have a consistent name across the all of the ManagedCluster instaces.",
 	"lastObservedGeneration": "Deprecated: This will be removed lastObservedGeneration is the observed generation of the custom resource for the configuration of the addon.",
-	"configGVR":              "configGVR represents the GroupVersionResource of the add-on configuration.",
+	"configGR":               "configGR represents the GroupResource of the add-on configuration.",
 	"defaultConfig":          "defaultConfig represents the namespace and name of the default add-on configuration. In scenario where all add-ons have a same configuration.",
 }
 
@@ -120,15 +120,14 @@ func (ConfigCoordinates) SwaggerDoc() map[string]string {
 	return map_ConfigCoordinates
 }
 
-var map_ConfigGVR = map[string]string{
+var map_ConfigGR = map[string]string{
 	"":         "ConfigGVR represents the GroupVersionResource of the add-on configuration",
 	"group":    "group of the add-on configuration.",
-	"version":  "version of the add-on configuration.",
 	"resource": "resource of the add-on configuration.",
 }
 
-func (ConfigGVR) SwaggerDoc() map[string]string {
-	return map_ConfigGVR
+func (ConfigGR) SwaggerDoc() map[string]string {
+	return map_ConfigGR
 }
 
 var map_ConfigReferent = map[string]string{
@@ -143,8 +142,7 @@ func (ConfigReferent) SwaggerDoc() map[string]string {
 
 var map_ConfigReference = map[string]string{
 	"":                       "ConfigReference is a reference to the current add-on configuration. This resource is used to locate the configuration resource for the current add-on.",
-	"configGVR":              "configGVR represents the add-on configuration GroupVersionResource for current add-on. This field is synced from ClusterManagementAddOn configGVR field.",
-	"config":                 "config represents the add-on configuration namespace and name for current add-on. This field is synced from ClusterManagementAddOn defaultConfig and ManagedClusterAddOn config fields. If both them are defined, the ManagedClusterAddOn config will overwrite the ClusterManagementAddOn defaultConfig.",
+	"version":                "version of the add-on configuration.",
 	"lastObservedGeneration": "lastObservedGeneration is the observed generation of the add-on configuration.",
 }
 

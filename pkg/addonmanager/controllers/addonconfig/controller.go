@@ -102,9 +102,8 @@ func (c *addonConfigController) sync(ctx context.Context, syncCtx factory.SyncCo
 }
 
 func (c *addonConfigController) startConfigController(ctx context.Context, addon *addonapiv1alpha1.ManagedClusterAddOn) {
-	if len(addon.Status.ConfigReference.ConfigGVR.Group) == 0 ||
-		len(addon.Status.ConfigReference.Config.Name) == 0 {
-		// addon config reference removed, stop the controller
+	if addon.Status.ConfigReference.Version == "" {
+		// no addon config reference, stop the controller
 		c.stopConfigController(addon)
 		return
 	}
@@ -124,16 +123,16 @@ func (c *addonConfigController) startConfigController(ctx context.Context, addon
 	configInformerFactory := dynamicinformer.NewFilteredDynamicSharedInformerFactory(
 		c.dynamicClient,
 		10*time.Minute,
-		addon.Status.ConfigReference.Config.Namespace,
+		addon.Status.ConfigReference.Namespace,
 		func(listOptions *metav1.ListOptions) {
 			listOptions.FieldSelector = fields.OneTermEqualSelector(
 				"metadata.name",
-				addon.Status.ConfigReference.Config.Name,
+				addon.Status.ConfigReference.Name,
 			).String()
 		},
 	)
 
-	configInformer := configInformerFactory.ForResource(toConfigGVR(addon.Status.ConfigReference.ConfigGVR))
+	configInformer := configInformerFactory.ForResource(toConfigGVR(addon.Status.ConfigReference))
 
 	configCtrlCtx, cancel := context.WithCancel(ctx)
 	c.configControlllers[ctrlKey] = configSyncContext{
@@ -214,8 +213,10 @@ func (c *configController) sync(ctx context.Context, syncCtx factory.SyncContext
 		return err
 	}
 
-	// TODO need handle if there is no gneration in the object
-	//addon.Status.ConfigReference.LastObservedGeneration = addon.Status.ConfigReference.LastObservedGeneration + 1
+	if generation == 0 {
+		// TODO think about this if there is no gneration in the object
+		addon.Status.ConfigReference.LastObservedGeneration = addon.Status.ConfigReference.LastObservedGeneration + 1
+	}
 
 	addon.Status.ConfigReference.LastObservedGeneration = generation
 
@@ -223,11 +224,11 @@ func (c *configController) sync(ctx context.Context, syncCtx factory.SyncContext
 	return err
 }
 
-func toConfigGVR(gvr addonapiv1alpha1.ConfigGVR) schema.GroupVersionResource {
+func toConfigGVR(configRefer addonapiv1alpha1.ConfigReference) schema.GroupVersionResource {
 	return schema.GroupVersionResource{
-		Group:    gvr.Group,
-		Version:  gvr.Version,
-		Resource: gvr.Resource,
+		Group:    configRefer.Group,
+		Version:  configRefer.Version,
+		Resource: configRefer.Resource,
 	}
 }
 

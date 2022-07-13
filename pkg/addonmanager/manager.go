@@ -30,6 +30,7 @@ import (
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned"
 	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 )
 
 // AddonManager is the interface to initialize a manager on hub to manage the addon
@@ -81,6 +82,11 @@ func (a *addonManager) Start(ctx context.Context) error {
 	}
 
 	workClient, err := workv1client.NewForConfig(a.config)
+	if err != nil {
+		return err
+	}
+
+	restMapper, err := apiutil.NewDynamicRESTMapper(a.config, apiutil.WithLazyDiscovery)
 	if err != nil {
 		return err
 	}
@@ -166,6 +172,7 @@ func (a *addonManager) Start(ctx context.Context) error {
 
 	clusterManagementController := clustermanagement.NewClusterManagementController(
 		addonClient,
+		restMapper,
 		clusterInformers.Cluster().V1().ManagedClusters(),
 		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 		addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),

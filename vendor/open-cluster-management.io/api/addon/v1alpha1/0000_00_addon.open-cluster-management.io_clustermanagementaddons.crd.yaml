@@ -41,8 +41,8 @@ spec:
                   description: addOnConfiguration is a reference to configuration information for the add-on. In scenario where a multiple add-ons share the same add-on CRD, multiple ClusterManagementAddOn resources need to be created and reference the same AddOnConfiguration.
                   type: object
                   properties:
-                    configGVR:
-                      description: configGVR represents the GroupVersionResource of the add-on configuration.
+                    configGR:
+                      description: configGR represents the GroupResource of the add-on configuration.
                       type: object
                       properties:
                         group:
@@ -50,9 +50,6 @@ spec:
                           type: string
                         resource:
                           description: resource of the add-on configuration.
-                          type: string
-                        version:
-                          description: version of the add-on configuration.
                           type: string
                     crName:
                       description: 'Deprecated: Use configGVR filed instead crName is the name of the CR used to configure instances of the managed add-on. This field should be configured if add-on CR have a consistent name across the all of the ManagedCluster instaces.'

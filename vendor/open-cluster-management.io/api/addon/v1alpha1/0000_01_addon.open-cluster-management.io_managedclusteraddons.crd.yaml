@@ -65,8 +65,8 @@ spec:
                   description: 'Deprecated: Use configReference instead addOnConfiguration is a reference to configuration information for the add-on. This resource is use to locate the configuration resource for the add-on.'
                   type: object
                   properties:
-                    configGVR:
-                      description: configGVR represents the GroupVersionResource of the add-on configuration.
+                    configGR:
+                      description: configGR represents the GroupResource of the add-on configuration.
                       type: object
                       properties:
                         group:
@@ -74,9 +74,6 @@ spec:
                           type: string
                         resource:
                           description: resource of the add-on configuration.
-                          type: string
-                        version:
-                          description: version of the add-on configuration.
                           type: string
                     crName:
                       description: 'Deprecated: Use configGVR filed instead crName is the name of the CR used to configure instances of the managed add-on. This field should be configured if add-on CR have a consistent name across the all of the ManagedCluster instaces.'
@@ -156,33 +153,25 @@ spec:
                   description: configReference is a reference to the add-on configuration.
                   type: object
                   properties:
-                    config:
-                      description: config represents the add-on configuration namespace and name for current add-on. This field is synced from ClusterManagementAddOn defaultConfig and ManagedClusterAddOn config fields. If both them are defined, the ManagedClusterAddOn config will overwrite the ClusterManagementAddOn defaultConfig.
-                      type: object
-                      properties:
-                        name:
-                          description: name of the add-on configuration.
-                          type: string
-                        namespace:
-                          description: namespace of the add-on configuration. If this field is not set, the configuration is in the cluster scope.
-                          type: string
-                    configGVR:
-                      description: configGVR represents the add-on configuration GroupVersionResource for current add-on. This field is synced from ClusterManagementAddOn configGVR field.
-                      type: object
-                      properties:
-                        group:
-                          description: group of the add-on configuration.
-                          type: string
-                        resource:
-                          description: resource of the add-on configuration.
-                          type: string
-                        version:
-                          description: version of the add-on configuration.
-                          type: string
+                    group:
+                      description: group of the add-on configuration.
+                      type: string
                     lastObservedGeneration:
                       description: lastObservedGeneration is the observed generation of the add-on configuration.
                       type: integer
                       format: int64
+                    name:
+                      description: name of the add-on configuration.
+                      type: string
+                    namespace:
+                      description: namespace of the add-on configuration. If this field is not set, the configuration is in the cluster scope.
+                      type: string
+                    resource:
+                      description: resource of the add-on configuration.
+                      type: string
+                    version:
+                      description: version of the add-on configuration.
+                      type: string
                 healthCheck:
                   description: healthCheck indicates how to check the healthiness status of the current addon. It should be set by each addon implementation, by default, the lease mode will be used.
                   type: object
