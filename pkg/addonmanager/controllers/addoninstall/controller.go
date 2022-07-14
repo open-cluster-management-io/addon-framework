@@ -118,7 +118,6 @@ func (c *addonInstallController) sync(ctx context.Context, syncCtx factory.SyncC
 			}
 
 			if !selector.Matches(labels.Set(cluster.Labels)) {
-				klog.Warningf("labels selector is not match for addon %s on %s", addonName, clusterName)
 				continue
 			}
 
