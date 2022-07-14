@@ -112,6 +112,10 @@ const (
 
 	// InstallByLabel indicate to install addon based on clusters' label
 	InstallByLabel StrategyType = "LabelSelector"
+
+	// InstallByFilterFunction indicate to install addon based on a filter function
+	// If filter function returns true or it's nil, the addon will be installed to the cluster
+	InstallByFilterFunction StrategyType = "FilterFunction"
 )
 
 // InstallStrategy is the installation strategy of the manifests prescribed by Manifests(..).
@@ -127,11 +131,6 @@ type InstallStrategy struct {
 
 	// ManagedClusterFilter will filter the clusters to install the addon to.
 	ManagedClusterFilter func(cluster *clusterv1.ManagedCluster) bool
-}
-
-func (s *InstallStrategy) WithManagedClusterFilter(f func(cluster *clusterv1.ManagedCluster) bool) *InstallStrategy {
-	s.ManagedClusterFilter = f
-	return s
 }
 
 type HealthProber struct {
@@ -218,6 +217,14 @@ func InstallByLabelStrategy(installNamespace string, selector metav1.LabelSelect
 		Type:             InstallByLabel,
 		InstallNamespace: installNamespace,
 		LabelSelector:    &selector,
+	}
+}
+
+func InstallByFilterFunctionStrategy(installNamespace string, f func(cluster *clusterv1.ManagedCluster) bool) *InstallStrategy {
+	return &InstallStrategy{
+		Type:                 InstallByFilterFunction,
+		InstallNamespace:     installNamespace,
+		ManagedClusterFilter: f,
 	}
 }
 

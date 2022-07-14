@@ -89,14 +89,6 @@ func (c *addonInstallController) sync(ctx context.Context, syncCtx factory.SyncC
 			continue
 		}
 
-		managedClusterFilter := addon.GetAgentAddonOptions().InstallStrategy.ManagedClusterFilter
-		if managedClusterFilter != nil {
-			if !managedClusterFilter(cluster) {
-				klog.Infof("managed cluster fileter is not match for addon %s on %s", addonName, clusterName)
-				continue
-			}
-		}
-
 		switch addon.GetAgentAddonOptions().InstallStrategy.Type {
 		case agent.InstallAll:
 			err := c.applyAddon(ctx, addonName, clusterName, addon.GetAgentAddonOptions().InstallStrategy.InstallNamespace)
@@ -119,6 +111,19 @@ func (c *addonInstallController) sync(ctx context.Context, syncCtx factory.SyncC
 
 			if !selector.Matches(labels.Set(cluster.Labels)) {
 				continue
+			}
+
+			err = c.applyAddon(ctx, addonName, clusterName, addon.GetAgentAddonOptions().InstallStrategy.InstallNamespace)
+			if err != nil {
+				errs = append(errs, err)
+			}
+		case agent.InstallByFilterFunction:
+			managedClusterFilter := addon.GetAgentAddonOptions().InstallStrategy.ManagedClusterFilter
+			if managedClusterFilter != nil {
+				if !managedClusterFilter(cluster) {
+					klog.Infof("managed cluster fileter is not match for addon %s on %s", addonName, clusterName)
+					continue
+				}
 			}
 
 			err = c.applyAddon(ctx, addonName, clusterName, addon.GetAgentAddonOptions().InstallStrategy.InstallNamespace)

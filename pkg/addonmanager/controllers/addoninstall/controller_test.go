@@ -174,7 +174,7 @@ func TestReconcile(t *testing.T) {
 				}
 			},
 			testaddons: map[string]agent.AgentAddon{
-				"test": &testAgent{name: "test", strategy: agent.InstallAllStrategy("test").WithManagedClusterFilter(func(cluster *clusterv1.ManagedCluster) bool {
+				"test": &testAgent{name: "test", strategy: agent.InstallByFilterFunctionStrategy("test", func(cluster *clusterv1.ManagedCluster) bool {
 					if v, ok := cluster.Annotations["mode"]; ok && v == "hosted" {
 						return false
 					}
