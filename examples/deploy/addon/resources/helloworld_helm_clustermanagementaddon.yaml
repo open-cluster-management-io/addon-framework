@@ -6,3 +6,9 @@ spec:
   addOnMeta:
     displayName: helloworldhelm
     description: "helloworldhelm is an example addon created by helm chart"
+  addOnConfiguration:
+    configGR:
+      group: addon.open-cluster-management.io
+      resource: addondeploymentconfigs
+    defaultConfig:
+      name: global

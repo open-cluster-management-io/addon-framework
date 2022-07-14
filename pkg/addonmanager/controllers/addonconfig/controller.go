@@ -29,8 +29,8 @@ import (
 )
 
 type configSyncContext struct {
-	configRef  addonapiv1alpha1.ConfigReference
-	cancelFunc context.CancelFunc
+	currentConfigReference addonapiv1alpha1.ConfigReference
+	cancelFunc             context.CancelFunc
 }
 
 // addonConfigController reconciles the addon to start a controller to reconcile the config of addon on the hub.
@@ -103,7 +103,7 @@ func (c *addonConfigController) sync(ctx context.Context, syncCtx factory.SyncCo
 
 func (c *addonConfigController) startConfigController(ctx context.Context, addon *addonapiv1alpha1.ManagedClusterAddOn) {
 	if addon.Status.ConfigReference.Version == "" {
-		// no addon config reference, stop the controller
+		// the addon config version is not found, if there is old controller, stop it
 		c.stopConfigController(addon)
 		return
 	}
@@ -112,7 +112,7 @@ func (c *addonConfigController) startConfigController(ctx context.Context, addon
 	ctrlName := fmt.Sprintf("addon-%s-config-controller", ctrlKey)
 
 	if ctrlCtx, ok := c.configControlllers[ctrlKey]; ok {
-		if equality.Semantic.DeepEqual(ctrlCtx.configRef, addon.Status.ConfigReference) {
+		if equality.Semantic.DeepEqual(ctrlCtx.currentConfigReference, addon.Status.ConfigReference) {
 			return
 		}
 
@@ -136,8 +136,8 @@ func (c *addonConfigController) startConfigController(ctx context.Context, addon
 
 	configCtrlCtx, cancel := context.WithCancel(ctx)
 	c.configControlllers[ctrlKey] = configSyncContext{
-		configRef:  addon.Status.ConfigReference,
-		cancelFunc: cancel,
+		currentConfigReference: addon.Status.ConfigReference,
+		cancelFunc:             cancel,
 	}
 
 	configCtrl := &configController{
@@ -214,7 +214,8 @@ func (c *configController) sync(ctx context.Context, syncCtx factory.SyncContext
 	}
 
 	if generation == 0 {
-		// TODO think about this if there is no gneration in the object
+		// if there is no gneration in the object
+		// TODO think about this
 		addon.Status.ConfigReference.LastObservedGeneration = addon.Status.ConfigReference.LastObservedGeneration + 1
 	}
 

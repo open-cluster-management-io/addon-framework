@@ -7,11 +7,13 @@ import (
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
@@ -36,7 +38,7 @@ var agentPermissionFiles = []string{
 
 func newRegistrationOption(kubeConfig *rest.Config, recorder events.Recorder, agentName string) *agent.RegistrationOption {
 	return &agent.RegistrationOption{
-		CSRConfigurations: agent.KubeClientSignerConfigurations("helloworld", agentName),
+		CSRConfigurations: agent.KubeClientSignerConfigurations(addonName, agentName),
 		CSRApproveCheck:   utils.DefaultCSRApprover(agentName),
 		PermissionConfig: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
 			kubeclient, err := kubernetes.NewForConfig(kubeConfig)
@@ -89,33 +91,15 @@ func applyManifestFromFile(file, clusterName, addonName string, kubeclient *kube
 }
 
 type global struct {
-	ImagePullPolicy string              `json:"imagePullPolicy"`
-	ImagePullSecret string              `json:"imagePullSecret"`
-	ImageOverrides  map[string]string   `json:"imageOverrides"`
-	NodeSelector    map[string]string   `json:"nodeSelector"`
-	Tolerations     []corev1.Toleration `json:"tolerations"`
+	ImagePullPolicy string            `json:"imagePullPolicy"`
+	ImagePullSecret string            `json:"imagePullSecret"`
+	ImageOverrides  map[string]string `json:"imageOverrides"`
+	NodeSelector    map[string]string `json:"nodeSelector"`
 }
 type userValues struct {
-	ClusterNamespace string `json:"clusterNamespace"`
-	Global           global `json:"global"`
-}
-
-func getValues(cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) (addonfactory.Values, error) {
-	userJsonValues := userValues{
-		ClusterNamespace: cluster.GetName(),
-		Global: global{
-			ImagePullPolicy: "IfNotPresent",
-			ImageOverrides: map[string]string{
-				"helloWorldHelm": defaultExampleImage,
-			},
-		},
-	}
-	values, err := addonfactory.JsonStructToValues(userJsonValues)
-	if err != nil {
-		return nil, err
-	}
-	return values, nil
+	ClusterNamespace string              `json:"clusterNamespace"`
+	Tolerations      []corev1.Toleration `json:"tolerations"`
+	Global           global              `json:"global"`
 }
 
 func getValuesFromAddOnDeploymentConfig(addonClient addonv1alpha1client.Interface) addonfactory.GetValuesFunc {
@@ -133,6 +117,7 @@ func getValuesFromAddOnDeploymentConfig(addonClient addonv1alpha1client.Interfac
 			return nil, err
 		}
 
+		// TODO read all configuration from addon deployment config
 		userJsonValues := userValues{
 			ClusterNamespace: cluster.GetName(),
 			Global: global{
@@ -149,7 +134,7 @@ func getValuesFromAddOnDeploymentConfig(addonClient addonv1alpha1client.Interfac
 		}
 
 		if len(config.Spec.NodePlacement.Tolerations) != 0 {
-			userJsonValues.Global.Tolerations = config.Spec.NodePlacement.Tolerations
+			userJsonValues.Tolerations = config.Spec.NodePlacement.Tolerations
 		}
 
 		return addonfactory.JsonStructToValues(userJsonValues)

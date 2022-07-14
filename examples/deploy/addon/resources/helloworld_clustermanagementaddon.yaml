@@ -6,3 +6,9 @@ spec:
   addOnMeta:
     displayName: helloworld
     description: "helloworld is an example addon created by go template"
+  addOnConfiguration:
+    configGR:
+      group: addon.open-cluster-management.io
+      resource: addondeploymentconfigs
+    defaultConfig:
+      name: global

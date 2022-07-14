@@ -10,18 +10,21 @@ import (
 	goflag "flag"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	utilflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 	"k8s.io/klog/v2"
+
 	"open-cluster-management.io/addon-framework/examples/helloworld/agent"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
+	"open-cluster-management.io/addon-framework/pkg/addonmanager"
 	addonagent "open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/version"
-
-	utilrand "k8s.io/apimachinery/pkg/util/rand"
-	"open-cluster-management.io/addon-framework/pkg/addonmanager"
+	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 )
 
 func main() {
@@ -74,6 +77,11 @@ func newControllerCommand() *cobra.Command {
 }
 
 func runController(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
+	addonClient, err := addonv1alpha1client.NewForConfig(controllerContext.KubeConfig)
+	if err != nil {
+		return err
+	}
+
 	mgr, err := addonmanager.New(controllerContext.KubeConfig)
 	if err != nil {
 		return err
@@ -84,7 +92,7 @@ func runController(ctx context.Context, controllerContext *controllercmd.Control
 		utilrand.String(5))
 
 	agentAddon, err := addonfactory.NewAgentAddonFactory(addonName, fs, "manifests/templates").
-		WithGetValuesFuncs(getValues, addonfactory.GetValuesFromAddonAnnotation).
+		WithGetValuesFuncs(getValuesFromAddOnDeploymentConfig(addonClient)).
 		WithAgentRegistrationOption(registrationOption).
 		WithInstallStrategy(addonagent.InstallAllStrategy(agent.HelloworldAgentInstallationNamespace)).
 		BuildTemplateAgentAddon()

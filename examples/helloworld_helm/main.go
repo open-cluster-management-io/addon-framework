@@ -10,23 +10,25 @@ import (
 	goflag "flag"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	utilflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 	"k8s.io/klog/v2"
+
 	helloworldagent "open-cluster-management.io/addon-framework/examples/helloworld/agent"
 	"open-cluster-management.io/addon-framework/examples/helloworld_helm/cleanup_agent"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
+	"open-cluster-management.io/addon-framework/pkg/addonmanager"
 	"open-cluster-management.io/addon-framework/pkg/version"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
-
-	utilrand "k8s.io/apimachinery/pkg/util/rand"
-	"open-cluster-management.io/addon-framework/pkg/addonmanager"
 )
 
 const (
-	addonName = "helloworld-helm"
+	addonName = "helloworldhelm"
 )
 
 func main() {
@@ -63,8 +65,8 @@ func newCommand() *cobra.Command {
 	}
 
 	cmd.AddCommand(newControllerCommand())
-	cmd.AddCommand(helloworldagent.NewAgentCommand("helloworld"))
-	cmd.AddCommand(cleanup_agent.NewAgentCommand("helloworld"))
+	cmd.AddCommand(helloworldagent.NewAgentCommand(addonName))
+	cmd.AddCommand(cleanup_agent.NewAgentCommand(addonName))
 	return cmd
 }
 
@@ -95,7 +97,7 @@ func runController(ctx context.Context, controllerContext *controllercmd.Control
 		controllerContext.EventRecorder,
 		utilrand.String(5))
 
-	agentAddon, err := addonfactory.NewAgentAddonFactory("helloworld", FS, "manifests/charts/helloworld").
+	agentAddon, err := addonfactory.NewAgentAddonFactory(addonName, FS, "manifests/charts/helloworld").
 		WithGetValuesFuncs(getValuesFromAddOnDeploymentConfig(addonClient)).
 		WithAgentRegistrationOption(registrationOption).
 		BuildHelmAgentAddon()

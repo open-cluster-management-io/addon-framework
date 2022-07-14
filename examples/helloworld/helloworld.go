@@ -9,15 +9,21 @@ import (
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+
 	helloworldagent "open-cluster-management.io/addon-framework/examples/helloworld/agent"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
@@ -97,29 +103,48 @@ func applyManifestFromFile(file, clusterName, addonName string, kubeclient *kube
 	return nil
 }
 
-func getValues(cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) (addonfactory.Values, error) {
-	installNamespace := addon.Spec.InstallNamespace
-	if len(installNamespace) == 0 {
-		installNamespace = helloworldagent.HelloworldAgentInstallationNamespace
-	}
+func getValuesFromAddOnDeploymentConfig(addonClient addonv1alpha1client.Interface) addonfactory.GetValuesFunc {
+	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (addonfactory.Values, error) {
+		configName := addon.Status.ConfigReference.Name
+		if configName == "" {
+			return nil, nil
+		}
 
-	image := os.Getenv("EXAMPLE_IMAGE_NAME")
-	if len(image) == 0 {
-		image = defaultExampleImage
-	}
+		config, err := addonClient.AddonV1alpha1().AddOnDeploymentConfigs().Get(context.TODO(), configName, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			return nil, nil
+		}
+		if err != nil {
+			return nil, err
+		}
 
-	manifestConfig := struct {
-		KubeConfigSecret      string
-		ClusterName           string
-		AddonInstallNamespace string
-		Image                 string
-	}{
-		KubeConfigSecret:      fmt.Sprintf("%s-hub-kubeconfig", addon.Name),
-		AddonInstallNamespace: installNamespace,
-		ClusterName:           cluster.Name,
-		Image:                 image,
-	}
+		installNamespace := addon.Spec.InstallNamespace
+		if len(installNamespace) == 0 {
+			installNamespace = helloworldagent.HelloworldAgentInstallationNamespace
+		}
 
-	return addonfactory.StructToValues(manifestConfig), nil
+		image := os.Getenv("EXAMPLE_IMAGE_NAME")
+		if len(image) == 0 {
+			image = defaultExampleImage
+		}
+
+		// TODO read all configuration from addon deployment config
+		manifestConfig := struct {
+			KubeConfigSecret      string
+			ClusterName           string
+			AddonInstallNamespace string
+			Image                 string
+			NodeSelector          map[string]string
+			Tolerations           []corev1.Toleration
+		}{
+			KubeConfigSecret:      fmt.Sprintf("%s-hub-kubeconfig", addon.Name),
+			AddonInstallNamespace: installNamespace,
+			ClusterName:           cluster.Name,
+			Image:                 image,
+			NodeSelector:          config.Spec.NodePlacement.NodeSelector,
+			Tolerations:           config.Spec.NodePlacement.Tolerations,
+		}
+
+		return addonfactory.StructToValues(manifestConfig), nil
+	}
 }

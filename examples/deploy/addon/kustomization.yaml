@@ -1,6 +1,7 @@
 namespace: open-cluster-management
 
 resources:
+- resources/addondeploymentconfig.yaml
 - resources/helloworld_clustermanagementaddon.yaml
 - resources/helloworld_helm_clustermanagementaddon.yaml
 - resources/clusterrole.yaml

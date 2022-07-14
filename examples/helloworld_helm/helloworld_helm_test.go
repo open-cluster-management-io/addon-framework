@@ -8,10 +8,12 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+
 	"sigs.k8s.io/yaml"
 )
 
@@ -19,7 +21,7 @@ func newAgentAddon(t *testing.T) (agent.AgentAddon, error) {
 	registrationOption := newRegistrationOption(nil, nil, utilrand.String(5))
 
 	agentAddon, err := addonfactory.NewAgentAddonFactory(addonName, FS, "manifests/charts/helloworld").
-		WithGetValuesFuncs(getValues, addonfactory.GetValuesFromAddonAnnotation).
+		WithGetValuesFuncs(addonfactory.GetValuesFromAddonAnnotation).
 		WithAgentRegistrationOption(registrationOption).
 		BuildHelmAgentAddon()
 	if err != nil {

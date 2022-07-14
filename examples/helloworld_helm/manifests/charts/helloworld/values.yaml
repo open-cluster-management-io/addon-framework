@@ -12,10 +12,11 @@ resources:
   limits:
     memory: 128Mi
 
+tolerations: []
+
 global:
   imagePullPolicy: IfNotPresent
   imagePullSecret: null
   imageOverrides:
     helloWorldHelm: quay.io/open-cluster-management/helloworld-addon:latest
   nodeSelector: {}
-  tolerations: []

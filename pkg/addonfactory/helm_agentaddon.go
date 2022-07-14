@@ -86,7 +86,9 @@ func (a *HelmAgentAddon) Manifests(
 		if len(data) == 0 {
 			continue
 		}
-		klog.V(4).Infof("rendered template: %v", data)
+
+		klog.Infof("template %s: %s", k, data)
+
 		object, _, err := a.decoder.Decode([]byte(data), nil, nil)
 		if err != nil {
 			if runtime.IsMissingKind(err) {
@@ -131,7 +133,7 @@ func (a *HelmAgentAddon) getValues(
 
 	overrideValues = MergeValues(overrideValues, builtinValues)
 
-	klog.Info("values::", overrideValues)
+	klog.Infof("helm overried values: %+v", overrideValues)
 
 	values, err := chartutil.ToRenderValues(a.chart, overrideValues,
 		a.releaseOptions(cluster, addon), a.capabilities(cluster, addon))
