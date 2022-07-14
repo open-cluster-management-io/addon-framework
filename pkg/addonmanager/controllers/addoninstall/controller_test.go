@@ -41,6 +41,12 @@ func newManagedClusterWithLabel(name, key, value string) *clusterv1.ManagedClust
 	return cluster
 }
 
+func newManagedClusterWithAnnotation(name, key, value string) *clusterv1.ManagedCluster {
+	cluster := addontesting.NewManagedCluster(name)
+	cluster.Annotations = map[string]string{key: value}
+	return cluster
+}
+
 func TestReconcile(t *testing.T) {
 	cases := []struct {
 		name                 string
@@ -111,6 +117,30 @@ func TestReconcile(t *testing.T) {
 			},
 			testaddon: &testAgent{name: "test", strategy: agent.InstallByLabelStrategy("test", metav1.LabelSelector{
 				MatchLabels: map[string]string{"mode": "dev"},
+			})},
+		},
+		{
+			name:  "managed cluster filter install strategy",
+			addon: []runtime.Object{},
+			cluster: []runtime.Object{
+				newManagedClusterWithAnnotation("hosted-1", "mode", "hosted"),
+				newManagedClusterWithAnnotation("hosted-2", "mode", "hosted"),
+				addontesting.NewManagedCluster("default"),
+			},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				// expect one create on trigger by cluster "default"
+				addontesting.AssertActions(t, actions, "create")
+				actual := actions[0].(clienttesting.CreateActionImpl).Object
+				addOn := actual.(*addonapiv1alpha1.ManagedClusterAddOn)
+				if addOn.Spec.InstallNamespace != "test" {
+					t.Errorf("Install namespace is not correct, expected test but got %s", addOn.Spec.InstallNamespace)
+				}
+			},
+			testaddon: &testAgent{name: "test", strategy: agent.InstallAllStrategy("test").WithManagedClusterFilter(func(cluster *clusterv1.ManagedCluster) bool {
+				if v, ok := cluster.Annotations["mode"]; ok && v == "hosted" {
+					return false
+				}
+				return true
 			})},
 		},
 	}

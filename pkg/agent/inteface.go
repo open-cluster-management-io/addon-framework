@@ -124,6 +124,14 @@ type InstallStrategy struct {
 
 	// LabelSelector is used to filter clusters based on label. It is only used when strategyType is InstallByLabel
 	LabelSelector *metav1.LabelSelector
+
+	// ManagedClusterFilter will filter the clusters to install the addon to.
+	ManagedClusterFilter func(cluster *clusterv1.ManagedCluster) bool
+}
+
+func (s *InstallStrategy) WithManagedClusterFilter(f func(cluster *clusterv1.ManagedCluster) bool) *InstallStrategy {
+	s.ManagedClusterFilter = f
+	return s
 }
 
 type HealthProber struct {

@@ -91,6 +91,7 @@ func (c *addonInstallController) sync(ctx context.Context, syncCtx factory.SyncC
 			return c.applyAddon(ctx, addonName, clusterName, addon.GetAgentAddonOptions().InstallStrategy.InstallNamespace)
 		case agent.InstallByLabel:
 			labelSelector := addon.GetAgentAddonOptions().InstallStrategy.LabelSelector
+			managedClusterFilter := addon.GetAgentAddonOptions().InstallStrategy.ManagedClusterFilter
 			if labelSelector == nil {
 				klog.Warningf("installByLabel strategy is set, but label selector is not set")
 				return nil
@@ -104,6 +105,12 @@ func (c *addonInstallController) sync(ctx context.Context, syncCtx factory.SyncC
 
 			if !selector.Matches(labels.Set(cluster.Labels)) {
 				return nil
+			}
+
+			if managedClusterFilter != nil {
+				if !managedClusterFilter(cluster) {
+					return nil
+				}
 			}
 
 			return c.applyAddon(ctx, addonName, clusterName, addon.GetAgentAddonOptions().InstallStrategy.InstallNamespace)
