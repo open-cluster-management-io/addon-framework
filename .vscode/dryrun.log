@@ -1,6 +1,0 @@
-make --dry-run --always-make --keep-going --print-directory
-make: Entering directory `/Users/xuezhao/go/src/github.com/xuezhaojun/addon-framework'
-go build -mod=vendor -trimpath -ldflags "-X open-cluster-management.io/addon-framework/pkg/version.versionFromGit="v0.3.0-17-g0c5f94a" -X open-cluster-management.io/addon-framework/pkg/version.commitFromGit="0c5f94a3" -X open-cluster-management.io/addon-framework/pkg/version.gitTreeState="clean" -X open-cluster-management.io/addon-framework/pkg/version.buildDate="2022-07-15T02:40:18Z" " open-cluster-management.io/addon-framework/examples/cmd/helloworld
-go build -mod=vendor -trimpath -ldflags "-X open-cluster-management.io/addon-framework/pkg/version.versionFromGit="v0.3.0-17-g0c5f94a" -X open-cluster-management.io/addon-framework/pkg/version.commitFromGit="0c5f94a3" -X open-cluster-management.io/addon-framework/pkg/version.gitTreeState="clean" -X open-cluster-management.io/addon-framework/pkg/version.buildDate="2022-07-15T02:40:18Z" " open-cluster-management.io/addon-framework/examples/cmd/helloworld_helm
-make: Leaving directory `/Users/xuezhao/go/src/github.com/xuezhaojun/addon-framework'
- 
