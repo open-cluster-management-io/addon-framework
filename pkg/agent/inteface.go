@@ -223,11 +223,6 @@ func InstallByLabelStrategy(installNamespace string, selector metav1.LabelSelect
 		Type:             InstallByLabel,
 		InstallNamespace: installNamespace,
 		managedClusterFilter: func(cluster *clusterv1.ManagedCluster) bool {
-			if &selector == nil {
-				klog.Warningf("installByLabel strategy is set, but label selector is not set")
-				return false
-			}
-
 			selector, err := metav1.LabelSelectorAsSelector(&selector)
 			if err != nil {
 				klog.Warningf("labels selector is not correct: %v", err)
