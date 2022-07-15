@@ -105,15 +105,6 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 		{
-			name:                 "selector install strategy with nil label selector",
-			addon:                []runtime.Object{},
-			cluster:              []runtime.Object{addontesting.NewManagedCluster("cluster1")},
-			validateAddonActions: addontesting.AssertNoActions,
-			testaddons: map[string]agent.AgentAddon{
-				"test": &testAgent{name: "test", strategy: &agent.InstallStrategy{Type: agent.InstallByLabel}},
-			},
-		},
-		{
 			name:    "selector install strategy with matched cluster",
 			addon:   []runtime.Object{},
 			cluster: []runtime.Object{newManagedClusterWithLabel("cluster1", "mode", "dev")},

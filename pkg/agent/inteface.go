@@ -5,7 +5,9 @@ import (
 
 	certificatesv1 "k8s.io/api/certificates/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
@@ -126,11 +128,12 @@ type InstallStrategy struct {
 	// InstallNamespace is target deploying namespace in the managed cluster upon automatic addon installation.
 	InstallNamespace string
 
-	// LabelSelector is used to filter clusters based on label. It is only used when strategyType is InstallByLabel
-	LabelSelector *metav1.LabelSelector
+	// managedClusterFilter will filter the clusters to install the addon to.
+	managedClusterFilter func(cluster *clusterv1.ManagedCluster) bool
+}
 
-	// ManagedClusterFilter will filter the clusters to install the addon to.
-	ManagedClusterFilter func(cluster *clusterv1.ManagedCluster) bool
+func (s *InstallStrategy) GetManagedClusterFilter() func(cluster *clusterv1.ManagedCluster) bool {
+	return s.managedClusterFilter
 }
 
 type HealthProber struct {
@@ -209,6 +212,9 @@ func InstallAllStrategy(installNamespace string) *InstallStrategy {
 	return &InstallStrategy{
 		Type:             InstallAll,
 		InstallNamespace: installNamespace,
+		managedClusterFilter: func(cluster *clusterv1.ManagedCluster) bool {
+			return true
+		},
 	}
 }
 
@@ -216,15 +222,36 @@ func InstallByLabelStrategy(installNamespace string, selector metav1.LabelSelect
 	return &InstallStrategy{
 		Type:             InstallByLabel,
 		InstallNamespace: installNamespace,
-		LabelSelector:    &selector,
+		managedClusterFilter: func(cluster *clusterv1.ManagedCluster) bool {
+			if &selector == nil {
+				klog.Warningf("installByLabel strategy is set, but label selector is not set")
+				return false
+			}
+
+			selector, err := metav1.LabelSelectorAsSelector(&selector)
+			if err != nil {
+				klog.Warningf("labels selector is not correct: %v", err)
+				return false
+			}
+
+			if !selector.Matches(labels.Set(cluster.Labels)) {
+				return false
+			}
+			return true
+		},
 	}
 }
 
 func InstallByFilterFunctionStrategy(installNamespace string, f func(cluster *clusterv1.ManagedCluster) bool) *InstallStrategy {
+	if f == nil {
+		f = func(cluster *clusterv1.ManagedCluster) bool {
+			return true
+		}
+	}
 	return &InstallStrategy{
 		Type:                 InstallByFilterFunction,
 		InstallNamespace:     installNamespace,
-		ManagedClusterFilter: f,
+		managedClusterFilter: f,
 	}
 }
 
