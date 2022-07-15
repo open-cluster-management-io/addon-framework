@@ -1,0 +1,944 @@
+make all --print-data-base --no-builtin-variables --no-builtin-rules --question
+# GNU Make 3.81
+# Copyright (C) 2006  Free Software Foundation, Inc.
+# This is free software; see the source for copying conditions.
+# There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A
+# PARTICULAR PURPOSE.
+
+# This program built for i386-apple-darwin11.3.0
+ 
+
+# Make data base, printed on Fri Jul 15 10:40:20 2022
+
+# Variables
+
+# automatic
+<D = $(patsubst %/,%,$(dir $<))
+# automatic
+?F = $(notdir $?)
+# environment
+ELECTRON_NO_ATTACH_CONSOLE = 1
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/openshift/imagebuilder.mk', line 6)
+IMAGEBUILDER_VERSION = 1.2.1
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/version.mk', line 23)
+define verify-golang-version-reference-internal
+verify-golang-versions-$(1): .empty-golang-versions-files
+verify-golang-versions-$(1):
+	@mkdir -p "$(PERMANENT_TMP)"
+	@echo "$(1): $(2)" >> "$(PERMANENT_TMP)/named-golang-versions"
+	@echo "$(2)" >> "$(PERMANENT_TMP)/golang-versions"
+.PHONY: verify-golang-versions-$(1)
+
+verify-golang-versions: verify-golang-versions-$(1)
+endef
+# environment
+FIG_WORKFLOWS_KEYBIND = ^f
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/golang.mk', line 69)
+GO_LD_FLAGS = -ldflags "$(call version-ldflags,$(GO_PACKAGE)/pkg/version) $(GO_LD_EXTRAFLAGS)"
+# makefile (from `Makefile', line 32)
+DEST := /Users/xuezhao/go/src/open-cluster-management.io/addon-framework
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/openshift/deps.mk', line 3)
+_self_dir_openshift_deps := vendor/github.com/openshift/build-machinery-go/make/targets/openshift/
+# automatic
+?D = $(patsubst %/,%,$(dir $?))
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/openshift//deps-gomod.mk', line 9)
+define restore-deps
+	ln -s $(abspath ./) "$(1)"/current
+	cp -R -H ./ "$(1)"/updated
+	$(RM) -r "$(1)"/updated/vendor
+	cd "$(1)"/updated && $(GO) mod tidy && $(GO) mod vendor && $(GO) mod verify
+	cd "$(1)" && $(deps_diff) -r {current,updated}/vendor/ > updated/deps.diff || true
+endef
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/openshift/imagebuilder.mk', line 8)
+IMAGEBUILDER = $(shell which imagebuilder 2>/dev/null)
+# automatic
+@D = $(patsubst %/,%,$(dir $@))
+# automatic
+@F = $(notdir $@)
+# makefile
+CURDIR := /Users/xuezhao/go/src/github.com/xuezhaojun/addon-framework
+# makefile (from `Makefile', line 1)
+SHELL := /bin/bash
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/golang.mk', line 47)
+GO_BUILD_BINDIR = 
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/golang.mk', line 5)
+GO = go
+# makefile (from `Makefile', line 31)
+BASE_DIR := addon-framework
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/golang.mk', line 34)
+GO_MOD_FLAGS = -mod=vendor
+# environment
+VSCODE_NLS_CONFIG = {"locale":"zh-cn","availableLanguages":{},"_languagePackSupport":true}
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/golang.mk', line 46)
+GO_BUILD_FLAGS = -trimpath
+# environment
+_ = /usr/bin/make
+# makefile (from `test/integration-test.mk', line 1)
+TEST_TMP := /tmp
+# makefile (from `test/integration-test.mk', line 1)
+MAKEFILE_LIST :=  Makefile vendor/github.com/openshift/build-machinery-go/make/golang.mk vendor/github.com/openshift/build-machinery-go/make/targets/help.mk vendor/github.com/openshift/build-machinery-go/make/targets/golang/build.mk vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/golang.mk vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/version.mk vendor/github.com/openshift/build-machinery-go/make/targets/golang/test-unit.mk vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/golang.mk vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/version.mk vendor/github.com/openshift/build-machinery-go/make/targets/golang/verify-update.mk vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/golang.mk vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/version.mk vendor/github.com/openshift/build-machinery-go/make/targets/golang/version.mk vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/golang.mk vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/version.mk vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/tmp.mk vendor/github.com/openshift/build-machinery-go/make/targets/openshift/deps.mk vendor/github.com/openshift/build-machinery-go/make/targets/openshift/../../lib/golang.mk vendor/github.com/openshift/build-machinery-go/make/targets/openshift/../../lib/version.mk vendor/github.com/openshift/build-machinery-go/make/targets/openshift//deps-gomod.mk vendor/github.com/openshift/build-machinery-go/make/targets/openshift//../../lib/golang.mk vendor/github.com/openshift/build-machinery-go/make/targets/openshift//../../lib/version.mk vendor/github.com/openshift/build-machinery-go/make/targets/openshift/images.mk vendor/github.com/openshift/build-machinery-go/make/targets/openshift/imagebuilder.mk vendor/github.com/openshift/build-machinery-go/make/targets/openshift/../../lib/golang.mk vendor/github.com/openshift/build-machinery-go/make/targets/openshift/../../lib/version.mk vendor/github.com/openshift/build-machinery-go/make/targets/openshift/../../lib/tmp.mk vendor/github.com/openshift/build-machinery-go/make/lib/tmp.mk test/integration-test.mk
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/verify-update.mk', line 5)
+go_files_count := 80
+# environment
+VSCODE_AMD_ENTRYPOINT = vs/workbench/api/node/extensionHostProcess
+# environment
+AUTOJUMP_SOURCED = 1
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/version.mk', line 49)
+verify-buildroot-golang-version = $(call verify-golang-version-reference,.ci-operator.yaml,$(shell grep -e 'tag: .*golang-[[:digit:]]*\.[[:digit:]]' .ci-operator.yaml 2>/dev/null | sed 's/.*golang-\([[:digit:]][[:digit:]]*.[[:digit:]][[:digit:]]*\).*/\1/'))
+# environment
+__CFBundleIdentifier = com.microsoft.VSCode
+# environment
+INFOPATH = /usr/local/share/info:
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/lib/tmp.mk', line 1)
+PERMANENT_TMP := _output
+# environment
+VSCODE_CWD = /Users/xuezhao/go/src/github.com/xuezhaojun
+# environment
+GOPROXY = https://goproxy.cn,direct
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/golang.mk', line 51)
+GO_LD_EXTRAFLAGS = 
+# environment
+PATH = /usr/local/bin:/usr/local/sbin:/opt/local/bin:/opt/local/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/go/bin:/usr/local/MacGPG2/bin:/Library/Apple/usr/bin:/Users/xuezhao/.fig/bin:/Users/xuezhao/.local/bin://Users/xuezhao/.oh-my-zsh/custom/plugins/kubetail:/root/go/bin:/Users/xuezhao/go/bin:/Users/xuezhao/flutter-dev/flutter/bin:/Users/xuezhao/.krew/bin:/Users/xuezhao/sonar-scanner-4.7.0.2747-macosx/bin
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/openshift/deps.mk', line 5)
+deps_gomod_mkfile := vendor/github.com/openshift/build-machinery-go/make/targets/openshift//deps-gomod.mk
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/golang.mk', line 60)
+OS_GIT_VERSION = $(SOURCE_GIT_TAG)
+# environment
+LSCOLORS = Gxfxcxdxbxegedabagacad
+# makefile (from `test/integration-test.mk', line 5)
+K8S_VERSION = 1.23.1
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/golang.mk', line 17)
+GOLINT = golint
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/golang.mk', line 37)
+GO_PACKAGE = $(shell $(GO) list $(GO_MOD_FLAGS) -m -f '{{ .Path }}' || echo 'no_package_detected')
+# environment
+GOPATH = /Users/xuezhao/go
+# makefile (from `Makefile', line 20)
+KUSTOMIZE_ARCHIVE_NAME = kustomize_$(KUSTOMIZE_VERSION)_$(GOHOSTOS)_$(GOHOSTARCH).tar.gz
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/lib/tmp.mk', line 2)
+PERMANENT_TMP_GOPATH := _output/tools
+# makefile (from `Makefile', line 27)
+IMAGE_TAG = latest
+# environment
+ELECTRON_RUN_AS_NODE = 1
+# environment
+ 
+KUBECONFIG = /Users/xuezhao/configs/kubeconfigs/default.kubeconfig
+# default
+.FEATURES := target-specific order-only second-expansion else-if archives jobserver check-symlink
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/golang.mk', line 9)
+GOHOSTOS = $(shell $(GO) env GOHOSTOS)
+# makefile (from `Makefile', line 21)
+kustomize_dir := /Users/xuezhao/go/src/github.com/xuezhaojun/addon-framework/_output/tools/bin/
+# environment
+SSH_AUTH_SOCK = /private/tmp/com.apple.launchd.xXbD7QUG2I/Listeners
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/version.mk', line 41)
+verify-Dockerfile-builder-golang-version = $(call verify-golang-version-reference,$(1),$(shell grep "AS builder" "$(1)" | sed 's/.*golang-\([[:digit:]][[:digit:]]*.[[:digit:]][[:digit:]]*\).*/\1/'))
+# automatic
+%F = $(notdir $%)
+# makefile (from `Makefile', line 30)
+GIT_HOST = open-cluster-management.io
+# makefile (from `Makefile', line 16)
+KUBECTL = kubectl
+# environment
+TTY = /dev/ttys006
+# makefile (from `Makefile', line 25)
+IMAGE = helloworld-addon
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/openshift/images.mk', line 31)
+build-image = $(eval $(call build-image-internal,$(1),$(2),$(3),$(4)))
+# environment
+FIG_PID = 79180
+# makefile (from `Makefile', line 17)
+PWD = $(shell pwd)
+# environment
+HOMEBREW_CELLAR = /usr/local/Cellar
+# environment
+ORIGINAL_XDG_CURRENT_DESKTOP = undefined
+# environment
+MANPATH = /opt/local/share/man:/usr/local/share/man::
+# environment
+GOMODCACHE = /Users/xuezhao/go/pkg/mod
+# environment
+HOME = /Users/xuezhao
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/version.mk', line 54)
+verify-golang-versions = $(if $(1),$(call verify-Dockerfile-builder-golang-version,$(1))) $(if $(wildcard ./.ci-operator.yaml),$(if $(shell grep 'build_root_image:' .ci-operator.yaml 2>/dev/null),$(call verify-buildroot-golang-version))) $(if $(wildcard ./go.mod),$(call verify-go-mod-golang-version))
+# default
+MAKEFILEPATH := /Applications/Xcode.app/Contents/Developer/Makefiles
+# makefile (from `Makefile', line 28)
+EXAMPLE_IMAGE_NAME = $(IMAGE_REGISTRY)/$(IMAGE):$(IMAGE_TAG)
+# environment
+VSCODE_CLI = 1
+# environment
+VSCODE_CODE_CACHE_PATH = /Users/xuezhao/Library/Application Support/Code/CachedData/b06ae3b2d2dbfe28bca3134cc6be65935cdfea6a
+# environment
+LOGNAME = xuezhao
+# environment
+APPLICATION_INSIGHTS_NO_DIAGNOSTIC_CHANNEL = true
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/golang.mk', line 15)
+GOFMT = gofmt
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/golang.mk', line 54)
+SOURCE_GIT_COMMIT = $(shell git rev-parse --short "HEAD^{commit}" 2>/dev/null)
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/openshift/../../lib/golang.mk', line 19)
+go_version := 1.18.1
+# environment
+ZSH = //Users/xuezhao/.oh-my-zsh
+# makefile (from `test/integration-test.mk', line 6)
+KB_TOOLS_ARCHIVE_NAME := kubebuilder-tools-1.23.1-darwin-amd64.tar.gz
+# environment
+VSCODE_HANDLES_UNCAUGHT_ERRORS = true
+# automatic
+^D = $(patsubst %/,%,$(dir $^))
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/golang.mk', line 12)
+GOEXE = $(shell $(GO) env GOEXE)
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/golang.mk', line 11)
+GOHOSTARCH = $(shell $(GO) env GOHOSTARCH)
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/openshift/images.mk', line 9)
+IMAGE_BUILD_EXTRA_FLAGS = 
+# environment
+XPC_FLAGS = 0x0
+# environment
+COLORTERM = truecolor
+# default
+MAKE = $(MAKE_COMMAND)
+# environment
+LC_TERMINAL = iTerm2
+# environment
+SHLVL = 3
+# environment
+FIG_TERM = 1
+# default
+MAKE_VERSION := 3.81
+# environment
+USER = xuezhao
+# environment
+FIG_TERM_VERSION = 4.4.1
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/openshift//deps-gomod.mk', line 6)
+deps_diff := LC_COLLATE=C diff --no-dereference -N
+# default
+MAKECMDGOALS := all
+# environment
+TERM_SESSION_ID = w0t0p0:462B2B52-B0C9-40D5-90DF-01913150BE21
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/golang.mk', line 20)
+GO_REQUIRED_MIN_VERSION = 1.15.2
+# environment
+LESS = -R
+# automatic
+%D = $(patsubst %/,%,$(dir $%))
+# environment
+FIG_INTEGRATION_VERSION = 8
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/openshift/../../lib/golang.mk', line 63)
+version-ldflags = -X $(1).versionFromGit="$(OS_GIT_VERSION)" -X $(1).commitFromGit="$(SOURCE_GIT_COMMIT)" -X $(1).gitTreeState="$(SOURCE_GIT_TREE_STATE)" -X $(1).buildDate="$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')"
+# default
+MAKE_COMMAND := /Applications/Xcode.app/Contents/Developer/usr/bin/make
+# makefile (from `Makefile', line 18)
+KUSTOMIZE = $(PWD)/$(PERMANENT_TMP_GOPATH)/bin/kustomize
+# environment
+TERM_PROGRAM = iTerm.app
+# default
+.VARIABLES := 
+# environment
+TMPDIR = /var/folders/56/kp11pb8d3bz1kxg2v4bs1lvc0000gn/T/
+# automatic
+*F = $(notdir $*)
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/golang.mk', line 8)
+GOOS = $(shell $(GO) env GOOS)
+# environment
+VSCODE_IPC_HOOK = /Users/xuezhao/Library/Application Support/Code/1.69.1-main.sock
+# environment
+MallocNanoZone = 0
+# makefile
+MAKEFLAGS = Rrqp
+# environment
+MFLAGS = -Rrqp
+# automatic
+*D = $(patsubst %/,%,$(dir $*))
+# environment
+TERM_PROGRAM_VERSION = 3.4.16
+# makefile (from `Makefile', line 19)
+KUSTOMIZE_VERSION = v3.5.4
+# environment
+XPC_SERVICE_NAME = application.com.microsoft.VSCode.44593444.44593450.9602ECEA-8407-4937-B010-92EDD8159757
+# environment
+LC_TERMINAL_VERSION = 3.4.16
+# environment
+HOMEBREW_PREFIX = /usr/local
+# automatic
++D = $(patsubst %/,%,$(dir $+))
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/openshift/images.mk', line 8)
+IMAGE_BUILD_DEFAULT_FLAGS = --allow-pull
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/golang.mk', line 55)
+SOURCE_GIT_TREE_STATE = $(shell ( ( [ ! -d ".git/" ] || git diff --quiet ) && echo 'clean' ) || echo 'dirty')
+# automatic
++F = $(notdir $+)
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/version.mk', line 36)
+verify-golang-version-reference = $(eval $(call verify-golang-version-reference-internal,$(1),$(2)))
+# environment
+ITERM_SESSION_ID = w0t0p0:462B2B52-B0C9-40D5-90DF-01913150BE21
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/openshift/../../lib/golang.mk', line 45)
+go_build_binaries = $(notdir $(GO_BUILD_PACKAGES_EXPANDED))
+# environment
+HOMEBREW_REPOSITORY = /usr/local/Homebrew
+# environment
+COLORFGBG = 7;0
+# makefile (from `test/integration-test.mk', line 7)
+KB_TOOLS_ARCHIVE_PATH := /tmp/kubebuilder-tools-1.23.1-darwin-amd64.tar.gz
+# environment
+__CF_USER_TEXT_ENCODING = 0x1F5:0x19:0x34
+# environment
+COMMAND_MODE = unix2003
+# default
+MAKEFILES := 
+# makefile (from `Makefile', line 35)
+GO_TEST_PACKAGES := ./pkg/...
+# automatic
+<F = $(notdir $<)
+# environment
+ITERM_PROFILE = Default
+# makefile (from `Makefile', line 26)
+IMAGE_REGISTRY = quay.io/open-cluster-management
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/golang.mk', line 13)
+GOFLAGS = $(shell $(GO) env GOFLAGS)
+# environment
+PAGER = less
+# environment
+LC_ALL = C
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/golang.mk', line 44)
+GO_BUILD_PACKAGES_EXPANDED = $(shell $(GO) list $(GO_MOD_FLAGS) $(GO_BUILD_PACKAGES))
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/openshift/images.mk', line 15)
+define build-image-internal
+image-$(1): ensure-imagebuilder
+	$(strip imagebuilder $(IMAGE_BUILD_DEFAULT_FLAGS) -t $(2)
+		-f $(3) $(IMAGE_BUILD_EXTRA_FLAGS) $(4) )
+.PHONY: image-$(1)
+
+images: image-$(1)
+.PHONY: images
+endef
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/golang.mk', line 38)
+GO_PACKAGES = ./...
+ 
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/golang.mk', line 10)
+GOARCH = $(shell $(GO) env GOARCH)
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/openshift/imagebuilder.mk', line 10)
+_imagebuilder_installed_version = $(shell $(IMAGEBUILDER) --version)
+# automatic
+^F = $(notdir $^)
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/golang.mk', line 53)
+SOURCE_GIT_TAG = $(shell git describe --long --tags --abbrev=7 --match 'v[0-9]*' || echo 'v0.0.0-unknown')
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/openshift/deps.mk', line 6)
+deps_glide_mkfile := vendor/github.com/openshift/build-machinery-go/make/targets/openshift//deps-glide.mk
+# default
+SUFFIXES := 
+# makefile (from `test/integration-test.mk', line 3)
+KUBEBUILDER_ASSETS = $(TEST_TMP)/kubebuilder/bin
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/build.mk', line 5)
+define build-package
+	$(if $(GO_BUILD_BINDIR),mkdir -p '$(GO_BUILD_BINDIR)',)
+	$(strip $(GO) build $(GO_MOD_FLAGS) $(GO_BUILD_FLAGS) $(GO_LD_FLAGS) $(if $(GO_BUILD_BINDIR),-o '$(GO_BUILD_BINDIR)/$(notdir $(1))$(GOEXE)',) $(1))
+
+endef
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/golang.mk', line 49)
+GO_TEST_FLAGS = -race
+# default
+.INCLUDE_DIRS = /usr/local/include
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/golang.mk', line 40)
+GO_FILES = $(shell find . -name '*.go' -not -path '*/vendor/*' -not -path '*/_output/*' -print)
+# environment
+MAKELEVEL := 0
+# environment
+AUTOJUMP_ERROR_PATH = /Users/xuezhao/Library/autojump/errors.log
+# makefile
+.DEFAULT_GOAL := all
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/openshift/../../lib/version.mk', line 3)
+is_equal_or_higher_version = $(strip $(filter $(2),$(firstword $(shell set -euo pipefail && printf '%s\n%s' '$(1)' '$(2)' | sort -V -r -b))))
+# environment
+LANG = C
+# environment
+TERM = xterm-256color
+# environment
+VSCODE_PID = 96326
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/version.mk', line 45)
+verify-go-mod-golang-version = $(call verify-golang-version-reference,go.mod,$(shell grep -e 'go [[:digit:]]*\.[[:digit:]]*' go.mod 2>/dev/null | sed 's/go //'))
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/golang.mk', line 16)
+GOFMT_FLAGS = -s -l
+# makefile (from `Makefile', line 24)
+GO_BUILD_PACKAGES := ./examples/cmd/...
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/openshift/../../lib/version.mk', line 10)
+require_minimal_version = $(if $($(2)), $(if $(strip $(call is_equal_or_higher_version,$($(2)),$(3))),,$(error `$(1)` is required with minimal version "$($(2))", detected version "$(3)". You can override this check by using `make $(2):=`)), )
+# variable set hash-table stats:
+# Load=162/1024=16%, Rehash=0, Collisions=64/773=8%
+
+# Pattern-specific Variable Values
+
+# No pattern-specific variable values.
+
+# Directories
+
+# . (device 16777221, inode 14925146): 23 files, no impossibilities.
+# /Users/xuezhao/go/src/github.com/xuezhaojun/addon-framework/_output/tools/bin: could not be stat'd.
+# vendor/github.com/openshift/build-machinery-go/make/targets/golang (device 16777221, inode 14926599): 7 files, no impossibilities.
+# /tmp/kubebuilder: could not be stat'd.
+
+# 30 files, no impossibilities in 4 directories.
+
+# Implicit Rules
+
+# No implicit rules.
+
+# Files
+
+verify-gofmt:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  commands to execute (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/verify-update.mk', line 8):
+	$(info Running `$(GOFMT) $(GOFMT_FLAGS)` on $(go_files_count) file(s).)
+	@TMP=$$( mktemp ); \
+	$(GOFMT) $(GOFMT_FLAGS) $(GO_FILES) | tee $${TMP}; \
+	if [ -s $${TMP} ]; then \
+	echo "$@ failed - please run \`make update-gofmt\`"; \
+	exit 1; \
+	fi;
+	
+
+# Not a target:
+vendor/github.com/openshift/build-machinery-go/make/targets/openshift/../../lib/version.mk:
+#  Implicit rule search has been done.
+#  Last modified 2021-12-02 10:08:40
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+# Not a target:
+vendor/github.com/openshift/build-machinery-go/make/targets/openshift/deps.mk:
+#  Implicit rule search has been done.
+#  Last modified 2021-12-02 10:08:40
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+# Not a target:
+vendor/github.com/openshift/build-machinery-go/make/targets/openshift/images.mk:
+#  Implicit rule search has been done.
+#  Last modified 2021-12-02 10:08:40
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+verify-golint:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  commands to execute (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/verify-update.mk', line 30):
+	$(GOLINT) $(GO_PACKAGES)
+	
+
+all: build build
+#  Phony target (prerequisite of .PHONY).
+#  Command-line target.
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has been updated.
+#  Needs to be updated (-q is set).
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/74=0%
+
+# Not a target:
+vendor/github.com/openshift/build-machinery-go/make/targets/golang/version.mk:
+#  Implicit rule search has been done.
+#  Last modified 2021-12-02 10:08:40
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+.empty-golang-versions-files:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  commands to execute (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/version.mk', line 7):
+	@rm -f "$(PERMANENT_TMP)/golang-versions" "$(PERMANENT_TMP)/named-golang-versions"
+	
+
+# Not a target:
+vendor/github.com/openshift/build-machinery-go/make/targets/golang/build.mk:
+#  Implicit rule search has been done.
+#  Last modified 2021-12-02 10:08:40
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+.PHONY: all all help build clean-binaries clean test-unit verify-gofmt update-gofmt verify-govet verify-golint .empty-golang-versions-files verify-golang-versions verify update test clean verify-deps update-deps-overrides ensure-imagebuilder image-helloworld-addon images ensure-kubebuilder-tools clean-integration-test test-integration
+#  Implicit rule search has not been done.
+#  Modification time never checked.
+#  File has not been updated.
+
+update-deps-overrides:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/openshift//deps-gomod.mk', line 32)
+# tmp_dir := /var/folders/56/kp11pb8d3bz1kxg2v4bs1lvc0000gn/T/tmp.NZcfkYxl
+# variable set hash-table stats:
+# Load=1/32=3%, Rehash=0, Collisions=0/3=0%
+#  commands to execute (from `vendor/github.com/openshift/build-machinery-go/make/targets/openshift//deps-gomod.mk', line 34):
+	$(call restore-deps,$(tmp_dir))
+	cp "$(tmp_dir)"/{updated,current}/deps.diff
+	
+
+ensure-kubebuilder-tools:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  commands to execute (from `test/integration-test.mk', line 12):
+	$(info Downloading kube-apiserver into '$(KUBEBUILDER_ASSETS)')
+	mkdir -p '$(KUBEBUILDER_ASSETS)'
+	curl -s -f -L https://storage.googleapis.com/kubebuilder-tools/$(KB_TOOLS_ARCHIVE_NAME) -o '$(KB_TOOLS_ARCHIVE_PATH)'
+ 
+	tar -C '$(KUBEBUILDER_ASSETS)' --strip-components=2 -zvxf '$(KB_TOOLS_ARCHIVE_PATH)'
+	
+
+deploy-example: ensure-kustomize
+#  Implicit rule search has not been done.
+#  Modification time never checked.
+#  File has not been updated.
+#  commands to execute (from `Makefile', line 55):
+	cp examples/deploy/addon/kustomization.yaml examples/deploy/addon/kustomization.yaml.tmp
+	cd examples/deploy/addon && $(KUSTOMIZE) edit set image example-addon-image=$(EXAMPLE_IMAGE_NAME) && $(KUSTOMIZE) edit add configmap image-config --from-literal=EXAMPLE_IMAGE_NAME=$(EXAMPLE_IMAGE_NAME)
+	$(KUSTOMIZE) build examples/deploy/addon | $(KUBECTL) apply -f -
+	mv examples/deploy/addon/kustomization.yaml.tmp examples/deploy/addon/kustomization.yaml
+	
+
+clean-integration-test:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  commands to execute (from `test/integration-test.mk', line 22):
+	$(RM) '$(KB_TOOLS_ARCHIVE_PATH)'
+	rm -rf $(TEST_TMP)/kubebuilder
+	$(RM) ./integration.test
+	
+
+# Not a target:
+vendor/github.com/openshift/build-machinery-go/make/targets/openshift//../../lib/version.mk:
+#  Implicit rule search has been done.
+#  Last modified 2021-12-02 10:08:40
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+# Not a target:
+.SUFFIXES:
+#  Implicit rule search has not been done.
+#  Modification time never checked.
+#  File has not been updated.
+
+# Not a target:
+Makefile:
+#  Implicit rule search has been done.
+#  Last modified 2022-07-14 16:12:48
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+update: update-gofmt
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+
+test: test-unit
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+
+image-helloworld-addon: ensure-imagebuilder
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  commands to execute (from `Makefile', line 43):
+	imagebuilder --allow-pull -t quay.io/open-cluster-management/helloworld-addon -f ./Dockerfile .
+	
+
+build:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  Implicit/static pattern stem: `'
+#  File does not exist.
+#  File has been updated.
+#  Needs to be updated (-q is set).
+# automatic
+# @ := build
+# automatic
+# % := 
+# automatic
+# * := 
+# automatic
+# + := 
+# automatic
+# | := 
+# automatic
+# < := 
+# automatic
+# ^ := 
+# automatic
+# ? := 
+# variable set hash-table stats:
+# Load=8/32=25%, Rehash=0, Collisions=7/82=9%
+#  commands to execute (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/build.mk', line 15):
+	$(if $(strip $(GO_BUILD_PACKAGES_EXPANDED)),,$(error no packages to build: GO_BUILD_PACKAGES_EXPANDED var is empty))
+	$(foreach package,$(GO_BUILD_PACKAGES_EXPANDED),$(call build-package,$(package)))
+	
+
+test-unit:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  commands to execute (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/test-unit.mk', line 7):
+	$(GO) test $(GO_MOD_FLAGS) $(GO_TEST_FLAGS) $(GO_TEST_PACKAGES)
+	
+
+# Not a target:
+vendor/github.com/openshift/build-machinery-go/make/golang.mk:
+#  Implicit rule search has been done.
+#  Last modified 2021-12-02 10:08:40
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+# Not a target:
+vendor/github.com/openshift/build-machinery-go/make/targets/openshift//deps-gomod.mk:
+#  Implicit rule search has been done.
+#  Last modified 2021-12-02 10:08:40
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+# Not a target:
+vendor/github.com/openshift/build-machinery-go/make/targets/openshift/imagebuilder.mk:
+#  Implicit rule search has been done.
+#  Last modified 2021-12-02 10:08:40
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+images: image-helloworld-addon
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+
+help:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  commands to execute (from `vendor/github.com/openshift/build-machinery-go/make/targets/help.mk', line 2):
+	$(info The following make targets are available:)
+	@$(MAKE) -f $(firstword $(MAKEFILE_LIST)) --print-data-base --question no-such-target 2>&1 | grep -v 'no-such-target' | \
+	grep -v -e '^no-such-target' -e '^makefile' | \
+	awk '/^[^.%][-A-Za-z0-9_]*:/	{ print substr($$1, 1, length($$1)-1) }' | sort -u
+	
+
+verify-gocilint:
+#  Implicit rule search has not been done.
+#  Modification time never checked.
+#  File has not been updated.
+#  commands to execute (from `Makefile', line 46):
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.2
+	golangci-lint run --timeout=3m --modules-download-mode vendor ./...
+	
+
+# Not a target:
+vendor/github.com/openshift/build-machinery-go/make/targets/openshift/../../lib/golang.mk:
+#  Implicit rule search has been done.
+#  Last modified 2022-04-22 15:32:51
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+# Not a target:
+vendor/github.com/openshift/build-machinery-go/make/targets/openshift/../../lib/tmp.mk:
+#  Implicit rule search has been done.
+#  Last modified 2021-12-02 10:08:40
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+verify-golang-versions:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  commands to execute (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/version.mk', line 11):
+	@if [ -f "$(PERMANENT_TMP)/golang-versions" ]; then \
+	LINES=$$(cat "$(PERMANENT_TMP)/golang-versions" | sort | uniq | wc -l); \
+	if [ $${LINES} -gt 1 ]; then \
+	echo "Golang version mismatch:"; \
+	cat "$(PERMANENT_TMP)/named-golang-versions" | sort | sed 's/^/- /'; \
+	false; \
+	fi; \
+	fi
+	
+
+# Not a target:
+vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/version.mk:
+#  Implicit rule search has been done.
+#  Last modified 2021-12-02 10:08:40
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+clean-binaries:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  commands to execute (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/build.mk', line 20):
+	$(RM) $(go_build_binaries)
+	
+
+# Not a target:
+vendor/github.com/openshift/build-machinery-go/make/targets/openshift//../../lib/golang.mk:
+#  Implicit rule search has been done.
+#  Last modified 2022-04-22 15:32:51
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+verify-deps:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+ 
+#  File has not been updated.
+# makefile (from `vendor/github.com/openshift/build-machinery-go/make/targets/openshift//deps-gomod.mk', line 17)
+# tmp_dir := /var/folders/56/kp11pb8d3bz1kxg2v4bs1lvc0000gn/T/tmp.OKPnPBho
+# variable set hash-table stats:
+# Load=1/32=3%, Rehash=0, Collisions=0/3=0%
+#  commands to execute (from `vendor/github.com/openshift/build-machinery-go/make/targets/openshift//deps-gomod.mk', line 19):
+	$(call restore-deps,$(tmp_dir))
+	$(deps_diff) "$(tmp_dir)"/{current,updated}/go.mod || ( echo '`go.mod` content is incorrect - did you run `go mod tidy`?' && false )
+	$(deps_diff) "$(tmp_dir)"/{current,updated}/go.sum || ( echo '`go.sum` content is incorrect - did you run `go mod tidy`?' && false )
+	@echo $(deps_diff) '$(tmp_dir)'/{current,updated}/deps.diff
+	@     $(deps_diff) '$(tmp_dir)'/{current,updated}/deps.diff || ( \
+	echo "ERROR: Content of 'vendor/' directory doesn't match 'go.mod' configuration and the overrides in 'deps.diff'!" && \
+	echo 'Did you run `go mod vendor`?' && \
+	echo "If this is an intentional change (a carry patch) please update the 'deps.diff' using 'make update-deps-overrides'." && \
+	false \
+	)
+	rm -rf $(tmp_dir)
+	
+
+update-gofmt:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  commands to execute (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/verify-update.mk', line 18):
+	$(info Running `$(GOFMT) $(GOFMT_FLAGS) -w` on $(go_files_count) file(s).)
+	@$(GOFMT) $(GOFMT_FLAGS) -w $(GO_FILES)
+	
+
+verify-govet:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  commands to execute (from `vendor/github.com/openshift/build-machinery-go/make/targets/golang/verify-update.mk', line 26):
+	$(GO) vet $(GO_MOD_FLAGS) $(GO_PACKAGES)
+	
+
+# Not a target:
+.DEFAULT:
+#  Implicit rule search has not been done.
+#  Modification time never checked.
+#  File has not been updated.
+
+test-e2e: build-e2e deploy-ocm deploy-example
+#  Implicit rule search has not been done.
+#  Modification time never checked.
+#  File has not been updated.
+#  commands to execute (from `Makefile', line 71):
+	./e2e.test -test.v -ginkgo.v
+	
+
+clean: clean-binaries clean-binaries clean-integration-test
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+
+# Not a target:
+vendor/github.com/openshift/build-machinery-go/make/targets/golang/test-unit.mk:
+#  Implicit rule search has been done.
+#  Last modified 2021-12-02 10:08:40
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+deploy-ocm:
+#  Implicit rule search has not been done.
+#  Modification time never checked.
+#  File has not been updated.
+#  commands to execute (from `Makefile', line 52):
+	examples/deploy/ocm/install.sh
+	
+
+build-e2e:
+#  Implicit rule search has not been done.
+#  Modification time never checked.
+#  File has not been updated.
+#  commands to execute (from `Makefile', line 68):
+	go test -c ./test/e2e
+	
+
+undeploy-addon:
+#  Implicit rule search has not been done.
+#  Modification time never checked.
+#  File has not been updated.
+#  commands to execute (from `Makefile', line 61):
+	$(KUBECTL) delete -f examples/deploy/addon/resources/helloworld_helm_clustermanagementaddon.yaml
+	$(KUBECTL) delete -f examples/deploy/addon/resources/helloworld_clustermanagementaddon.yaml
+	
+
+verify: verify-gofmt verify-govet verify-golang-versions verify-gocilint
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+
+ensure-imagebuilder:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  commands to execute (from `vendor/github.com/openshift/build-machinery-go/make/targets/openshift/imagebuilder.mk', line 21):
+	$(info Using existing imagebuilder from $(IMAGEBUILDER))
+	@[[ "$(_imagebuilder_installed_version)" == $(IMAGEBUILDER_VERSION) ]] || \
+	echo "Warning: Installed imagebuilder version $(_imagebuilder_installed_version) does not match expected version $(IMAGEBUILDER_VERSION)."
+	
+
+# Not a target:
+vendor/github.com/openshift/build-machinery-go/make/lib/tmp.mk:
+#  Implicit rule search has been done.
+#  Last modified 2021-12-02 10:08:40
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+# Not a target:
+test/integration-test.mk:
+#  Implicit rule search has been done.
+#  Last modified 2022-04-22 15:32:51
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+# Not a target:
+vendor/github.com/openshift/build-machinery-go/make/targets/golang/verify-update.mk:
+#  Implicit rule search has been done.
+#  Last modified 2021-12-02 10:08:40
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+undeploy-example: ensure-kustomize
+#  Implicit rule search has not been done.
+#  Modification time never checked.
+#  File has not been updated.
+#  commands to execute (from `Makefile', line 65):
+	$(KUSTOMIZE) build examples/deploy/addon | $(KUBECTL) delete --ignore-not-found -f -
+	
+
+test-integration: ensure-kubebuilder-tools
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  commands to execute (from `test/integration-test.mk', line 30):
+	go test -c ./test/integration
+	./integration.test -ginkgo.slowSpecThreshold=15 -ginkgo.v -ginkgo.failFast
+	
+
+ensure-kustomize:
+#  Implicit rule search has not been done.
+#  Modification time never checked.
+#  File has not been updated.
+#  commands to execute (from `Makefile', line 76):
+	$(info Installing kustomize into '$(KUSTOMIZE)')
+	mkdir -p '$(kustomize_dir)'
+	curl -s -f -L https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F$(KUSTOMIZE_VERSION)/$(KUSTOMIZE_ARCHIVE_NAME) -o '$(kustomize_dir)$(KUSTOMIZE_ARCHIVE_NAME)'
+	tar -C '$(kustomize_dir)' -zvxf '$(kustomize_dir)$(KUSTOMIZE_ARCHIVE_NAME)'
+	chmod +x '$(KUSTOMIZE)';
+	
+
+# Not a target:
+vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/golang.mk:
+#  Implicit rule search has been done.
+#  Last modified 2022-04-22 15:32:51
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+# Not a target:
+vendor/github.com/openshift/build-machinery-go/make/targets/golang/../../lib/tmp.mk:
+#  Implicit rule search has been done.
+#  Last modified 2021-12-02 10:08:40
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+# Not a target:
+vendor/github.com/openshift/build-machinery-go/make/targets/help.mk:
+#  Implicit rule search has been done.
+#  Last modified 2021-12-02 10:08:40
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+# files hash-table stats:
+# Load=55/1024=5%, Rehash=0, Collisions=4/175=2%
+# VPATH Search Paths
+
+# No `vpath' search paths.
+
+# No general (`VPATH' variable) search path.
+
+# # of strings in strcache: 21
+# # of strcache buffers: 1
+# strcache size: total = 4096 / max = 4096 / min = 4096 / avg = 4096
+# strcache free: total = 2512 / max = 2512 / min = 2512 / avg = 2512
+
+# Finished Make data base on Fri Jul 15 10:40:20 2022
+
+ 
