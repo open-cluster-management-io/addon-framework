@@ -106,30 +106,12 @@ type RegistrationOption struct {
 	CSRSign CSRSignerFunc
 }
 
-type StrategyType string
-
-const (
-	// InstallAll indicate to install addon to all clusters
-	InstallAll StrategyType = "*"
-
-	// InstallByLabel indicate to install addon based on clusters' label
-	InstallByLabel StrategyType = "LabelSelector"
-
-	// InstallByFilterFunction indicate to install addon based on a filter function
-	// If filter function returns true or it's nil, the addon will be installed to the cluster
-	InstallByFilterFunction StrategyType = "FilterFunction"
-)
-
 // InstallStrategy is the installation strategy of the manifests prescribed by Manifests(..).
 type InstallStrategy struct {
 	*installStrategy
 }
 
 type installStrategy struct {
-	// Type is the type of the installation strategy.
-	// Currently supported values: "InstallAll".
-	Type StrategyType
-
 	// InstallNamespace is target deploying namespace in the managed cluster upon automatic addon installation.
 	InstallNamespace string
 
@@ -216,7 +198,6 @@ func DefaultGroups(clusterName, addonName string) []string {
 func InstallAllStrategy(installNamespace string) *InstallStrategy {
 	return &InstallStrategy{
 		&installStrategy{
-			Type:             InstallAll,
 			InstallNamespace: installNamespace,
 			managedClusterFilter: func(cluster *clusterv1.ManagedCluster) bool {
 				return true
@@ -228,7 +209,6 @@ func InstallAllStrategy(installNamespace string) *InstallStrategy {
 func InstallByLabelStrategy(installNamespace string, selector metav1.LabelSelector) *InstallStrategy {
 	return &InstallStrategy{
 		&installStrategy{
-			Type:             InstallByLabel,
 			InstallNamespace: installNamespace,
 			managedClusterFilter: func(cluster *clusterv1.ManagedCluster) bool {
 				selector, err := metav1.LabelSelectorAsSelector(&selector)
@@ -254,7 +234,6 @@ func InstallByFilterFunctionStrategy(installNamespace string, f func(cluster *cl
 	}
 	return &InstallStrategy{
 		&installStrategy{
-			Type:                 InstallByFilterFunction,
 			InstallNamespace:     installNamespace,
 			managedClusterFilter: f,
 		},
