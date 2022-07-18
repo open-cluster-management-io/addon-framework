@@ -123,9 +123,14 @@ const (
 // Deprecated: InstallStrategy is deprecated. Please don't use it to create a InstallStrategy directly, instead, using functions like `InstallAll`, `InstallByLabel`, `InstallByFilterFunction`.
 // InstallStrategy is the installation strategy of the manifests prescribed by Manifests(..).
 type InstallStrategy struct {
+	*installStrategy
+}
+
+type installStrategy struct {
 	// Type is the type of the installation strategy.
 	// Currently supported values: "InstallAll".
 	Type StrategyType
+
 	// InstallNamespace is target deploying namespace in the managed cluster upon automatic addon installation.
 	InstallNamespace string
 
@@ -211,29 +216,33 @@ func DefaultGroups(clusterName, addonName string) []string {
 
 func InstallAllStrategy(installNamespace string) *InstallStrategy {
 	return &InstallStrategy{
-		Type:             InstallAll,
-		InstallNamespace: installNamespace,
-		managedClusterFilter: func(cluster *clusterv1.ManagedCluster) bool {
-			return true
+		&installStrategy{
+			Type:             InstallAll,
+			InstallNamespace: installNamespace,
+			managedClusterFilter: func(cluster *clusterv1.ManagedCluster) bool {
+				return true
+			},
 		},
 	}
 }
 
 func InstallByLabelStrategy(installNamespace string, selector metav1.LabelSelector) *InstallStrategy {
 	return &InstallStrategy{
-		Type:             InstallByLabel,
-		InstallNamespace: installNamespace,
-		managedClusterFilter: func(cluster *clusterv1.ManagedCluster) bool {
-			selector, err := metav1.LabelSelectorAsSelector(&selector)
-			if err != nil {
-				klog.Warningf("labels selector is not correct: %v", err)
-				return false
-			}
+		&installStrategy{
+			Type:             InstallByLabel,
+			InstallNamespace: installNamespace,
+			managedClusterFilter: func(cluster *clusterv1.ManagedCluster) bool {
+				selector, err := metav1.LabelSelectorAsSelector(&selector)
+				if err != nil {
+					klog.Warningf("labels selector is not correct: %v", err)
+					return false
+				}
 
-			if !selector.Matches(labels.Set(cluster.Labels)) {
-				return false
-			}
-			return true
+				if !selector.Matches(labels.Set(cluster.Labels)) {
+					return false
+				}
+				return true
+			},
 		},
 	}
 }
@@ -245,9 +254,11 @@ func InstallByFilterFunctionStrategy(installNamespace string, f func(cluster *cl
 		}
 	}
 	return &InstallStrategy{
-		Type:                 InstallByFilterFunction,
-		InstallNamespace:     installNamespace,
-		managedClusterFilter: f,
+		&installStrategy{
+			Type:                 InstallByFilterFunction,
+			InstallNamespace:     installNamespace,
+			managedClusterFilter: f,
+		},
 	}
 }
 
