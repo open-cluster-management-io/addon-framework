@@ -120,7 +120,6 @@ const (
 	InstallByFilterFunction StrategyType = "FilterFunction"
 )
 
-// Deprecated: InstallStrategy is deprecated. Please don't use it to create a InstallStrategy directly, instead, using functions like `InstallAll`, `InstallByLabel`, `InstallByFilterFunction`.
 // InstallStrategy is the installation strategy of the manifests prescribed by Manifests(..).
 type InstallStrategy struct {
 	*installStrategy
