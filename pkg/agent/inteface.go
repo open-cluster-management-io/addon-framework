@@ -195,6 +195,7 @@ func DefaultGroups(clusterName, addonName string) []string {
 	}
 }
 
+// InstallAllStrategy indicate to install addon to all clusters
 func InstallAllStrategy(installNamespace string) *InstallStrategy {
 	return &InstallStrategy{
 		&installStrategy{
@@ -206,6 +207,7 @@ func InstallAllStrategy(installNamespace string) *InstallStrategy {
 	}
 }
 
+// InstallByLabelStrategy indicate to install addon based on clusters' label
 func InstallByLabelStrategy(installNamespace string, selector metav1.LabelSelector) *InstallStrategy {
 	return &InstallStrategy{
 		&installStrategy{
@@ -226,6 +228,7 @@ func InstallByLabelStrategy(installNamespace string, selector metav1.LabelSelect
 	}
 }
 
+// InstallByFilterFunctionStrategy indicate to install addon based on a filter function, and it will also install addons if the filter function is nil.
 func InstallByFilterFunctionStrategy(installNamespace string, f func(cluster *clusterv1.ManagedCluster) bool) *InstallStrategy {
 	if f == nil {
 		f = func(cluster *clusterv1.ManagedCluster) bool {
