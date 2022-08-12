@@ -57,13 +57,13 @@ type AddOnMeta struct {
 
 // ConfigCoordinates represents the information for locating the CRD and CR that configures the add-on.
 type ConfigCoordinates struct {
-	// Deprecated: Use configGVR filed instead
+	// Deprecated: Use configGroupResource filed instead
 	// crdName is the name of the CRD used to configure instances of the managed add-on.
 	// This field should be configured if the add-on have a CRD that controls the configuration of the add-on.
 	// +optional
 	CRDName string `json:"crdName"`
 
-	// Deprecated: Use configGVR filed instead
+	// Deprecated: Use configGroupResource filed instead
 	// crName is the name of the CR used to configure instances of the managed add-on.
 	// This field should be configured if add-on CR have a consistent name across the all of the ManagedCluster instaces.
 	// +optional
@@ -74,9 +74,9 @@ type ConfigCoordinates struct {
 	// +optional
 	LastObservedGeneration int64 `json:"lastObservedGeneration,omitempty"`
 
-	// configGR represents the GroupResource of the add-on configuration.
+	// configGroupResource represents the GroupResource of the add-on configuration.
 	// +optional
-	ConfigGR ConfigGR `json:"configGR,omitempty"`
+	ConfigGroupResource ConfigGroupResource `json:"configGroupResource,omitempty"`
 
 	// defaultConfig represents the namespace and name of the default add-on configuration.
 	// In scenario where all add-ons have a same configuration.
@@ -84,8 +84,8 @@ type ConfigCoordinates struct {
 	DefaultConfig ConfigReferent `json:"defaultConfig,omitempty"`
 }
 
-// ConfigGVR represents the GroupVersionResource of the add-on configuration
-type ConfigGR struct {
+// ConfigGroupResource represents the GroupResource of the add-on configuration
+type ConfigGroupResource struct {
 	// group of the add-on configuration.
 	Group string `json:"group"`
 

@@ -30,7 +30,7 @@ spec:
               description: spec represents a desired configuration for an add-on.
               type: object
               properties:
-                customizedVariable:
+                customizedVariables:
                   description: CustomizedVariables is a list of name-value variables for the current add-on deployment. The add-on implementation can use these variables to render the add-on deployment. The default is an empty list.
                   type: array
                   items:

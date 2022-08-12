@@ -1,6 +1,6 @@
 module open-cluster-management.io/addon-framework
 
-go 1.17
+go 1.18
 
 require (
 	github.com/fatih/structs v1.1.0
@@ -130,4 +130,4 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.0 // indirect
 )
 
-replace open-cluster-management.io/api => github.com/skeeey/api v0.5.1-0.20220713083550-28e1ecb42be7
+replace open-cluster-management.io/api => github.com/skeeey/api v0.5.1-0.20220811122128-eb75e5e538ab

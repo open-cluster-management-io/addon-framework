@@ -3,7 +3,14 @@ kind: AddOnDeploymentConfig
 metadata:
   name: global
 spec:
+  customizedVariables:
+  - name: Image
+    value: quay.io/open-cluster-management/helloworld-addon:latest
+  - name: ImagePullPolicy
+    value: IfNotPresent
   nodePlacement:
+    nodeSelector:
+      "kubernetes.io/os": "linux"
     tolerations:
     - effect: NoSchedule
       key: node-role.kubernetes.io/infra

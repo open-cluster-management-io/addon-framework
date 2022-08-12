@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"embed"
+	"fmt"
 
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -117,13 +118,22 @@ func getValuesFromAddOnDeploymentConfig(addonClient addonv1alpha1client.Interfac
 			return nil, err
 		}
 
-		// TODO read all configuration from addon deployment config
+		imagePullPolicy, ok := getCustomizedVariableValue(config.Spec.CustomizedVariables, "ImagePullPolicy")
+		if !ok {
+			imagePullPolicy = "IfNotPresent"
+		}
+
+		image, ok := getCustomizedVariableValue(config.Spec.CustomizedVariables, "Image")
+		if !ok {
+			image = defaultExampleImage
+		}
+
 		userJsonValues := userValues{
 			ClusterNamespace: cluster.GetName(),
 			Global: global{
-				ImagePullPolicy: "IfNotPresent",
+				ImagePullPolicy: imagePullPolicy,
 				ImageOverrides: map[string]string{
-					"helloWorldHelm": defaultExampleImage,
+					"helloWorldHelm": image,
 				},
 				NodeSelector: map[string]string{},
 			},
@@ -137,6 +147,36 @@ func getValuesFromAddOnDeploymentConfig(addonClient addonv1alpha1client.Interfac
 			userJsonValues.Tolerations = config.Spec.NodePlacement.Tolerations
 		}
 
-		return addonfactory.JsonStructToValues(userJsonValues)
+		values, err := addonfactory.JsonStructToValues(userJsonValues)
+		if err != nil {
+			return nil, err
+		}
+
+		if _, _, err := utils.UpdateManagedClusterAddOnStatus(
+			context.TODO(),
+			addonClient,
+			addon.Namespace,
+			addon.Name,
+			utils.UpdateManagedClusterAddOnConditionFn(metav1.Condition{
+				Type:    addonapiv1alpha1.ManagedClusterAddOnCondtionConfigured,
+				Status:  metav1.ConditionTrue,
+				Reason:  "Configured",
+				Message: fmt.Sprintf("the add-on is configured with AddOnDeploymentConfigs %s", configName),
+			}),
+		); err != nil {
+			return nil, err
+		}
+
+		return values, nil
 	}
+}
+
+func getCustomizedVariableValue(variables []addonapiv1alpha1.CustomizedVariable, name string) (string, bool) {
+	for _, variable := range variables {
+		if variable.Name == name {
+			return variable.Value, true
+		}
+	}
+
+	return "", false
 }

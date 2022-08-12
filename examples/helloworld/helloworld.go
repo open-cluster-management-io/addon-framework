@@ -4,7 +4,6 @@ import (
 	"context"
 	"embed"
 	"fmt"
-	"os"
 
 	"github.com/openshift/library-go/pkg/assets"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -123,12 +122,11 @@ func getValuesFromAddOnDeploymentConfig(addonClient addonv1alpha1client.Interfac
 			installNamespace = helloworldagent.HelloworldAgentInstallationNamespace
 		}
 
-		image := os.Getenv("EXAMPLE_IMAGE_NAME")
-		if len(image) == 0 {
+		image, ok := getCustomizedVariableValue(config.Spec.CustomizedVariables, "Image")
+		if !ok {
 			image = defaultExampleImage
 		}
 
-		// TODO read all configuration from addon deployment config
 		manifestConfig := struct {
 			KubeConfigSecret      string
 			ClusterName           string
@@ -145,6 +143,32 @@ func getValuesFromAddOnDeploymentConfig(addonClient addonv1alpha1client.Interfac
 			Tolerations:           config.Spec.NodePlacement.Tolerations,
 		}
 
-		return addonfactory.StructToValues(manifestConfig), nil
+		values := addonfactory.StructToValues(manifestConfig)
+		if _, _, err := utils.UpdateManagedClusterAddOnStatus(
+			context.TODO(),
+			addonClient,
+			addon.Namespace,
+			addon.Name,
+			utils.UpdateManagedClusterAddOnConditionFn(metav1.Condition{
+				Type:    addonapiv1alpha1.ManagedClusterAddOnCondtionConfigured,
+				Status:  metav1.ConditionTrue,
+				Reason:  "Configured",
+				Message: fmt.Sprintf("the add-on is configured with AddOnDeploymentConfigs %s", configName),
+			}),
+		); err != nil {
+			return nil, err
+		}
+
+		return values, nil
 	}
+}
+
+func getCustomizedVariableValue(variables []addonapiv1alpha1.CustomizedVariable, name string) (string, bool) {
+	for _, variable := range variables {
+		if variable.Name == name {
+			return variable.Value, true
+		}
+	}
+
+	return "", false
 }

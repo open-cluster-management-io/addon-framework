@@ -10,6 +10,7 @@ import (
 	certv1 "k8s.io/api/certificates/v1"
 	certv1beta1 "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	clienttesting "k8s.io/client-go/testing"
@@ -186,7 +187,40 @@ func AssertActions(t *testing.T, actualActions []clienttesting.Action, expectedV
 	}
 }
 
+func NewCondition(name, status, reason, message string, lastTransition *metav1.Time) metav1.Condition {
+	ret := metav1.Condition{
+		Type:    name,
+		Status:  metav1.ConditionStatus(status),
+		Reason:  reason,
+		Message: message,
+	}
+	if lastTransition != nil {
+		ret.LastTransitionTime = *lastTransition
+	}
+	return ret
+}
+
 // AssertNoActions asserts no actions are happened
 func AssertNoActions(t *testing.T, actualActions []clienttesting.Action) {
 	AssertActions(t, actualActions)
+}
+
+// AssertCondition asserts the actual conditions has the expected condition
+func AssertCondition(
+	t *testing.T,
+	actualConditions []metav1.Condition,
+	expectedCondition metav1.Condition) {
+	cond := meta.FindStatusCondition(actualConditions, expectedCondition.Type)
+	if cond == nil {
+		t.Errorf("expected condition %s but got: %s", expectedCondition.Type, cond.Type)
+	}
+	if cond.Status != expectedCondition.Status {
+		t.Errorf("expected status %s but got: %s", expectedCondition.Status, cond.Status)
+	}
+	if cond.Reason != expectedCondition.Reason {
+		t.Errorf("expected reason %s but got: %s", expectedCondition.Reason, cond.Reason)
+	}
+	if cond.Message != expectedCondition.Message {
+		t.Errorf("expected message %s but got: %s", expectedCondition.Message, cond.Message)
+	}
 }

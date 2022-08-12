@@ -25,7 +25,7 @@ type AddOnDeploymentConfigSpec struct {
 	// The add-on implementation can use these variables to render the add-on deployment.
 	// The default is an empty list.
 	// +optional
-	CustomizedVariables []CustomizedVariable `json:"customizedVariable,omitempty"`
+	CustomizedVariables []CustomizedVariable `json:"customizedVariables,omitempty"`
 
 	// NodePlacement enables explicit control over the scheduling of the add-on.
 	// +optional

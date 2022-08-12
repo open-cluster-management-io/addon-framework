@@ -9,6 +9,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,13 +33,14 @@ const HelloworldAgentInstallationNamespace = "default"
 
 func NewAgentCommand(addonName string) *cobra.Command {
 	o := NewAgentOptions(addonName)
-	cmd := controllercmd.
-		NewControllerCommandConfig("helloworld-addon-agent", version.Get(), o.RunAgent).
-		NewCommand()
+	cmdConfig := controllercmd.NewControllerCommandConfig("helloworld-addon-agent", version.Get(), o.RunAgent)
+	cmd := cmdConfig.NewCommand()
 	cmd.Use = "agent"
 	cmd.Short = "Start the addon agent"
 
-	o.AddFlags(cmd)
+	flags := cmd.Flags()
+	o.AddFlags(flags)
+	flags.BoolVar(&cmdConfig.DisableLeaderElection, "disable-leader-election", false, "Disable leader election for the controller.")
 	return cmd
 }
 
@@ -55,8 +57,7 @@ func NewAgentOptions(addonName string) *AgentOptions {
 	return &AgentOptions{AddonName: addonName}
 }
 
-func (o *AgentOptions) AddFlags(cmd *cobra.Command) {
-	flags := cmd.Flags()
+func (o *AgentOptions) AddFlags(flags *pflag.FlagSet) {
 	// This command only supports reading from config
 	flags.StringVar(&o.HubKubeconfigFile, "hub-kubeconfig", o.HubKubeconfigFile, "Location of kubeconfig file to connect to hub cluster.")
 	flags.StringVar(&o.SpokeClusterName, "cluster-name", o.SpokeClusterName, "Name of spoke cluster.")

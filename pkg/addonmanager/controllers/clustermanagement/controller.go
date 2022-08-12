@@ -106,32 +106,43 @@ func (c *clusterManagementController) sync(ctx context.Context, syncCtx factory.
 		return err
 	}
 
-	addon = addon.DeepCopy()
+	addonCopy := addon.DeepCopy()
 
 	// AddOwner if it does not exist
 	modified := resourcemerge.BoolPtr(false)
-	resourcemerge.MergeOwnerRefs(modified, &addon.OwnerReferences, []metav1.OwnerReference{*owner})
+	resourcemerge.MergeOwnerRefs(modified, &addonCopy.OwnerReferences, []metav1.OwnerReference{*owner})
 	if *modified {
-		_, err = c.addonClient.AddonV1alpha1().ManagedClusterAddOns(namespace).Update(ctx, addon, metav1.UpdateOptions{})
+		_, err = c.addonClient.AddonV1alpha1().ManagedClusterAddOns(namespace).Update(ctx, addonCopy, metav1.UpdateOptions{})
 		return err
 	}
 
-	if err := c.mergeConfigReference(modified, clusterManagementAddon, addon); err != nil {
-		return err
-	}
-
-	utils.MergeRelatedObjects(modified, &addon.Status.RelatedObjects, addonapiv1alpha1.ObjectReference{
+	utils.MergeRelatedObjects(modified, &addonCopy.Status.RelatedObjects, addonapiv1alpha1.ObjectReference{
 		Name:     clusterManagementAddon.Name,
 		Resource: "clustermanagementaddons",
 		Group:    addonapiv1alpha1.GroupVersion.Group,
 	})
 
+	if err := mergeConfigReference(c.mapper, modified, clusterManagementAddon, addonCopy); err != nil {
+		_, _, err = utils.UpdateManagedClusterAddOnStatus(
+			ctx,
+			c.addonClient,
+			namespace,
+			addonName,
+			utils.UpdateManagedClusterAddOnConditionFn(metav1.Condition{
+				Type:    addonapiv1alpha1.ManagedClusterAddOnCondtionConfigured,
+				Status:  metav1.ConditionFalse,
+				Reason:  "ConfigurationWrong",
+				Message: err.Error(),
+			}),
+		)
+		return err
+	}
+
 	if !*modified {
 		return nil
 	}
 
-	_, err = c.addonClient.AddonV1alpha1().ManagedClusterAddOns(namespace).UpdateStatus(ctx, addon, metav1.UpdateOptions{})
-
+	_, err = c.addonClient.AddonV1alpha1().ManagedClusterAddOns(namespace).UpdateStatus(ctx, addonCopy, metav1.UpdateOptions{})
 	return err
 }
 
@@ -157,40 +168,32 @@ func (c *clusterManagementController) syncAllAddon(syncCtx factory.SyncContext, 
 	return nil
 }
 
-func (c *clusterManagementController) mergeConfigReference(modified *bool,
-	clusterManagementAddon *addonapiv1alpha1.ClusterManagementAddOn, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
-	if clusterManagementAddon.Spec.AddOnConfiguration.ConfigGR.Group == "" {
-		// keep this in the next few releases for compatibility
-		mergeOldConfigCoordinates(modified, clusterManagementAddon, addon)
+func mergeConfigReference(mapper meta.RESTMapper,
+	modified *bool,
+	clusterManagementAddon *addonapiv1alpha1.ClusterManagementAddOn,
+	addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+	if clusterManagementAddon.Spec.AddOnConfiguration.ConfigGroupResource.Group == "" {
+		// the ConfigGroupResource is not set, the config coordinates may be used
+		mergeConfigCoordinates(modified, clusterManagementAddon, addon)
 		return nil
+	}
+
+	configGVR, err := mapper.ResourceFor(schema.GroupVersionResource{
+		Group:    clusterManagementAddon.Spec.AddOnConfiguration.ConfigGroupResource.Group,
+		Resource: clusterManagementAddon.Spec.AddOnConfiguration.ConfigGroupResource.Resource,
+	})
+	if err != nil {
+		return fmt.Errorf("the configuration resource type is not found, %v", err)
 	}
 
 	if clusterManagementAddon.Spec.AddOnConfiguration.DefaultConfig.Name == "" && addon.Spec.Config.Name == "" {
-		// keep this in the next few releases for compatibility
-		mergeOldConfigCoordinates(modified, clusterManagementAddon, addon)
-		return nil
-	}
-
-	configGVR, err := c.mapper.ResourceFor(schema.GroupVersionResource{
-		Group:    clusterManagementAddon.Spec.AddOnConfiguration.ConfigGR.Group,
-		Resource: clusterManagementAddon.Spec.AddOnConfiguration.ConfigGR.Resource,
-	})
-	if err != nil {
-		return fmt.Errorf("the server doesn't have a resource type %v", err)
-	}
-
-	klog.Infof("version:: %s", configGVR.Version)
-
-	actualConfigReference := addonapiv1alpha1.ConfigReference{
-		ConfigGR:       addon.Status.ConfigReference.ConfigGR,
-		ConfigReferent: addon.Status.ConfigReference.ConfigReferent,
-		Version:        addon.Status.ConfigReference.Version,
+		return fmt.Errorf("the configuration name is required")
 	}
 
 	expectedConfigReference := addonapiv1alpha1.ConfigReference{
-		ConfigGR:       clusterManagementAddon.Spec.AddOnConfiguration.ConfigGR,
-		ConfigReferent: clusterManagementAddon.Spec.AddOnConfiguration.DefaultConfig,
-		Version:        configGVR.Version,
+		ConfigGroupResource: clusterManagementAddon.Spec.AddOnConfiguration.ConfigGroupResource,
+		ConfigReferent:      clusterManagementAddon.Spec.AddOnConfiguration.DefaultConfig,
+		Version:             configGVR.Version,
 	}
 
 	if addon.Spec.Config.Namespace != "" {
@@ -201,8 +204,14 @@ func (c *clusterManagementController) mergeConfigReference(modified *bool,
 		expectedConfigReference.ConfigReferent.Name = addon.Spec.Config.Name
 	}
 
+	actualConfigReference := addonapiv1alpha1.ConfigReference{
+		ConfigGroupResource: addon.Status.ConfigReference.ConfigGroupResource,
+		ConfigReferent:      addon.Status.ConfigReference.ConfigReferent,
+		Version:             addon.Status.ConfigReference.Version,
+	}
+
 	if !equality.Semantic.DeepEqual(actualConfigReference, expectedConfigReference) {
-		addon.Status.ConfigReference.ConfigGR = expectedConfigReference.ConfigGR
+		addon.Status.ConfigReference.ConfigGroupResource = expectedConfigReference.ConfigGroupResource
 		addon.Status.ConfigReference.ConfigReferent = expectedConfigReference.ConfigReferent
 		addon.Status.ConfigReference.Version = expectedConfigReference.Version
 		*modified = true
@@ -211,7 +220,8 @@ func (c *clusterManagementController) mergeConfigReference(modified *bool,
 	return nil
 }
 
-func mergeOldConfigCoordinates(modified *bool,
+// keep this function in the next few releases for compatibility
+func mergeConfigCoordinates(modified *bool,
 	clusterManagementAddon *addonapiv1alpha1.ClusterManagementAddOn, addon *addonapiv1alpha1.ManagedClusterAddOn) {
 	expectedCoordinate := addonapiv1alpha1.ConfigCoordinates{
 		//lint:ignore SA1019 Ignore the deprecation warnings

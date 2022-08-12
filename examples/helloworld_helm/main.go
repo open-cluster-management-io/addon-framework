@@ -71,12 +71,12 @@ func newCommand() *cobra.Command {
 }
 
 func newControllerCommand() *cobra.Command {
-	cmd := controllercmd.
-		NewControllerCommandConfig("helloworldhelm-addon-controller", version.Get(), runController).
-		NewCommand()
+	cmdConfig := controllercmd.NewControllerCommandConfig("helloworldhelm-addon-controller", version.Get(), runController)
+	cmdConfig.DisableLeaderElection = false
+
+	cmd := cmdConfig.NewCommand()
 	cmd.Use = "controller"
 	cmd.Short = "Start the addon controller"
-
 	return cmd
 }
 

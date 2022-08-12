@@ -31,8 +31,8 @@ func (AddOnDeploymentConfigList) SwaggerDoc() map[string]string {
 }
 
 var map_AddOnDeploymentConfigSpec = map[string]string{
-	"customizedVariable": "CustomizedVariables is a list of name-value variables for the current add-on deployment. The add-on implementation can use these variables to render the add-on deployment. The default is an empty list.",
-	"nodePlacement":      "NodePlacement enables explicit control over the scheduling of the add-on.",
+	"customizedVariables": "CustomizedVariables is a list of name-value variables for the current add-on deployment. The add-on implementation can use these variables to render the add-on deployment. The default is an empty list.",
+	"nodePlacement":       "NodePlacement enables explicit control over the scheduling of the add-on.",
 }
 
 func (AddOnDeploymentConfigSpec) SwaggerDoc() map[string]string {
@@ -109,10 +109,10 @@ func (ClusterManagementAddOnStatus) SwaggerDoc() map[string]string {
 
 var map_ConfigCoordinates = map[string]string{
 	"":                       "ConfigCoordinates represents the information for locating the CRD and CR that configures the add-on.",
-	"crdName":                "Deprecated: Use configGVR filed instead crdName is the name of the CRD used to configure instances of the managed add-on. This field should be configured if the add-on have a CRD that controls the configuration of the add-on.",
-	"crName":                 "Deprecated: Use configGVR filed instead crName is the name of the CR used to configure instances of the managed add-on. This field should be configured if add-on CR have a consistent name across the all of the ManagedCluster instaces.",
+	"crdName":                "Deprecated: Use configGroupResource filed instead crdName is the name of the CRD used to configure instances of the managed add-on. This field should be configured if the add-on have a CRD that controls the configuration of the add-on.",
+	"crName":                 "Deprecated: Use configGroupResource filed instead crName is the name of the CR used to configure instances of the managed add-on. This field should be configured if add-on CR have a consistent name across the all of the ManagedCluster instaces.",
 	"lastObservedGeneration": "Deprecated: This will be removed lastObservedGeneration is the observed generation of the custom resource for the configuration of the addon.",
-	"configGR":               "configGR represents the GroupResource of the add-on configuration.",
+	"configGroupResource":    "configGroupResource represents the GroupResource of the add-on configuration.",
 	"defaultConfig":          "defaultConfig represents the namespace and name of the default add-on configuration. In scenario where all add-ons have a same configuration.",
 }
 
@@ -120,14 +120,14 @@ func (ConfigCoordinates) SwaggerDoc() map[string]string {
 	return map_ConfigCoordinates
 }
 
-var map_ConfigGR = map[string]string{
-	"":         "ConfigGVR represents the GroupVersionResource of the add-on configuration",
+var map_ConfigGroupResource = map[string]string{
+	"":         "ConfigGroupResource represents the GroupResource of the add-on configuration",
 	"group":    "group of the add-on configuration.",
 	"resource": "resource of the add-on configuration.",
 }
 
-func (ConfigGR) SwaggerDoc() map[string]string {
-	return map_ConfigGR
+func (ConfigGroupResource) SwaggerDoc() map[string]string {
+	return map_ConfigGroupResource
 }
 
 var map_ConfigReferent = map[string]string{

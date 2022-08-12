@@ -136,6 +136,9 @@ const (
 	// ManagedClusterAddOnConditionDegraded represents that the addon agent is providing degraded service on
 	// the managed cluster.
 	ManagedClusterAddOnConditionDegraded string = "Degraded"
+
+	// ManagedClusterAddOnCondtionConfigured represents that the addon agent is configured with its configuration
+	ManagedClusterAddOnCondtionConfigured string = "Configured"
 )
 
 // ObjectReference contains enough information to let you inspect or modify the referred object.
@@ -160,8 +163,8 @@ type ObjectReference struct {
 // ConfigReference is a reference to the current add-on configuration.
 // This resource is used to locate the configuration resource for the current add-on.
 type ConfigReference struct {
-	// This field is synced from ClusterManagementAddOn configGVR field.
-	ConfigGR `json:",inline"`
+	// This field is synced from ClusterManagementAddOn configGroupResource field.
+	ConfigGroupResource `json:",inline"`
 
 	// This field is synced from ClusterManagementAddOn defaultConfig and ManagedClusterAddOn config fields.
 	// If both them are defined, the ManagedClusterAddOn config will overwrite the ClusterManagementAddOn
