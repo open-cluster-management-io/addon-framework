@@ -105,6 +105,8 @@ func (a *HelmAgentAddon) Manifests(
 			if len(b) != 0 {
 				object, _, err := a.decoder.Decode(b, nil, nil)
 				if err != nil {
+					// In some conditions, resources will be provide by other hub-side components.
+					// Example case: https://github.com/open-cluster-management-io/addon-framework/pull/72
 					if runtime.IsMissingKind(err) {
 						klog.V(4).Infof("Skipping template %v, reason: %v", k, err)
 						continue
