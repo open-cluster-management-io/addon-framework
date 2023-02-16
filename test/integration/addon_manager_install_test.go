@@ -153,6 +153,7 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 
 			// delete an addon and ensure it is recreated.
 			err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(clusterNames[1]).Delete(context.Background(), cma.Name, metav1.DeleteOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Eventually(func() error {
 				_, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(clusterNames[1]).Get(context.Background(), cma.Name, metav1.GetOptions{})
 				if err != nil {

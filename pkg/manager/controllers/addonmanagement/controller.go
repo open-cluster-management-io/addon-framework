@@ -23,7 +23,6 @@ type addonManagementController struct {
 	addonClient                   addonv1alpha1client.Interface
 	clusterManagementAddonLister  addonlisterv1alpha1.ClusterManagementAddOnLister
 	clusterManagementAddonIndexer cache.Indexer
-	managedClusterAddonIndexer    cache.Indexer
 
 	reconcilers []addonManagementReconcile
 }

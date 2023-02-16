@@ -1,14 +1,17 @@
 FROM golang:1.18 AS builder
+ARG OS=linux
+ARG ARCH=amd64
 WORKDIR /go/src/open-cluster-management.io/addon-framework
 COPY . .
 ENV GO_PACKAGE open-cluster-management.io/addon-framework
 
-RUN make build --warn-undefined-variables
+RUN GOOS=${OS} \
+    GOARCH=${ARCH} \
+    make build --warn-undefined-variables
 
 FROM registry.access.redhat.com/ubi8/ubi-minimal:latest
-COPY --from=builder /go/src/open-cluster-management.io/addon-framework/busybox /
-COPY --from=builder /go/src/open-cluster-management.io/addon-framework/helloworld /
-COPY --from=builder /go/src/open-cluster-management.io/addon-framework/helloworld_helm /
-COPY --from=builder /go/src/open-cluster-management.io/addon-framework/helloworld_hosted /
+ENV USER_UID=10001
+COPY --from=builder /go/src/open-cluster-management.io/addon-framework/addon-manager /
 
 RUN microdnf update && microdnf clean all
+USER ${USER_UID}

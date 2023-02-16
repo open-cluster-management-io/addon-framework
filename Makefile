@@ -45,10 +45,10 @@ GO_TEST_PACKAGES :=./pkg/...
 # This will call a macro called "build-image" which will generate image specific targets based on the parameters:
 # $0 - macro name
 # $1 - target suffix
-# $2 - Dockerfile.example path
+# $2 - Dockerfile path
 # $3 - context directory for image build
 # It will generate target "image-$(1)" for building the image and binding it as a prerequisite to target "images".
-$(call build-image,$(IMAGE),$(IMAGE_REGISTRY)/$(IMAGE),./Dockerfile,.)
+$(call build-image,$(IMAGE),$(IMAGE_REGISTRY)/$(IMAGE),./build/Dockerfile,.)
 $(call build-image,$(EXAMPLE_IMAGE),$(IMAGE_REGISTRY)/$(EXAMPLE_IMAGE),./build/Dockerfile.example,.)
 
 verify-gocilint:
