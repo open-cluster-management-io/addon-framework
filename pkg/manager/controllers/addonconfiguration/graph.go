@@ -5,22 +5,25 @@ import (
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
 
-// configurationGraph is a snapshot graph on the configuration of addons
+// configurationTree is a 2 level snapshot tree on the configuration of addons
+// the first level is a list of nodes that represents a install strategy and a desired configuration for this install
+// strategy. The second level is a list of nodes that represent each mca and its desired configuration
 type configurationGraph struct {
-	// placementNodes maintains a list between a placement and its related mcas
-	placementNodes []*placementNode
-	// defaults are the addons that not defined in any placementNode
-	defaults *placementNode
+	// nodes maintains a list between a installStrategy and its related mcas
+	nodes []*installStrategyNode
+	// defaults is the nodes with no install strategy
+	defaults *installStrategyNode
 }
 
-// placementNode is a node in configurationGraph defined by a placement
-type placementNode struct {
+// installStrategyNode is a node in configurationGraph defined by a install strategy
+type installStrategyNode struct {
 	desiredConfigs addonConfigMap
-	addons         map[string]*addonNode
-	clusters       sets.String
+	// children keeps a map of addons node as the children of this node
+	children map[string]*addonNode
+	clusters sets.String
 }
 
-// addonNode is a child of placementNode
+// addonNode is node as a child of installStrategy node represting a mca
 type addonNode struct {
 	desiredConfigs addonConfigMap
 	mca            *addonv1alpha1.ManagedClusterAddOn
@@ -38,10 +41,10 @@ func (d addonConfigMap) copy() addonConfigMap {
 
 func newGraph(supportedConfigs []addonv1alpha1.ConfigMeta) *configurationGraph {
 	graph := &configurationGraph{
-		placementNodes: []*placementNode{},
-		defaults: &placementNode{
+		nodes: []*installStrategyNode{},
+		defaults: &installStrategyNode{
 			desiredConfigs: map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference{},
-			addons:         map[string]*addonNode{},
+			children:       map[string]*addonNode{},
 		},
 	}
 
@@ -62,9 +65,9 @@ func newGraph(supportedConfigs []addonv1alpha1.ConfigMeta) *configurationGraph {
 
 // addAddonNode to the graph, starting from placement with the highest order
 func (g *configurationGraph) addAddonNode(mca *addonv1alpha1.ManagedClusterAddOn) {
-	for i := len(g.placementNodes) - 1; i >= 0; i-- {
-		if g.placementNodes[i].clusters.Has(mca.Namespace) {
-			g.placementNodes[i].addNode(mca)
+	for i := len(g.nodes) - 1; i >= 0; i-- {
+		if g.nodes[i].clusters.Has(mca.Namespace) {
+			g.nodes[i].addNode(mca)
 			return
 		}
 	}
@@ -74,9 +77,9 @@ func (g *configurationGraph) addAddonNode(mca *addonv1alpha1.ManagedClusterAddOn
 
 // addNode delete clusters on existing graph so the new configuration overrides the previous
 func (g *configurationGraph) addPlacementNode(configs []addonv1alpha1.AddOnConfig, clusters []string) {
-	node := &placementNode{
+	node := &installStrategyNode{
 		desiredConfigs: g.defaults.desiredConfigs,
-		addons:         map[string]*addonNode{},
+		children:       map[string]*addonNode{},
 		clusters:       sets.NewString(clusters...),
 	}
 
@@ -93,24 +96,24 @@ func (g *configurationGraph) addPlacementNode(configs []addonv1alpha1.AddOnConfi
 
 	// remove addon in defaults and other placements.
 	for _, cluster := range clusters {
-		if _, ok := g.defaults.addons[cluster]; ok {
-			node.addNode(g.defaults.addons[cluster].mca)
-			delete(g.defaults.addons, cluster)
+		if _, ok := g.defaults.children[cluster]; ok {
+			node.addNode(g.defaults.children[cluster].mca)
+			delete(g.defaults.children, cluster)
 		}
-		for _, placement := range g.placementNodes {
-			if _, ok := placement.addons[cluster]; ok {
-				node.addNode(placement.addons[cluster].mca)
-				delete(placement.addons, cluster)
+		for _, placement := range g.nodes {
+			if _, ok := placement.children[cluster]; ok {
+				node.addNode(placement.children[cluster].mca)
+				delete(placement.children, cluster)
 			}
 		}
 	}
-	g.placementNodes = append(g.placementNodes, node)
+	g.nodes = append(g.nodes, node)
 }
 
 func (g *configurationGraph) addonToUpdate() []*addonNode {
 	var addons []*addonNode
-	for _, placement := range g.placementNodes {
-		addons = append(addons, placement.addonToUpdate()...)
+	for _, node := range g.nodes {
+		addons = append(addons, node.addonToUpdate()...)
 	}
 
 	addons = append(addons, g.defaults.addonToUpdate()...)
@@ -118,18 +121,18 @@ func (g *configurationGraph) addonToUpdate() []*addonNode {
 	return addons
 }
 
-func (n *placementNode) addNode(addon *addonv1alpha1.ManagedClusterAddOn) {
-	n.addons[addon.Namespace] = &addonNode{
+func (n *installStrategyNode) addNode(addon *addonv1alpha1.ManagedClusterAddOn) {
+	n.children[addon.Namespace] = &addonNode{
 		mca:            addon,
 		desiredConfigs: n.desiredConfigs,
 	}
 
 	// override configuration by mca spec
 	if len(addon.Spec.Configs) > 0 {
-		n.addons[addon.Namespace].desiredConfigs = n.addons[addon.Namespace].desiredConfigs.copy()
+		n.children[addon.Namespace].desiredConfigs = n.children[addon.Namespace].desiredConfigs.copy()
 		// TODO we should also filter out the configs which are not supported configs.
 		for _, config := range addon.Spec.Configs {
-			n.addons[addon.Namespace].desiredConfigs[config.ConfigGroupResource] = addonv1alpha1.ConfigReference{
+			n.children[addon.Namespace].desiredConfigs[config.ConfigGroupResource] = addonv1alpha1.ConfigReference{
 				ConfigGroupResource: config.ConfigGroupResource,
 				ConfigReferent:      config.ConfigReferent,
 			}
@@ -138,10 +141,10 @@ func (n *placementNode) addNode(addon *addonv1alpha1.ManagedClusterAddOn) {
 }
 
 // addonToUpdate finds the addons to be updated by placement
-func (n *placementNode) addonToUpdate() []*addonNode {
+func (n *installStrategyNode) addonToUpdate() []*addonNode {
 	var addons []*addonNode
 
-	for _, addon := range n.addons {
+	for _, addon := range n.children {
 		addons = append(addons, addon)
 	}
 

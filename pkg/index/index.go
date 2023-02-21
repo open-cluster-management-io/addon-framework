@@ -89,7 +89,7 @@ func ClusterManagementAddonByPlacementDecisionQueueKey(clusterManagementAddonInf
 		var keys []string
 		for _, o := range objs {
 			cma := o.(*addonv1alpha1.ClusterManagementAddOn)
-			klog.V(4).Infof("enqueue placeManifestWork %s, because of placementDecision %s/%s",
+			klog.V(4).Infof("enqueue ClusterManagementAddon %s, because of placementDecision %s/%s",
 				cma.Name, accessor.GetNamespace(), accessor.GetName())
 			keys = append(keys, cma.Name)
 		}

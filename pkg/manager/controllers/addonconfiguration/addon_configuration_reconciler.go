@@ -105,11 +105,7 @@ func (d *managedClusterAddonConfigurationReconciler) reconcile(
 		}
 	}
 
-	if len(errs) > 0 {
-		return cma, reconcileContinue, utilerrors.NewAggregate(errs)
-	}
-
-	return cma, reconcileContinue, nil
+	return cma, reconcileContinue, utilerrors.NewAggregate(errs)
 }
 
 func (d *managedClusterAddonConfigurationReconciler) mergeAddonConfig(mca *addonv1alpha1.ManagedClusterAddOn, desiredConfigMap addonConfigMap) *addonv1alpha1.ManagedClusterAddOn {

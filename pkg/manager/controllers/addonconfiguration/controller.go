@@ -16,6 +16,10 @@ import (
 	clusterinformersv1beta1 "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1beta1"
 )
 
+// addonConfigurationController is a controller to update configuration of mca with the following order
+// 1. use configuration in mca spec if it is set
+// 2. use configuration in install strategy
+// 3. use configuration in the default configuration in cma
 type addonConfigurationController struct {
 	addonClient                   addonv1alpha1client.Interface
 	clusterManagementAddonLister  addonlisterv1alpha1.ClusterManagementAddOnLister
@@ -24,10 +28,6 @@ type addonConfigurationController struct {
 	reconcilers []addonConfigurationReconcile
 }
 
-// addonConfigurationReconcile is a interface for reconcile logic. It updates configuration of mca based on
-// 1. default configuration on cma
-// 2. configuration on mca
-// 3. configuration in install strategy
 type addonConfigurationReconcile interface {
 	reconcile(ctx context.Context, cma *addonv1alpha1.ClusterManagementAddOn) (*addonv1alpha1.ClusterManagementAddOn, reconcileState, error)
 }

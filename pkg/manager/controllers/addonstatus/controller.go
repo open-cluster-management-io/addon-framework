@@ -73,6 +73,13 @@ func (c *addonStatusController) sync(ctx context.Context, syncCtx factory.SyncCo
 
 	clusterManagementAddon, err := c.clusterManagementAddonLister.Get(addonName)
 	if err == nil {
+		owner := metav1.NewControllerRef(clusterManagementAddon, addonapiv1alpha1.GroupVersion.WithKind("ClusterManagementAddOn"))
+		modified = utils.MergeOwnerRefs(&addonCopy.OwnerReferences, *owner, false)
+		if modified {
+			_, err = c.addonClient.AddonV1alpha1().ManagedClusterAddOns(namespace).Update(ctx, addonCopy, metav1.UpdateOptions{})
+			return err
+		}
+
 		// Add related ClusterManagementAddon
 		utils.MergeRelatedObjects(&modified, &addonCopy.Status.RelatedObjects, addonapiv1alpha1.ObjectReference{
 			Name:     clusterManagementAddon.Name,

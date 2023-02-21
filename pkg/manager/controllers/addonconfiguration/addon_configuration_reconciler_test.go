@@ -16,11 +16,12 @@ import (
 	fakecluster "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	"sort"
 	"testing"
 	"time"
 )
 
-func TestAddonInstallReconcile(t *testing.T) {
+func TestAddonConfigReconcile(t *testing.T) {
 	cases := []struct {
 		name                   string
 		managedClusteraddon    []runtime.Object
@@ -54,6 +55,7 @@ func TestAddonInstallReconcile(t *testing.T) {
 			placementDecisions: []runtime.Object{},
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "patch", "patch")
+				sort.Sort(byPatchName(actions))
 				expectPatchConfigurationAction(t, actions[0], []addonv1alpha1.ConfigReference{{
 					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
 					ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test"},
@@ -99,6 +101,7 @@ func TestAddonInstallReconcile(t *testing.T) {
 				}),
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "patch", "patch")
+				sort.Sort(byPatchName(actions))
 				expectPatchConfigurationAction(t, actions[0], []addonv1alpha1.ConfigReference{{
 					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
 					ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
@@ -151,6 +154,7 @@ func TestAddonInstallReconcile(t *testing.T) {
 				}),
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "patch", "patch")
+				sort.Sort(byPatchName(actions))
 				expectPatchConfigurationAction(t, actions[0], []addonv1alpha1.ConfigReference{{
 					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
 					ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test2"},
@@ -300,9 +304,21 @@ func TestAddonInstallReconcile(t *testing.T) {
 			if err == nil && c.expectErr {
 				t.Errorf("Expect error but got no error")
 			}
+
 			c.validateAddonActions(t, fakeAddonClient.Actions())
 		})
 	}
+}
+
+// the Age field.
+type byPatchName []clienttesting.Action
+
+func (a byPatchName) Len() int      { return len(a) }
+func (a byPatchName) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a byPatchName) Less(i, j int) bool {
+	patchi := a[i].(clienttesting.PatchActionImpl)
+	patchj := a[j].(clienttesting.PatchActionImpl)
+	return patchi.Name < patchj.Name
 }
 
 func newClusterManagementAddon(name string, defaultConfigs []addonv1alpha1.ConfigMeta, installStrategy *addonv1alpha1.InstallStrategy) *addonv1alpha1.ClusterManagementAddOn {
