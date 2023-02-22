@@ -48,7 +48,7 @@ func NewAddonStatusController(
 			return []string{key}
 		},
 		addonInformers.Informer()).
-		WithSync(c.sync).ToController("cluster-management-addon-controller")
+		WithSync(c.sync).ToController("addon-status-controller")
 }
 
 func (c *addonStatusController) sync(ctx context.Context, syncCtx factory.SyncContext, key string) error {

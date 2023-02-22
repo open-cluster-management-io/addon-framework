@@ -104,11 +104,11 @@ func TestAddonConfigReconcile(t *testing.T) {
 				sort.Sort(byPatchName(actions))
 				expectPatchConfigurationAction(t, actions[0], []addonv1alpha1.ConfigReference{{
 					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
-					ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
+					ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test"},
 				}})
 				expectPatchConfigurationAction(t, actions[1], []addonv1alpha1.ConfigReference{{
 					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
-					ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test"},
+					ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
 				}})
 			},
 		},
@@ -318,7 +318,7 @@ func (a byPatchName) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 func (a byPatchName) Less(i, j int) bool {
 	patchi := a[i].(clienttesting.PatchActionImpl)
 	patchj := a[j].(clienttesting.PatchActionImpl)
-	return patchi.Name < patchj.Name
+	return patchi.Namespace < patchj.Namespace
 }
 
 func newClusterManagementAddon(name string, defaultConfigs []addonv1alpha1.ConfigMeta, installStrategy *addonv1alpha1.InstallStrategy) *addonv1alpha1.ClusterManagementAddOn {

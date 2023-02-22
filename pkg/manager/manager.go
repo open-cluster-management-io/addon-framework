@@ -73,5 +73,7 @@ func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
 
 	go clusterInformerFactory.Start(ctx.Done())
 	go addonInformerFactory.Start(ctx.Done())
+
+	<-ctx.Done()
 	return nil
 }

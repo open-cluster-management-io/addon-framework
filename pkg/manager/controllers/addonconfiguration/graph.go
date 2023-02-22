@@ -20,7 +20,7 @@ type installStrategyNode struct {
 	desiredConfigs addonConfigMap
 	// children keeps a map of addons node as the children of this node
 	children map[string]*addonNode
-	clusters sets.String
+	clusters sets.Set[string]
 }
 
 // addonNode is node as a child of installStrategy node represting a mca
@@ -80,7 +80,7 @@ func (g *configurationGraph) addPlacementNode(configs []addonv1alpha1.AddOnConfi
 	node := &installStrategyNode{
 		desiredConfigs: g.defaults.desiredConfigs,
 		children:       map[string]*addonNode{},
-		clusters:       sets.NewString(clusters...),
+		clusters:       sets.New[string](clusters...),
 	}
 
 	// overrides configuration by install strategy
