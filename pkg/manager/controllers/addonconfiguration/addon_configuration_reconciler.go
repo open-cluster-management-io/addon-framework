@@ -108,6 +108,7 @@ func (d *managedClusterAddonConfigurationReconciler) patchAddonStatus(ctx contex
 	}
 
 	klog.V(2).Infof("Patching addon %s/%s status with %s", new.Namespace, new.Name, string(patchBytes))
+
 	_, err = d.addonClient.AddonV1alpha1().ManagedClusterAddOns(new.Namespace).Patch(
 		ctx, new.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 	return err

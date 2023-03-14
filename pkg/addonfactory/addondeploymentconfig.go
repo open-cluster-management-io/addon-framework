@@ -2,7 +2,6 @@ package addonfactory
 
 import (
 	"context"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -222,4 +221,28 @@ func ToAddOnDeploymentConfigValues(config addonapiv1alpha1.AddOnDeploymentConfig
 	}
 
 	return values, nil
+}
+
+// ToAddOnNodePlacementPrivateValues only transform the AddOnDeploymentConfig NodePlacement part into Values object
+// with a specific key, this value would be used by the addon template controller
+func ToAddOnNodePlacementPrivateValues(config addonapiv1alpha1.AddOnDeploymentConfig) (Values, error) {
+	if config.Spec.NodePlacement == nil {
+		return nil, nil
+	}
+
+	return Values{
+		NodePlacementPrivateValueKey: config.Spec.NodePlacement,
+	}, nil
+}
+
+// ToAddOnRegistriesPrivateValues only transform the AddOnDeploymentConfig Registries part into Values object
+// with a specific key, this value would be used by the addon template controller
+func ToAddOnRegistriesPrivateValues(config addonapiv1alpha1.AddOnDeploymentConfig) (Values, error) {
+	if config.Spec.Registries == nil {
+		return nil, nil
+	}
+
+	return Values{
+		RegistriesPrivateValueKey: config.Spec.Registries,
+	}, nil
 }

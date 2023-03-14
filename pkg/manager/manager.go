@@ -5,6 +5,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -20,11 +21,17 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonmanagement"
 	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonowner"
 	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonprogressing"
+	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addontemplate"
 	"open-cluster-management.io/addon-framework/pkg/manager/controllers/managementaddoninstallprogression"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 )
 
 func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
+	hubKubeClient, err := kubernetes.NewForConfig(kubeConfig)
+	if err != nil {
+		return err
+	}
+
 	hubClusterClient, err := clusterclientset.NewForConfig(kubeConfig)
 	if err != nil {
 		return err
@@ -110,11 +117,20 @@ func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
 		addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns(),
 	)
 
+	addonTemplateController := addontemplate.NewAddonTemplateController(
+		kubeConfig,
+		hubKubeClient,
+		addonClient,
+		addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
+	)
+
 	go addonManagementController.Run(ctx, 2)
 	go addonConfigurationController.Run(ctx, 2)
 	go addonOwnerController.Run(ctx, 2)
 	go addonProgressingController.Run(ctx, 2)
 	go mgmtAddonInstallProgressionController.Run(ctx, 2)
+
+	go addonTemplateController.Run(ctx, 1)
 
 	go clusterInformerFactory.Start(ctx.Done())
 	go addonInformerFactory.Start(ctx.Done())

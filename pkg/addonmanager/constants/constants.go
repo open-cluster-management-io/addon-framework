@@ -2,7 +2,6 @@ package constants
 
 import (
 	"fmt"
-
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
 
@@ -42,6 +41,12 @@ func GetHostedModeInfo(annotations map[string]string) (string, string) {
 	}
 
 	return InstallModeHosted, hostingClusterName
+}
+
+// IsHostedMode checks if the addon is deployed in hosted mode
+func IsHostedMode(annotations map[string]string) bool {
+	mode, _ := GetHostedModeInfo(annotations)
+	return mode == InstallModeHosted
 }
 
 // GetHostedManifestLocation returns the location of the manifest in Hosted mode, if it is invalid will return error
