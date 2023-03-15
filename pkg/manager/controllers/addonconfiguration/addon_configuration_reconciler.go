@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	jsonpatch "github.com/evanphx/json-patch"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -40,7 +41,7 @@ func (d *managedClusterAddonConfigurationReconciler) buildConfigurationGraph(cma
 		graph.addAddonNode(addon)
 	}
 
-	if cma.Spec.InstallStrategy == nil || cma.Spec.InstallStrategy.Type == addonv1alpha1.AddonInstallStrategyManual {
+	if cma.Spec.InstallStrategy.Type == "" || cma.Spec.InstallStrategy.Type == addonv1alpha1.AddonInstallStrategyManual {
 		return graph, nil
 	}
 
