@@ -128,30 +128,34 @@ func setDefaultConfigReference(supportedConfigs []addonv1alpha1.ConfigMeta,
 	existDefaultConfigReferences []addonv1alpha1.DefaultConfigReference) []addonv1alpha1.DefaultConfigReference {
 	newDefaultConfigReferences := []addonv1alpha1.DefaultConfigReference{}
 	for _, config := range supportedConfigs {
-		if config.DefaultConfig != nil {
-			configRef := addonv1alpha1.DefaultConfigReference{
-				ConfigGroupResource: config.ConfigGroupResource,
-				DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-					ConfigReferent: *config.DefaultConfig,
-				},
-			}
-			// if the config already exists in status, keep the existing spec hash
-			if i, exist := findDefaultConfigReference(configRef, existDefaultConfigReferences); exist {
-				configRef.DesiredConfig.SpecHash = existDefaultConfigReferences[i].DesiredConfig.SpecHash
-			}
-			newDefaultConfigReferences = append(newDefaultConfigReferences, configRef)
+		if config.DefaultConfig == nil {
+			continue
 		}
+		configRef := addonv1alpha1.DefaultConfigReference{
+			ConfigGroupResource: config.ConfigGroupResource,
+			DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+				ConfigReferent: *config.DefaultConfig,
+			},
+		}
+		// if the config already exists in status, keep the existing spec hash
+		if existConfigRef, exist := findDefaultConfigReference(&configRef, existDefaultConfigReferences); exist {
+			configRef.DesiredConfig.SpecHash = existConfigRef.DesiredConfig.SpecHash
+		}
+		newDefaultConfigReferences = append(newDefaultConfigReferences, configRef)
 	}
 	return newDefaultConfigReferences
 }
 
-func findDefaultConfigReference(newobj addonv1alpha1.DefaultConfigReference, oldobjs []addonv1alpha1.DefaultConfigReference) (int, bool) {
-	for i, oldconfig := range oldobjs {
+func findDefaultConfigReference(
+	newobj *addonv1alpha1.DefaultConfigReference,
+	oldobjs []addonv1alpha1.DefaultConfigReference,
+) (*addonv1alpha1.DefaultConfigReference, bool) {
+	for _, oldconfig := range oldobjs {
 		if oldconfig.ConfigGroupResource == newobj.ConfigGroupResource && oldconfig.DesiredConfig.ConfigReferent == newobj.DesiredConfig.ConfigReferent {
-			return i, true
+			return &oldconfig, true
 		}
 	}
-	return -1, false
+	return nil, false
 }
 
 func setInstallProgression(supportedConfigs []addonv1alpha1.ConfigMeta, placementStrategies []addonv1alpha1.PlacementStrategy,
@@ -163,7 +167,7 @@ func setInstallProgression(supportedConfigs []addonv1alpha1.ConfigMeta, placemen
 			PlacementRef: placementStrategy.PlacementRef,
 		}
 
-		// set config reference
+		// set config references as default configuration
 		installConfigReferences := []addonv1alpha1.InstallConfigReference{}
 		installConfigReferencesMap := map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReferent{}
 		for _, config := range supportedConfigs {
@@ -171,9 +175,13 @@ func setInstallProgression(supportedConfigs []addonv1alpha1.ConfigMeta, placemen
 				installConfigReferencesMap[config.ConfigGroupResource] = *config.DefaultConfig
 			}
 		}
+
+		// override the default configuration for each placement
 		for _, config := range placementStrategy.Configs {
 			installConfigReferencesMap[config.ConfigGroupResource] = config.ConfigReferent
 		}
+
+		// set the config references for each install progression
 		for k, v := range installConfigReferencesMap {
 			installConfigReferences = append(installConfigReferences,
 				addonv1alpha1.InstallConfigReference{
@@ -187,16 +195,16 @@ func setInstallProgression(supportedConfigs []addonv1alpha1.ConfigMeta, placemen
 		installProgression.ConfigReferences = installConfigReferences
 
 		// if the config already exists in status, keep the existing spec hash
-		if i, exist := findInstallProgression(installProgression, existInstallProgressions); exist {
-			mergeInstallProgression(installProgression, existInstallProgressions[i])
+		if existInstallProgression, exist := findInstallProgression(&installProgression, existInstallProgressions); exist {
+			mergeInstallProgression(&installProgression, existInstallProgression)
 		}
 		newInstallProgressions = append(newInstallProgressions, installProgression)
 	}
 	return newInstallProgressions
 }
 
-func findInstallProgression(newobj addonv1alpha1.InstallProgression, oldobjs []addonv1alpha1.InstallProgression) (int, bool) {
-	for i, oldobj := range oldobjs {
+func findInstallProgression(newobj *addonv1alpha1.InstallProgression, oldobjs []addonv1alpha1.InstallProgression) (*addonv1alpha1.InstallProgression, bool) {
+	for _, oldobj := range oldobjs {
 		if oldobj.PlacementRef == newobj.PlacementRef {
 			count := 0
 			for _, oldconfig := range oldobj.ConfigReferences {
@@ -207,21 +215,22 @@ func findInstallProgression(newobj addonv1alpha1.InstallProgression, oldobjs []a
 				}
 			}
 			if count == len(newobj.ConfigReferences) {
-				return i, true
+				return &oldobj, true
 			}
 		}
 	}
-	return 0, false
+	return nil, false
 }
 
-func mergeInstallProgression(newobj addonv1alpha1.InstallProgression, oldobj addonv1alpha1.InstallProgression) {
+func mergeInstallProgression(newobj, oldobj *addonv1alpha1.InstallProgression) {
 	// merge config reference
-	for _, newconfig := range newobj.ConfigReferences {
+	for i := range newobj.ConfigReferences {
 		for _, oldconfig := range oldobj.ConfigReferences {
-			if newconfig.ConfigGroupResource == oldconfig.ConfigGroupResource && newconfig.DesiredConfig.ConfigReferent == oldconfig.DesiredConfig.ConfigReferent {
-				newconfig.DesiredConfig.SpecHash = oldconfig.DesiredConfig.SpecHash
-				newconfig.LastAppliedConfig = oldconfig.LastAppliedConfig
-				newconfig.LastKnownGoodConfig = oldconfig.LastKnownGoodConfig
+			if newobj.ConfigReferences[i].ConfigGroupResource == oldconfig.ConfigGroupResource &&
+				newobj.ConfigReferences[i].DesiredConfig.ConfigReferent == oldconfig.DesiredConfig.ConfigReferent {
+				newobj.ConfigReferences[i].DesiredConfig.SpecHash = oldconfig.DesiredConfig.SpecHash
+				newobj.ConfigReferences[i].LastAppliedConfig = oldconfig.LastAppliedConfig
+				newobj.ConfigReferences[i].LastKnownGoodConfig = oldconfig.LastKnownGoodConfig
 			}
 		}
 	}

@@ -41,7 +41,7 @@ type clusterManagementAddonConfigController struct {
 	addonClient                   addonv1alpha1client.Interface
 	clusterManagementAddonLister  addonlisterv1alpha1.ClusterManagementAddOnLister
 	clusterManagementAddonIndexer cache.Indexer
-	configListers                 map[string]dynamiclister.Lister
+	configListers                 map[schema.GroupResource]dynamiclister.Lister
 	queue                         workqueue.RateLimitingInterface
 }
 
@@ -57,7 +57,7 @@ func NewManagementAddonConfigController(
 		addonClient:                   addonClient,
 		clusterManagementAddonLister:  clusterManagementAddonInformers.Lister(),
 		clusterManagementAddonIndexer: clusterManagementAddonInformers.Informer().GetIndexer(),
-		configListers:                 map[string]dynamiclister.Lister{},
+		configListers:                 map[schema.GroupResource]dynamiclister.Lister{},
 		queue:                         syncCtx.Queue(),
 	}
 
@@ -83,8 +83,7 @@ func (c *clusterManagementAddonConfigController) buildConfigInformers(
 ) []factory.Informer {
 	configInformers := []factory.Informer{}
 	for gvr := range configGVRs {
-		genericInformer := configInformerFactory.ForResource(gvr)
-		indexInformer := genericInformer.Informer()
+		indexInformer := configInformerFactory.ForResource(gvr).Informer()
 		_, err := indexInformer.AddEventHandler(
 			cache.ResourceEventHandlerFuncs{
 				AddFunc: c.enqueueClusterManagementAddOnsByConfig(gvr),
@@ -98,20 +97,20 @@ func (c *clusterManagementAddonConfigController) buildConfigInformers(
 			utilruntime.HandleError(err)
 		}
 		configInformers = append(configInformers, indexInformer)
-		c.configListers[toListerKey(gvr.Group, gvr.Resource)] = dynamiclister.New(indexInformer.GetIndexer(), gvr)
+		c.configListers[schema.GroupResource{Group: gvr.Group, Resource: gvr.Resource}] = dynamiclister.New(indexInformer.GetIndexer(), gvr)
 	}
 	return configInformers
 }
 
 func (c *clusterManagementAddonConfigController) enqueueClusterManagementAddOnsByConfig(gvr schema.GroupVersionResource) enqueueFunc {
 	return func(obj interface{}) {
-		name, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+		namespaceName, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("error to get accessor of object: %v", obj))
 			return
 		}
 
-		objs, err := c.clusterManagementAddonIndexer.ByIndex(byClusterManagementAddOnConfig, fmt.Sprintf("%s/%s/%s", gvr.Group, gvr.Resource, name))
+		objs, err := c.clusterManagementAddonIndexer.ByIndex(byClusterManagementAddOnConfig, fmt.Sprintf("%s/%s/%s", gvr.Group, gvr.Resource, namespaceName))
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("error to get addons: %v", err))
 			return
@@ -121,9 +120,7 @@ func (c *clusterManagementAddonConfigController) enqueueClusterManagementAddOnsB
 			if obj == nil {
 				continue
 			}
-
-			cma := obj.(*addonapiv1alpha1.ClusterManagementAddOn)
-			key, _ := cache.MetaNamespaceKeyFunc(cma)
+			key, _ := cache.MetaNamespaceKeyFunc(obj)
 			c.queue.Add(key)
 		}
 	}
@@ -142,7 +139,7 @@ func (c *clusterManagementAddonConfigController) indexByConfig(obj interface{}) 
 			continue
 		}
 
-		configNames.Insert(getDefaultConfigIndex(defaultConfigRef))
+		configNames.Insert(getIndex(defaultConfigRef.ConfigGroupResource, *defaultConfigRef.DesiredConfig))
 	}
 
 	for _, installProgression := range cma.Status.InstallProgressions {
@@ -152,13 +149,8 @@ func (c *clusterManagementAddonConfigController) indexByConfig(obj interface{}) 
 				continue
 			}
 
-			configNames.Insert(getInstallConfigIndex(configReference))
+			configNames.Insert(getIndex(configReference.ConfigGroupResource, *configReference.DesiredConfig))
 		}
-	}
-
-	if configNames.Len() == 0 {
-		// no configs , ignore
-		return nil, nil
 	}
 
 	return configNames.UnsortedList(), nil
@@ -196,16 +188,11 @@ func (c *clusterManagementAddonConfigController) updateConfigSpecHash(cma *addon
 			continue
 		}
 
-		var err error
-		group := defaultConfigReference.Group
-		resource := defaultConfigReference.Resource
-		namespace := defaultConfigReference.DesiredConfig.Namespace
-		name := defaultConfigReference.DesiredConfig.Name
-
-		cma.Status.DefaultConfigReferences[i].DesiredConfig.SpecHash, err = c.getConfigSpecHash(group, resource, namespace, name)
+		specHash, err := c.getConfigSpecHash(defaultConfigReference.ConfigGroupResource, defaultConfigReference.DesiredConfig.ConfigReferent)
 		if err != nil {
 			return nil
 		}
+		cma.Status.DefaultConfigReferences[i].DesiredConfig.SpecHash = specHash
 	}
 
 	for i, installProgression := range cma.Status.InstallProgressions {
@@ -214,16 +201,11 @@ func (c *clusterManagementAddonConfigController) updateConfigSpecHash(cma *addon
 				continue
 			}
 
-			var err error
-			group := configReference.Group
-			resource := configReference.Resource
-			namespace := configReference.DesiredConfig.Namespace
-			name := configReference.DesiredConfig.Name
-
-			cma.Status.InstallProgressions[i].ConfigReferences[j].DesiredConfig.SpecHash, err = c.getConfigSpecHash(group, resource, namespace, name)
+			specHash, err := c.getConfigSpecHash(configReference.ConfigGroupResource, configReference.DesiredConfig.ConfigReferent)
 			if err != nil {
 				return nil
 			}
+			cma.Status.InstallProgressions[i].ConfigReferences[j].DesiredConfig.SpecHash = specHash
 		}
 	}
 
@@ -277,24 +259,17 @@ func (c *clusterManagementAddonConfigController) patchConfigReferences(ctx conte
 	return err
 }
 
-func (c *clusterManagementAddonConfigController) getConfigSpecHash(group, resource, namespace, name string) (string, error) {
-	lister, ok := c.configListers[toListerKey(group, resource)]
+func (c *clusterManagementAddonConfigController) getConfigSpecHash(gr addonapiv1alpha1.ConfigGroupResource,
+	cr addonapiv1alpha1.ConfigReferent) (string, error) {
+	lister, ok := c.configListers[schema.GroupResource{Group: gr.Group, Resource: gr.Resource}]
 	if !ok {
 		return "", nil
 	}
 
-	var config *unstructured.Unstructured
-	var err error
-	if namespace == "" {
-		config, err = lister.Get(name)
-	} else {
-		config, err = lister.Namespace(namespace).Get(name)
-	}
-
+	config, err := lister.Namespace(cr.Namespace).Get(cr.Name)
 	if errors.IsNotFound(err) {
 		return "", nil
 	}
-
 	if err != nil {
 		return "", err
 	}
@@ -302,24 +277,12 @@ func (c *clusterManagementAddonConfigController) getConfigSpecHash(group, resour
 	return GetSpecHash(config)
 }
 
-func getDefaultConfigIndex(config addonapiv1alpha1.DefaultConfigReference) string {
-	if config.DesiredConfig.Namespace != "" {
-		return fmt.Sprintf("%s/%s/%s/%s", config.Group, config.Resource, config.DesiredConfig.Namespace, config.DesiredConfig.Name)
+func getIndex(configGroupResource addonapiv1alpha1.ConfigGroupResource, configSpecHash addonapiv1alpha1.ConfigSpecHash) string {
+	if configSpecHash.Namespace != "" {
+		return fmt.Sprintf("%s/%s/%s/%s", configGroupResource.Group, configGroupResource.Resource, configSpecHash.Namespace, configSpecHash.Name)
 	}
 
-	return fmt.Sprintf("%s/%s/%s", config.Group, config.Resource, config.DesiredConfig.Name)
-}
-
-func getInstallConfigIndex(config addonapiv1alpha1.InstallConfigReference) string {
-	if config.DesiredConfig.Namespace != "" {
-		return fmt.Sprintf("%s/%s/%s/%s", config.Group, config.Resource, config.DesiredConfig.Namespace, config.DesiredConfig.Name)
-	}
-
-	return fmt.Sprintf("%s/%s/%s", config.Group, config.Resource, config.DesiredConfig.Name)
-}
-
-func toListerKey(group, resource string) string {
-	return fmt.Sprintf("%s/%s", group, resource)
+	return fmt.Sprintf("%s/%s/%s", configGroupResource.Group, configGroupResource.Resource, configSpecHash.Name)
 }
 
 func GetSpecHash(obj *unstructured.Unstructured) (string, error) {
