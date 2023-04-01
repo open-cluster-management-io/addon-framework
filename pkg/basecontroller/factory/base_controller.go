@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
@@ -155,7 +157,11 @@ func (c *baseController) processNextWorkItem(queueCtx context.Context) {
 	}
 
 	if err := c.sync(queueCtx, syncCtx, queueKey); err != nil {
-		if klog.V(4).Enabled() || key != "key" {
+		err = tryUnwrapAggregate(err)
+
+		if apierrors.IsConflict(err) {
+			klog.V(4).Infof("%q controller encountered a conflict - re-queueing: %v", c.name, err)
+		} else if klog.V(4).Enabled() || key != "key" {
 			utilruntime.HandleError(fmt.Errorf("%q controller failed to sync %q, err: %w", c.name, key, err))
 		} else {
 			utilruntime.HandleError(fmt.Errorf("%s reconciliation failed: %w", c.name, err))
@@ -165,4 +171,13 @@ func (c *baseController) processNextWorkItem(queueCtx context.Context) {
 	}
 
 	c.syncContext.Queue().Forget(key)
+}
+
+func tryUnwrapAggregate(err error) error {
+	a, ok := err.(utilerrors.Aggregate)
+	if !ok || len(a.Errors()) != 1 {
+		return err
+	}
+
+	return tryUnwrapAggregate(a.Errors()[0])
 }
