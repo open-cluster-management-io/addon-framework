@@ -140,6 +140,7 @@ func (d *managedClusterAddonConfigurationReconciler) mergeAddonConfig(
 			if !equality.Semantic.DeepEqual(mergedConfigs[i].DesiredConfig, config.DesiredConfig) {
 				mergedConfigs[i].ConfigReferent = config.ConfigReferent
 				mergedConfigs[i].DesiredConfig = config.DesiredConfig.DeepCopy()
+				mergedConfigs[i].LastObservedGeneration = 0
 			}
 		}
 

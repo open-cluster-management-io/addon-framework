@@ -128,6 +128,7 @@ var _ = ginkgo.Describe("AddConfigs", func() {
 				Namespace: configDefaultNamespace,
 				Name:      configDefaultName,
 			},
+			LastObservedGeneration: 1,
 			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
 				ConfigReferent: addonapiv1alpha1.ConfigReferent{
 					Namespace: configDefaultNamespace,
@@ -230,6 +231,7 @@ var _ = ginkgo.Describe("AddConfigs", func() {
 				Namespace: configDefaultNamespace,
 				Name:      "another-config",
 			},
+			LastObservedGeneration: 0,
 			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
 				ConfigReferent: addonapiv1alpha1.ConfigReferent{
 					Namespace: configDefaultNamespace,
@@ -318,6 +320,7 @@ var _ = ginkgo.Describe("AddConfigs", func() {
 				Namespace: addOnConfig.Namespace,
 				Name:      addOnConfig.Name,
 			},
+			LastObservedGeneration: 1,
 			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
 				ConfigReferent: addonapiv1alpha1.ConfigReferent{
 					Namespace: addOnConfig.Namespace,
@@ -390,6 +393,7 @@ var _ = ginkgo.Describe("AddConfigs", func() {
 				Namespace: addOnConfig.Namespace,
 				Name:      addOnConfig.Name,
 			},
+			LastObservedGeneration: 1,
 			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
 				ConfigReferent: addonapiv1alpha1.ConfigReferent{
 					Namespace: addOnConfig.Namespace,
@@ -419,6 +423,7 @@ var _ = ginkgo.Describe("AddConfigs", func() {
 				Namespace: addOnConfig.Namespace,
 				Name:      addOnConfig.Name,
 			},
+			LastObservedGeneration: 2,
 			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
 				ConfigReferent: addonapiv1alpha1.ConfigReferent{
 					Namespace: addOnConfig.Namespace,
@@ -498,6 +503,7 @@ var _ = ginkgo.Describe("AddConfigs", func() {
 				Namespace: addOnConfig.Namespace,
 				Name:      addOnConfig.Name,
 			},
+			LastObservedGeneration: 0,
 			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
 				ConfigReferent: addonapiv1alpha1.ConfigReferent{
 					Namespace: addOnConfig.Namespace,

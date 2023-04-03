@@ -65,6 +65,7 @@ func TestAddonConfigReconcile(t *testing.T) {
 					DesiredConfig: &addonv1alpha1.ConfigSpecHash{
 						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test"},
 					},
+					LastObservedGeneration: 0,
 				}})
 			},
 		},
@@ -107,6 +108,7 @@ func TestAddonConfigReconcile(t *testing.T) {
 					DesiredConfig: &addonv1alpha1.ConfigSpecHash{
 						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test"},
 					},
+					LastObservedGeneration: 0,
 				}})
 				expectPatchConfigurationAction(t, actions[1], []addonv1alpha1.ConfigReference{{
 					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
@@ -114,6 +116,7 @@ func TestAddonConfigReconcile(t *testing.T) {
 					DesiredConfig: &addonv1alpha1.ConfigSpecHash{
 						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
 					},
+					LastObservedGeneration: 0,
 				}})
 			},
 		},
@@ -159,6 +162,7 @@ func TestAddonConfigReconcile(t *testing.T) {
 					DesiredConfig: &addonv1alpha1.ConfigSpecHash{
 						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
 					},
+					LastObservedGeneration: 0,
 				}})
 				expectPatchConfigurationAction(t, actions[1], []addonv1alpha1.ConfigReference{{
 					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
@@ -166,6 +170,7 @@ func TestAddonConfigReconcile(t *testing.T) {
 					DesiredConfig: &addonv1alpha1.ConfigSpecHash{
 						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
 					},
+					LastObservedGeneration: 0,
 				}})
 			},
 		},
@@ -179,6 +184,7 @@ func TestAddonConfigReconcile(t *testing.T) {
 						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
 						SpecHash:       "hash1",
 					},
+					LastObservedGeneration: 1,
 				}}),
 			},
 			placements: []runtime.Object{
@@ -214,6 +220,7 @@ func TestAddonConfigReconcile(t *testing.T) {
 						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test2"},
 						SpecHash:       "",
 					},
+					LastObservedGeneration: 0,
 				}})
 			},
 		},

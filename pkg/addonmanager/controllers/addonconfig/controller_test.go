@@ -49,13 +49,13 @@ func TestSync(t *testing.T) {
 			name:                "no addons",
 			syncKey:             "cluster1/test",
 			managedClusteraddon: []runtime.Object{},
-			configs:             []runtime.Object{newTestConfing("test", "cluster1")},
+			configs:             []runtime.Object{newTestConfing("test", "cluster1", 1)},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertNoActions(t, actions)
 			},
 		},
 		{
-			name:    "update config spec hash",
+			name:    "update config spec hash and generation",
 			syncKey: "cluster1/test",
 			managedClusteraddon: []runtime.Object{
 				func() *addonapiv1alpha1.ManagedClusterAddOn {
@@ -82,6 +82,7 @@ func TestSync(t *testing.T) {
 								Namespace: "cluster1",
 								Name:      "test",
 							},
+							LastObservedGeneration: 1,
 							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
 								ConfigReferent: addonapiv1alpha1.ConfigReferent{
 									Namespace: "cluster1",
@@ -101,7 +102,7 @@ func TestSync(t *testing.T) {
 					return addon
 				}(),
 			},
-			configs: []runtime.Object{newTestConfing("test", "cluster1")},
+			configs: []runtime.Object{newTestConfing("test", "cluster1", 2)},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				patch := actions[0].(clienttesting.PatchActionImpl).Patch
 				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
@@ -110,13 +111,16 @@ func TestSync(t *testing.T) {
 					t.Fatal(err)
 				}
 
+				if addOn.Status.ConfigReferences[0].LastObservedGeneration != 2 {
+					t.Errorf("Expect addon config generation is 2, but got %v", addOn.Status.ConfigReferences[0].LastObservedGeneration)
+				}
 				if addOn.Status.ConfigReferences[0].DesiredConfig.SpecHash != "3e80b3778b3b03766e7be993131c0af2ad05630c5d96fb7fa132d05b77336e04" {
 					t.Errorf("Expect addon config spec hash is 3e80b3778b3b03766e7be993131c0af2ad05630c5d96fb7fa132d05b77336e04, but got %v", addOn.Status.ConfigReferences[0].DesiredConfig.SpecHash)
 				}
 			},
 		},
 		{
-			name:    "config not defined in spec",
+			name:    "only update generation when config is not defined in spec",
 			syncKey: "cluster1/test",
 			managedClusteraddon: []runtime.Object{
 				func() *addonapiv1alpha1.ManagedClusterAddOn {
@@ -131,6 +135,7 @@ func TestSync(t *testing.T) {
 								Namespace: "cluster1",
 								Name:      "test",
 							},
+							LastObservedGeneration: 1,
 							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
 								ConfigReferent: addonapiv1alpha1.ConfigReferent{
 									Namespace: "cluster1",
@@ -150,13 +155,25 @@ func TestSync(t *testing.T) {
 					return addon
 				}(),
 			},
-			configs: []runtime.Object{newTestConfing("test", "cluster1")},
+			configs: []runtime.Object{newTestConfing("test", "cluster1", 2)},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertNoActions(t, actions)
+				patch := actions[0].(clienttesting.PatchActionImpl).Patch
+				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				err := json.Unmarshal(patch, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if addOn.Status.ConfigReferences[0].LastObservedGeneration != 2 {
+					t.Errorf("Expect addon config generation is 2, but got %v", addOn.Status.ConfigReferences[0].LastObservedGeneration)
+				}
+				if addOn.Status.ConfigReferences[0].DesiredConfig.SpecHash != "" {
+					t.Errorf("Expect addon config spec hash is empty, but got %v", addOn.Status.ConfigReferences[0].DesiredConfig.SpecHash)
+				}
 			},
 		},
 		{
-			name:    "configs reference in status is not ready",
+			name:    "no status",
 			syncKey: "cluster1/test",
 			managedClusteraddon: []runtime.Object{
 				func() *addonapiv1alpha1.ManagedClusterAddOn {
@@ -185,7 +202,7 @@ func TestSync(t *testing.T) {
 					return addon
 				}(),
 			},
-			configs: []runtime.Object{newTestConfing("test", "cluster1")},
+			configs: []runtime.Object{newTestConfing("test", "cluster1", 1)},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertNoActions(t, actions)
 			},
@@ -218,6 +235,7 @@ func TestSync(t *testing.T) {
 								Namespace: "cluster1",
 								Name:      "test",
 							},
+							LastObservedGeneration: 1,
 							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
 								ConfigReferent: addonapiv1alpha1.ConfigReferent{
 									Namespace: "cluster1",
@@ -278,6 +296,7 @@ func TestSync(t *testing.T) {
 								Namespace: "cluster1",
 								Name:      "test",
 							},
+							LastObservedGeneration: 0,
 							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
 								ConfigReferent: addonapiv1alpha1.ConfigReferent{
 									Namespace: "cluster1",
@@ -297,7 +316,7 @@ func TestSync(t *testing.T) {
 					return addon
 				}(),
 			},
-			configs: []runtime.Object{newTestConfing("test", "cluster1")},
+			configs: []runtime.Object{newTestConfing("test", "cluster1", 1)},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertNoActions(t, actions)
 			},
@@ -328,6 +347,7 @@ func TestSync(t *testing.T) {
 							ConfigReferent: addonapiv1alpha1.ConfigReferent{
 								Name: "test",
 							},
+							LastObservedGeneration: 2,
 							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
 								ConfigReferent: addonapiv1alpha1.ConfigReferent{
 									Name: "test",
@@ -346,13 +366,16 @@ func TestSync(t *testing.T) {
 					return addon
 				}(),
 			},
-			configs: []runtime.Object{newTestConfing("test", "")},
+			configs: []runtime.Object{newTestConfing("test", "", 3)},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				patch := actions[0].(clienttesting.PatchActionImpl).Patch
 				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
 				err := json.Unmarshal(patch, addOn)
 				if err != nil {
 					t.Fatal(err)
+				}
+				if addOn.Status.ConfigReferences[0].LastObservedGeneration != 3 {
+					t.Errorf("Expect addon config generation is 3, but got %v", addOn.Status.ConfigReferences[0].LastObservedGeneration)
 				}
 				if addOn.Status.ConfigReferences[0].DesiredConfig.SpecHash != "3e80b3778b3b03766e7be993131c0af2ad05630c5d96fb7fa132d05b77336e04" {
 					t.Errorf("Expect addon config spec hash is 3e80b3778b3b03766e7be993131c0af2ad05630c5d96fb7fa132d05b77336e04, but got %v", addOn.Status.ConfigReferences[0].DesiredConfig.SpecHash)
@@ -412,7 +435,7 @@ func TestEnqueue(t *testing.T) {
 		{
 			name:              "no config reference",
 			addons:            []runtime.Object{addontesting.NewAddon("test", "cluster1")},
-			config:            newTestConfing("test", "cluster1"),
+			config:            newTestConfing("test", "cluster1", 1),
 			expectedQueueSize: 0,
 		},
 		{
@@ -458,8 +481,8 @@ func TestEnqueue(t *testing.T) {
 					return addon
 				}(),
 			},
-			config:            newTestConfing("test", ""),
-			expectedQueueSize: 2,
+			config:            newTestConfing("test", "", 1),
+			expectedQueueSize: 0,
 		},
 		{
 			name: "configs in status",
@@ -504,8 +527,8 @@ func TestEnqueue(t *testing.T) {
 					return addon
 				}(),
 			},
-			config:            newTestConfing("test", ""),
-			expectedQueueSize: 0,
+			config:            newTestConfing("test", "", 1),
+			expectedQueueSize: 2,
 		},
 		{
 			name: "owned configs",
@@ -544,8 +567,8 @@ func TestEnqueue(t *testing.T) {
 					return addon
 				}(),
 			},
-			config:            newTestConfing("test", "cluster1"),
-			expectedQueueSize: 0,
+			config:            newTestConfing("test", "cluster1", 1),
+			expectedQueueSize: 1,
 		},
 	}
 
@@ -579,14 +602,30 @@ func TestEnqueue(t *testing.T) {
 	}
 }
 
-func newTestConfing(name, namespace string) *unstructured.Unstructured {
+func newTestConfing(name, namespace string, generation int64) *unstructured.Unstructured {
+	if generation == 0 {
+		return &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"apiVersion": "config.test/v1",
+				"kind":       "Config",
+				"metadata": map[string]interface{}{
+					"name":      name,
+					"namespace": namespace,
+				},
+				"spec": map[string]interface{}{
+					"test": "test",
+				},
+			},
+		}
+	}
 	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "config.test/v1",
 			"kind":       "Config",
 			"metadata": map[string]interface{}{
-				"name":      name,
-				"namespace": namespace,
+				"name":       name,
+				"namespace":  namespace,
+				"generation": generation,
 			},
 			"spec": map[string]interface{}{
 				"test": "test",
