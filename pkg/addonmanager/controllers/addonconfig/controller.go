@@ -8,6 +8,7 @@ import (
 	jsonpatch "github.com/evanphx/json-patch"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -24,12 +25,14 @@ import (
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
 
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/managementaddonconfig"
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
 )
 
 const (
-	controllerName = "addon-config-controller"
-	byAddOnConfig  = "by-addon-config"
+	controllerName               = "addon-config-controller"
+	byAddOnConfig                = "by-addon-config"
+	UnsupportedConfigurationType = "UnsupportedConfiguration"
 )
 
 type enqueueFunc func(obj interface{})
@@ -131,19 +134,14 @@ func (c *addonConfigController) indexByConfig(obj interface{}) ([]string, error)
 		return nil, fmt.Errorf("obj is supposed to be a ManagedClusterAddOn, but is %T", obj)
 	}
 
-	if len(addon.Status.ConfigReferences) == 0 {
-		// no config references, ignore
-		return nil, nil
-	}
-
 	configNames := []string{}
-	for _, configReference := range addon.Status.ConfigReferences {
-		if configReference.Name == "" {
+	for _, config := range addon.Spec.Configs {
+		if config.Name == "" {
 			// bad config reference, ignore
 			continue
 		}
 
-		configNames = append(configNames, getIndex(configReference))
+		configNames = append(configNames, getIndex(config))
 	}
 
 	return configNames, nil
@@ -165,36 +163,35 @@ func (c *addonConfigController) sync(ctx context.Context, syncCtx factory.SyncCo
 		return err
 	}
 
+	// if there is unsupported configs defined in spec, skip updating spec hash.
+	configCond := meta.FindStatusCondition(addon.Status.Conditions, UnsupportedConfigurationType)
+	if configCond == nil || configCond.Status == metav1.ConditionTrue {
+		klog.Warningf("failed to update spec hash as unsupported configuration defined in %s", addon.Name)
+		return nil
+	}
+
 	addonCopy := addon.DeepCopy()
 
-	if err := c.updateConfigGenerations(addonCopy); err != nil {
+	if err := c.updateConfigSpecHash(addonCopy); err != nil {
 		return err
 	}
 
 	return c.patchConfigReferences(ctx, addon, addonCopy)
 }
 
-func (c *addonConfigController) updateConfigGenerations(addon *addonapiv1alpha1.ManagedClusterAddOn) error {
-	if len(addon.Status.ConfigReferences) == 0 {
-		// no config references, ignore
-		return nil
-	}
-
-	for index, configReference := range addon.Status.ConfigReferences {
-		lister, ok := c.configListers[schema.GroupResource{Group: configReference.ConfigGroupResource.Group, Resource: configReference.ConfigGroupResource.Resource}]
+func (c *addonConfigController) updateConfigSpecHash(addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+	for _, addonconfig := range addon.Spec.Configs {
+		lister, ok := c.configListers[schema.GroupResource{Group: addonconfig.ConfigGroupResource.Group, Resource: addonconfig.ConfigGroupResource.Resource}]
 		if !ok {
 			continue
 		}
 
-		namespace := configReference.ConfigReferent.Namespace
-		name := configReference.ConfigReferent.Name
-
 		var config *unstructured.Unstructured
 		var err error
-		if namespace == "" {
-			config, err = lister.Get(name)
+		if addonconfig.Namespace == "" {
+			config, err = lister.Get(addonconfig.Name)
 		} else {
-			config, err = lister.Namespace(namespace).Get(name)
+			config, err = lister.Namespace(addonconfig.Namespace).Get(addonconfig.Name)
 		}
 
 		if errors.IsNotFound(err) {
@@ -205,9 +202,18 @@ func (c *addonConfigController) updateConfigGenerations(addon *addonapiv1alpha1.
 			return err
 		}
 
-		// TODO if config is configmap or secret, the generation will not be increased automatically,
-		// we may need to consider how to handle this in the future
-		addon.Status.ConfigReferences[index].LastObservedGeneration = config.GetGeneration()
+		for index, configReference := range addon.Status.ConfigReferences {
+			if configReference.DesiredConfig == nil {
+				continue
+			}
+			if configReference.ConfigGroupResource == addonconfig.ConfigGroupResource && configReference.DesiredConfig.ConfigReferent == addonconfig.ConfigReferent {
+				specHash, err := managementaddonconfig.GetSpecHash(config)
+				if err != nil {
+					return err
+				}
+				addon.Status.ConfigReferences[index].DesiredConfig.SpecHash = specHash
+			}
+		}
 	}
 
 	return nil
@@ -257,7 +263,7 @@ func (c *addonConfigController) patchConfigReferences(ctx context.Context, old, 
 	return err
 }
 
-func getIndex(config addonapiv1alpha1.ConfigReference) string {
+func getIndex(config addonapiv1alpha1.AddOnConfig) string {
 	if config.Namespace != "" {
 		return fmt.Sprintf("%s/%s/%s/%s", config.Group, config.Resource, config.Namespace, config.Name)
 	}

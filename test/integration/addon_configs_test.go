@@ -128,14 +128,13 @@ var _ = ginkgo.Describe("AddConfigs", func() {
 				Namespace: configDefaultNamespace,
 				Name:      configDefaultName,
 			},
-			LastObservedGeneration: 1,
-			//			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-			//				ConfigReferent: addonapiv1alpha1.ConfigReferent{
-			//					Namespace: configDefaultNamespace,
-			//					Name:      configDefaultName,
-			//				},
-			//				SpecHash: addOnDefaultConfigSpecHash,
-			//			},
+			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+				ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					Namespace: configDefaultNamespace,
+					Name:      configDefaultName,
+				},
+				SpecHash: addOnDefaultConfigSpecHash,
+			},
 		})
 	})
 
@@ -231,14 +230,13 @@ var _ = ginkgo.Describe("AddConfigs", func() {
 				Namespace: configDefaultNamespace,
 				Name:      "another-config",
 			},
-			LastObservedGeneration: 0,
-			//			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-			//				ConfigReferent: addonapiv1alpha1.ConfigReferent{
-			//					Namespace: configDefaultNamespace,
-			//					Name:      "another-config",
-			//				},
-			//				SpecHash: "",
-			//			},
+			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+				ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					Namespace: configDefaultNamespace,
+					Name:      "another-config",
+				},
+				SpecHash: "",
+			},
 		})
 	})
 
@@ -320,14 +318,13 @@ var _ = ginkgo.Describe("AddConfigs", func() {
 				Namespace: addOnConfig.Namespace,
 				Name:      addOnConfig.Name,
 			},
-			LastObservedGeneration: 1,
-			//			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-			//				ConfigReferent: addonapiv1alpha1.ConfigReferent{
-			//					Namespace: addOnConfig.Namespace,
-			//					Name:      addOnConfig.Name,
-			//				},
-			//				SpecHash: addOnTest1ConfigSpecHash,
-			//			},
+			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+				ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					Namespace: addOnConfig.Namespace,
+					Name:      addOnConfig.Name,
+				},
+				SpecHash: addOnTest1ConfigSpecHash,
+			},
 		})
 	})
 
@@ -393,14 +390,13 @@ var _ = ginkgo.Describe("AddConfigs", func() {
 				Namespace: addOnConfig.Namespace,
 				Name:      addOnConfig.Name,
 			},
-			LastObservedGeneration: 1,
-			//			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-			//				ConfigReferent: addonapiv1alpha1.ConfigReferent{
-			//					Namespace: addOnConfig.Namespace,
-			//					Name:      addOnConfig.Name,
-			//				},
-			//				SpecHash: addOnTest1ConfigSpecHash,
-			//			},
+			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+				ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					Namespace: addOnConfig.Namespace,
+					Name:      addOnConfig.Name,
+				},
+				SpecHash: addOnTest1ConfigSpecHash,
+			},
 		})
 
 		addOnConfig, err = hubAddonClient.AddonV1alpha1().AddOnDeploymentConfigs(managedClusterName).Get(context.Background(), addOnConfig.Name, metav1.GetOptions{})
@@ -423,14 +419,13 @@ var _ = ginkgo.Describe("AddConfigs", func() {
 				Namespace: addOnConfig.Namespace,
 				Name:      addOnConfig.Name,
 			},
-			LastObservedGeneration: 2,
-			//			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-			//				ConfigReferent: addonapiv1alpha1.ConfigReferent{
-			//					Namespace: addOnConfig.Namespace,
-			//					Name:      addOnConfig.Name,
-			//				},
-			//				SpecHash: addOnTest2ConfigSpecHash,
-			//			},
+			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+				ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					Namespace: addOnConfig.Namespace,
+					Name:      addOnConfig.Name,
+				},
+				SpecHash: addOnTest2ConfigSpecHash,
+			},
 		})
 	})
 
@@ -503,14 +498,13 @@ var _ = ginkgo.Describe("AddConfigs", func() {
 				Namespace: addOnConfig.Namespace,
 				Name:      addOnConfig.Name,
 			},
-			LastObservedGeneration: 1,
-			//			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-			//				ConfigReferent: addonapiv1alpha1.ConfigReferent{
-			//					Namespace: addOnConfig.Namespace,
-			//					Name:      addOnConfig.Name,
-			//				},
-			//				SpecHash: "",
-			//			},
+			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+				ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					Namespace: addOnConfig.Namespace,
+					Name:      addOnConfig.Name,
+				},
+				SpecHash: "",
+			},
 		})
 	})
 })

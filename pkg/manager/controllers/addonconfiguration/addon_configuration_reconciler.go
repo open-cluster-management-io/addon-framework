@@ -30,7 +30,7 @@ type managedClusterAddonConfigurationReconciler struct {
 }
 
 func (d *managedClusterAddonConfigurationReconciler) buildConfigurationGraph(cma *addonv1alpha1.ClusterManagementAddOn) (*configurationGraph, error) {
-	graph := newGraph(cma.Spec.SupportedConfigs)
+	graph := newGraph(cma.Spec.SupportedConfigs, cma.Status.DefaultConfigReferences)
 	addons, err := d.managedClusterAddonIndexer.ByIndex(index.ManagedClusterAddonByName, cma.Name)
 	if err != nil {
 		return graph, err
@@ -59,7 +59,13 @@ func (d *managedClusterAddonConfigurationReconciler) buildConfigurationGraph(cma
 			continue
 		}
 
-		graph.addPlacementNode(strategy.Configs, clusters)
+		installConfigReferences := []addonv1alpha1.InstallConfigReference{}
+		for _, installProgression := range cma.Status.InstallProgressions {
+			if installProgression.PlacementRef == strategy.PlacementRef {
+				installConfigReferences = installProgression.ConfigReferences
+			}
+		}
+		graph.addPlacementNode(strategy.Configs, installConfigReferences, clusters)
 	}
 
 	return graph, utilerrors.NewAggregate(errs)
@@ -131,9 +137,9 @@ func (d *managedClusterAddonConfigurationReconciler) mergeAddonConfig(
 			}
 
 			match = true
-			if mergedConfigs[i].ConfigReferent != config.ConfigReferent {
+			if !equality.Semantic.DeepEqual(mergedConfigs[i].DesiredConfig, config.DesiredConfig) {
 				mergedConfigs[i].ConfigReferent = config.ConfigReferent
-				mergedConfigs[i].LastObservedGeneration = 0
+				mergedConfigs[i].DesiredConfig = config.DesiredConfig.DeepCopy()
 			}
 		}
 
