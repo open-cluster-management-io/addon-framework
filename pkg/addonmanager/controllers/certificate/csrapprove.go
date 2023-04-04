@@ -2,7 +2,6 @@ package certificate
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	certificatesv1 "k8s.io/api/certificates/v1"
@@ -12,11 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	certificatesinformers "k8s.io/client-go/informers/certificates/v1"
-	v1beta1certificatesinformers "k8s.io/client-go/informers/certificates/v1beta1"
 	"k8s.io/client-go/kubernetes"
-	certificateslisters "k8s.io/client-go/listers/certificates/v1"
-	v1beta1certificateslisters "k8s.io/client-go/listers/certificates/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -50,42 +45,45 @@ var (
 	EnableV1Beta1CSRCompatibility = true
 )
 
+type CSR interface {
+	*certificatesv1.CertificateSigningRequest | *certificatesv1beta1.CertificateSigningRequest
+	GetLabels() map[string]string
+	GetName() string
+}
+
+type CSRLister[T CSR] interface {
+	Get(name string) (T, error)
+}
+
+type CSRApprover[T CSR] interface {
+	approve(ctx context.Context, csr T) error
+	isInTerminalState(csr T) bool
+}
+
 // csrApprovingController auto approve the renewal CertificateSigningRequests for an accepted spoke cluster on the hub.
-type csrApprovingController struct {
-	kubeClient                kubernetes.Interface
+type csrApprovingController[T CSR] struct {
 	agentAddons               map[string]agent.AgentAddon
 	managedClusterLister      clusterlister.ManagedClusterLister
 	managedClusterAddonLister addonlisterv1alpha1.ManagedClusterAddOnLister
-	csrLister                 certificateslisters.CertificateSigningRequestLister
-	csrListerBeta             v1beta1certificateslisters.CertificateSigningRequestLister
+	csrLister                 CSRLister[T]
+	approver                  CSRApprover[T]
 }
 
 // NewCSRApprovingController creates a new csr approving controller
-func NewCSRApprovingController(
-	kubeClient kubernetes.Interface,
+func NewCSRApprovingController[T CSR](
 	clusterInformers clusterinformers.ManagedClusterInformer,
-	csrV1Informer certificatesinformers.CertificateSigningRequestInformer,
-	csrBetaInformer v1beta1certificatesinformers.CertificateSigningRequestInformer,
 	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
+	csrInformer cache.SharedIndexInformer,
+	csrLister CSRLister[T],
+	approver CSRApprover[T],
 	agentAddons map[string]agent.AgentAddon,
 ) factory.Controller {
-	if (csrV1Informer != nil) == (csrBetaInformer != nil) {
-		klog.Fatalf("V1 and V1beta1 CSR informer cannot be present or absent at the same time")
-	}
-	c := &csrApprovingController{
-		kubeClient:                kubeClient,
+	c := &csrApprovingController[T]{
 		agentAddons:               agentAddons,
 		managedClusterLister:      clusterInformers.Lister(),
 		managedClusterAddonLister: addonInformers.Lister(),
-	}
-	var csrInformer cache.SharedIndexInformer
-	if csrV1Informer != nil {
-		c.csrLister = csrV1Informer.Lister()
-		csrInformer = csrV1Informer.Informer()
-	}
-	if EnableV1Beta1CSRCompatibility && csrBetaInformer != nil {
-		c.csrListerBeta = csrBetaInformer.Lister()
-		csrInformer = csrBetaInformer.Informer()
+		csrLister:                 csrLister,
+		approver:                  approver,
 	}
 
 	return factory.New().
@@ -113,18 +111,18 @@ func NewCSRApprovingController(
 		ToController("CSRApprovingController")
 }
 
-func (c *csrApprovingController) sync(ctx context.Context, syncCtx factory.SyncContext, csrName string) error {
+func (c *csrApprovingController[T]) sync(ctx context.Context, syncCtx factory.SyncContext, csrName string) error {
 	klog.V(4).Infof("Reconciling CertificateSigningRequests %q", csrName)
 
-	csr, err := c.getCSR(csrName)
-	if csr == nil {
+	csr, err := c.csrLister.Get(csrName)
+	if errors.IsNotFound(err) {
 		return nil
 	}
 	if err != nil {
 		return err
 	}
 
-	if isCSRApproved(csr) || IsCSRInTerminalState(csr) {
+	if c.approver.isInTerminalState(csr) {
 		return nil
 	}
 
@@ -161,11 +159,6 @@ func (c *csrApprovingController) sync(ctx context.Context, syncCtx factory.SyncC
 		return err
 	}
 
-	if registrationOption.CSRApproveCheck == nil {
-		klog.V(4).Infof("addon csr %q cannont be auto approved due to approve check not defined", csr.GetName())
-		return nil
-	}
-
 	if err := c.approve(ctx, registrationOption, managedCluster, managedClusterAddon, csr); err != nil {
 		return err
 	}
@@ -173,167 +166,125 @@ func (c *csrApprovingController) sync(ctx context.Context, syncCtx factory.SyncC
 	return nil
 }
 
-func (c *csrApprovingController) getCSR(csrName string) (metav1.Object, error) {
-	// TODO: remove the following block for deprecating V1beta1 CSR compatibility
-	if EnableV1Beta1CSRCompatibility {
-		if c.csrListerBeta != nil {
-			csr, err := c.csrListerBeta.Get(csrName)
-			if errors.IsNotFound(err) {
-				return nil, nil
-			}
-			if err != nil {
-				return nil, err
-			}
-			return csr, nil
-		}
-	}
-	csr, err := c.csrLister.Get(csrName)
-	if errors.IsNotFound(err) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return csr, nil
+// CSRV1Approver implement CSRApprover interface
+type CSRV1Approver struct {
+	kubeClient kubernetes.Interface
 }
 
-func (c *csrApprovingController) approve(
-	ctx context.Context,
-	registrationOption *agent.RegistrationOption,
-	managedCluster *clusterv1.ManagedCluster,
-	managedClusterAddon *addonv1alpha1.ManagedClusterAddOn,
-	csr metav1.Object) error {
-
-	switch t := csr.(type) {
-	case *certificatesv1.CertificateSigningRequest:
-		approve := registrationOption.CSRApproveCheck(managedCluster, managedClusterAddon, t)
-		if !approve {
-			klog.V(4).Infof("addon csr %q cannont be auto approved due to approve check fails", csr.GetName())
-			return nil
-		}
-		return c.approveCSRV1(ctx, t)
-	// TODO: remove the following block for deprecating V1beta1 CSR compatibility
-	case *certificatesv1beta1.CertificateSigningRequest:
-		v1CSR := unsafeConvertV1beta1CSRToV1CSR(t)
-		approve := registrationOption.CSRApproveCheck(managedCluster, managedClusterAddon, v1CSR)
-		if !approve {
-			klog.V(4).Infof("addon csr %q cannont be auto approved due to approve check fails", csr.GetName())
-			return nil
-		}
-		return c.approveCSRV1Beta1(ctx, t)
-	default:
-		return fmt.Errorf("unknown csr object type: %t", csr)
-	}
+func NewCSRV1Approver(client kubernetes.Interface) *CSRV1Approver {
+	return &CSRV1Approver{kubeClient: client}
 }
 
-func (c *csrApprovingController) approveCSRV1(ctx context.Context, v1CSR *certificatesv1.CertificateSigningRequest) error {
-	v1CSR.Status.Conditions = append(v1CSR.Status.Conditions, certificatesv1.CertificateSigningRequestCondition{
-		Type:    certificatesv1.CertificateApproved,
-		Status:  corev1.ConditionTrue,
-		Reason:  "AutoApprovedByHubCSRApprovingController",
-		Message: "Auto approving addon agent certificate.",
-	})
-	_, err := c.kubeClient.CertificatesV1().CertificateSigningRequests().UpdateApproval(ctx, v1CSR.GetName(), v1CSR, metav1.UpdateOptions{})
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (c *csrApprovingController) approveCSRV1Beta1(ctx context.Context, v1beta1CSR *certificatesv1beta1.CertificateSigningRequest) error {
-	v1beta1CSR.Status.Conditions = append(v1beta1CSR.Status.Conditions, certificatesv1beta1.CertificateSigningRequestCondition{
-		Type:    certificatesv1beta1.CertificateApproved,
-		Status:  corev1.ConditionTrue,
-		Reason:  "AutoApprovedByHubCSRApprovingController",
-		Message: "Auto approving addon agent certificate.",
-	})
-	_, err := c.kubeClient.CertificatesV1beta1().CertificateSigningRequests().UpdateApproval(ctx, v1beta1CSR, metav1.UpdateOptions{})
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// Check whether a CSR is in terminal state
-func IsCSRInTerminalState(csr metav1.Object) bool {
-	if v1CSR, ok := csr.(*certificatesv1.CertificateSigningRequest); ok {
-		for _, c := range v1CSR.Status.Conditions {
-			if c.Type == certificatesv1.CertificateApproved {
-				return true
-			}
-			if c.Type == certificatesv1.CertificateDenied {
-				return true
-			}
+func (c *CSRV1Approver) isInTerminalState(csr *certificatesv1.CertificateSigningRequest) bool {
+	for _, c := range csr.Status.Conditions {
+		if c.Type == certificatesv1.CertificateApproved {
+			return true
 		}
-	}
-	// TODO: remove the following block for deprecating V1beta1 CSR compatibility
-	if EnableV1Beta1CSRCompatibility {
-		if v1beta1CSR, ok := csr.(*certificatesv1beta1.CertificateSigningRequest); ok {
-			for _, c := range v1beta1CSR.Status.Conditions {
-				if c.Type == certificatesv1beta1.CertificateApproved {
-					return true
-				}
-				if c.Type == certificatesv1beta1.CertificateDenied {
-					return true
-				}
-			}
+		if c.Type == certificatesv1.CertificateDenied {
+			return true
 		}
 	}
 	return false
 }
 
-func isCSRApproved(csr metav1.Object) bool {
-	approved := false
-	if v1CSR, ok := csr.(*certificatesv1.CertificateSigningRequest); ok {
-		for _, condition := range v1CSR.Status.Conditions {
-			if condition.Type == certificatesv1.CertificateDenied {
-				return false
-			} else if condition.Type == certificatesv1.CertificateApproved {
-				approved = true
-			}
+func (c *CSRV1Approver) approve(ctx context.Context, csr *certificatesv1.CertificateSigningRequest) error {
+	csrCopy := csr.DeepCopy()
+	// Auto approve the spoke cluster csr
+	csrCopy.Status.Conditions = append(csr.Status.Conditions, certificatesv1.CertificateSigningRequestCondition{
+		Type:    certificatesv1.CertificateApproved,
+		Status:  corev1.ConditionTrue,
+		Reason:  "AutoApprovedByHubCSRApprovingController",
+		Message: "Auto approving Managed cluster agent certificate after SubjectAccessReview.",
+	})
+	_, err := c.kubeClient.CertificatesV1().CertificateSigningRequests().UpdateApproval(ctx, csrCopy.Name, csrCopy, metav1.UpdateOptions{})
+	return err
+}
+
+type CSRV1beta1Approver struct {
+	kubeClient kubernetes.Interface
+}
+
+func NewCSRV1beta1Approver(client kubernetes.Interface) *CSRV1beta1Approver {
+	return &CSRV1beta1Approver{kubeClient: client}
+}
+
+func (c *CSRV1beta1Approver) isInTerminalState(csr *certificatesv1beta1.CertificateSigningRequest) bool {
+	for _, c := range csr.Status.Conditions {
+		if c.Type == certificatesv1beta1.CertificateApproved {
+			return true
+		}
+		if c.Type == certificatesv1beta1.CertificateDenied {
+			return true
 		}
 	}
-	// TODO: remove the following block for deprecating V1beta1 CSR compatibility
-	if EnableV1Beta1CSRCompatibility {
-		if v1beta1CSR, ok := csr.(*certificatesv1beta1.CertificateSigningRequest); ok {
-			for _, condition := range v1beta1CSR.Status.Conditions {
-				if condition.Type == certificatesv1beta1.CertificateDenied {
-					return false
-				} else if condition.Type == certificatesv1beta1.CertificateApproved {
-					approved = true
-				}
-			}
-		}
+	return false
+}
+
+func (c *CSRV1beta1Approver) approve(ctx context.Context, csr *certificatesv1beta1.CertificateSigningRequest) error {
+	csrCopy := csr.DeepCopy()
+	// Auto approve the spoke cluster csr
+	csrCopy.Status.Conditions = append(csr.Status.Conditions, certificatesv1beta1.CertificateSigningRequestCondition{
+		Type:    certificatesv1beta1.CertificateApproved,
+		Status:  corev1.ConditionTrue,
+		Reason:  "AutoApprovedByHubCSRApprovingController",
+		Message: "Auto approving Managed cluster agent certificate after SubjectAccessReview.",
+	})
+	_, err := c.kubeClient.CertificatesV1beta1().CertificateSigningRequests().UpdateApproval(ctx, csrCopy, metav1.UpdateOptions{})
+	return err
+}
+
+func (c *csrApprovingController[T]) approve(
+	ctx context.Context,
+	registrationOption *agent.RegistrationOption,
+	managedCluster *clusterv1.ManagedCluster,
+	managedClusterAddon *addonv1alpha1.ManagedClusterAddOn,
+	csr T) error {
+
+	v1CSR := unsafeConvertV1beta1CSRToV1CSR[T](csr)
+	if registrationOption.CSRApproveCheck == nil {
+		klog.V(4).Infof("addon csr %q cannont be auto approved due to approve check not defined", csr.GetName())
+		return nil
 	}
-	return approved
+	approve := registrationOption.CSRApproveCheck(managedCluster, managedClusterAddon, v1CSR)
+	if !approve {
+		klog.V(4).Infof("addon csr %q cannont be auto approved due to approve check fails", csr.GetName())
+		return nil
+	}
+
+	return c.approver.approve(ctx, csr)
 }
 
 // TODO: remove the following block for deprecating V1beta1 CSR compatibility
-func unsafeConvertV1beta1CSRToV1CSR(v1beta1CSR *certificatesv1beta1.CertificateSigningRequest) *certificatesv1.CertificateSigningRequest {
-	v1CSR := &certificatesv1.CertificateSigningRequest{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: certificatesv1.SchemeGroupVersion.String(),
-			Kind:       "CertificateSigningRequest",
-		},
-		ObjectMeta: *v1beta1CSR.ObjectMeta.DeepCopy(),
-		Spec: certificatesv1.CertificateSigningRequestSpec{
-			Request:           v1beta1CSR.Spec.Request,
-			ExpirationSeconds: v1beta1CSR.Spec.ExpirationSeconds,
-			Usages:            unsafeCovertV1beta1KeyUsageToV1KeyUsage(v1beta1CSR.Spec.Usages),
-			Username:          v1beta1CSR.Spec.Username,
-			UID:               v1beta1CSR.Spec.UID,
-			Groups:            v1beta1CSR.Spec.Groups,
-			Extra:             unsafeCovertV1beta1ExtraValueToV1ExtraValue(v1beta1CSR.Spec.Extra),
-		},
-		Status: certificatesv1.CertificateSigningRequestStatus{
-			Certificate: v1beta1CSR.Status.Certificate,
-			Conditions:  unsafeCovertV1beta1ConditionsToV1Conditions(v1beta1CSR.Status.Conditions),
-		},
+func unsafeConvertV1beta1CSRToV1CSR[T CSR](csr T) *certificatesv1.CertificateSigningRequest {
+	switch obj := any(csr).(type) {
+	case *certificatesv1.CertificateSigningRequest:
+		return obj
+	case *certificatesv1beta1.CertificateSigningRequest:
+		v1CSR := &certificatesv1.CertificateSigningRequest{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: certificatesv1.SchemeGroupVersion.String(),
+				Kind:       "CertificateSigningRequest",
+			},
+			ObjectMeta: *obj.ObjectMeta.DeepCopy(),
+			Spec: certificatesv1.CertificateSigningRequestSpec{
+				Request:           obj.Spec.Request,
+				ExpirationSeconds: obj.Spec.ExpirationSeconds,
+				Usages:            unsafeCovertV1beta1KeyUsageToV1KeyUsage(obj.Spec.Usages),
+				Username:          obj.Spec.Username,
+				UID:               obj.Spec.UID,
+				Groups:            obj.Spec.Groups,
+				Extra:             unsafeCovertV1beta1ExtraValueToV1ExtraValue(obj.Spec.Extra),
+			},
+			Status: certificatesv1.CertificateSigningRequestStatus{
+				Certificate: obj.Status.Certificate,
+				Conditions:  unsafeCovertV1beta1ConditionsToV1Conditions(obj.Status.Conditions),
+			},
+		}
+		if obj.Spec.SignerName != nil {
+			v1CSR.Spec.SignerName = *obj.Spec.SignerName
+		}
 	}
-	if v1beta1CSR.Spec.SignerName != nil {
-		v1CSR.Spec.SignerName = *v1beta1CSR.Spec.SignerName
-	}
-	return v1CSR
+	return nil
 }
 
 // TODO: remove the following block for deprecating V1beta1 CSR compatibility

@@ -145,3 +145,15 @@ func (c *csrSignController) sync(ctx context.Context, syncCtx factory.SyncContex
 	}
 	return nil
 }
+
+func isCSRApproved(csr *certificatesv1.CertificateSigningRequest) bool {
+	approved := false
+	for _, condition := range csr.Status.Conditions {
+		if condition.Type == certificatesv1.CertificateDenied {
+			return false
+		} else if condition.Type == certificatesv1.CertificateApproved {
+			approved = true
+		}
+	}
+	return approved
+}
