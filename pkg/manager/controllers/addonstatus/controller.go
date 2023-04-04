@@ -49,7 +49,7 @@ func NewAddonStatusController(
 			key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 			return []string{key}
 		},
-		addonInformers.Informer()).
+		addonInformers.Informer(), clusterManagementAddonInformers.Informer()).
 		WithSync(c.sync).ToController("addon-status-controller")
 }
 

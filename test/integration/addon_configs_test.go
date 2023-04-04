@@ -143,6 +143,9 @@ var _ = ginkgo.Describe("AddConfigs", func() {
 		cma, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), testAddOnConfigsImpl.name, metav1.GetOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
+		cma.Annotations = map[string]string{
+			addonapiv1alpha1.AddonLifecycleAnnotationKey: addonapiv1alpha1.AddonLifecycleAddonManagerAnnotationValue,
+		}
 		cma.Spec.InstallStrategy = addonapiv1alpha1.InstallStrategy{
 			Type: addonapiv1alpha1.AddonInstallStrategyPlacements,
 			Placements: []addonapiv1alpha1.PlacementStrategy{
@@ -561,6 +564,7 @@ func updateClusterManagementAddOn(ctx context.Context, new *addonapiv1alpha1.Clu
 	gomega.Eventually(func() bool {
 		old, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), new.Name, metav1.GetOptions{})
 		old.Spec = new.Spec
+		old.Annotations = new.Annotations
 		_, err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Update(context.Background(), old, metav1.UpdateOptions{})
 		if err == nil {
 			return true
