@@ -8,7 +8,6 @@ import (
 	jsonpatch "github.com/evanphx/json-patch"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -30,9 +29,8 @@ import (
 )
 
 const (
-	controllerName               = "addon-config-controller"
-	byAddOnConfig                = "by-addon-config"
-	UnsupportedConfigurationType = "UnsupportedConfiguration"
+	controllerName = "addon-config-controller"
+	byAddOnConfig  = "by-addon-config"
 )
 
 type enqueueFunc func(obj interface{})
@@ -163,13 +161,6 @@ func (c *addonConfigController) sync(ctx context.Context, syncCtx factory.SyncCo
 		return err
 	}
 
-	// if there is unsupported configs defined in spec, skip updating spec hash.
-	configCond := meta.FindStatusCondition(addon.Status.Conditions, UnsupportedConfigurationType)
-	if configCond == nil || configCond.Status == metav1.ConditionTrue {
-		klog.Warningf("failed to update spec hash as unsupported configuration defined in %s", addon.Name)
-		return nil
-	}
-
 	addonCopy := addon.DeepCopy()
 
 	if err := c.updateConfigSpecHashAndGenerations(addonCopy); err != nil {
@@ -180,6 +171,10 @@ func (c *addonConfigController) sync(ctx context.Context, syncCtx factory.SyncCo
 }
 
 func (c *addonConfigController) updateConfigSpecHashAndGenerations(addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+	supportedConfigSet := map[addonapiv1alpha1.ConfigGroupResource]bool{}
+	for _, config := range addon.Status.SupportedConfigs {
+		supportedConfigSet[config] = true
+	}
 	for index, configReference := range addon.Status.ConfigReferences {
 		lister, ok := c.configListers[schema.GroupResource{Group: configReference.ConfigGroupResource.Group, Resource: configReference.ConfigGroupResource.Resource}]
 		if !ok {
@@ -205,8 +200,12 @@ func (c *addonConfigController) updateConfigSpecHashAndGenerations(addon *addona
 		// update LastObservedGeneration for all the configs in status
 		addon.Status.ConfigReferences[index].LastObservedGeneration = config.GetGeneration()
 
-		// update desired spec hash only for all the configs in spec
+		// update desired spec hash only for the configs in spec
 		for _, addonconfig := range addon.Spec.Configs {
+			// do not update spec hash for unsupported configs
+			if _, ok := supportedConfigSet[addonconfig.ConfigGroupResource]; !ok {
+				continue
+			}
 			if configReference.DesiredConfig == nil {
 				continue
 			}

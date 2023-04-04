@@ -302,7 +302,7 @@ func TestConfigurationGraph(t *testing.T) {
 				graph.addAddonNode(addon)
 			}
 			for i, strategy := range c.placementStrategies {
-				graph.addPlacementNode(strategy.configs, c.installProgressions[i].ConfigReferences, strategy.clusters)
+				graph.addPlacementNode(c.installProgressions[i].ConfigReferences, strategy.clusters)
 			}
 
 			actual := graph.addonToUpdate()

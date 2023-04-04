@@ -503,7 +503,7 @@ var _ = ginkgo.Describe("AddConfigs", func() {
 				Namespace: addOnConfig.Namespace,
 				Name:      addOnConfig.Name,
 			},
-			LastObservedGeneration: 0,
+			LastObservedGeneration: 1,
 			DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
 				ConfigReferent: addonapiv1alpha1.ConfigReferent{
 					Namespace: addOnConfig.Namespace,

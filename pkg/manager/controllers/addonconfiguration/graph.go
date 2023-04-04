@@ -87,8 +87,7 @@ func (g *configurationGraph) addAddonNode(mca *addonv1alpha1.ManagedClusterAddOn
 }
 
 // addNode delete clusters on existing graph so the new configuration overrides the previous
-func (g *configurationGraph) addPlacementNode(configs []addonv1alpha1.AddOnConfig,
-	installConfigReference []addonv1alpha1.InstallConfigReference, clusters []string) {
+func (g *configurationGraph) addPlacementNode(installConfigReference []addonv1alpha1.InstallConfigReference, clusters []string) {
 	node := &installStrategyNode{
 		desiredConfigs: g.defaults.desiredConfigs,
 		children:       map[string]*addonNode{},
@@ -96,26 +95,17 @@ func (g *configurationGraph) addPlacementNode(configs []addonv1alpha1.AddOnConfi
 	}
 
 	// overrides configuration by install strategy
-	if len(configs) > 0 {
+	if len(installConfigReference) > 0 {
 		node.desiredConfigs = node.desiredConfigs.copy()
-		for _, config := range configs {
-			node.desiredConfigs[config.ConfigGroupResource] = addonv1alpha1.ConfigReference{
-				ConfigGroupResource: config.ConfigGroupResource,
-				ConfigReferent:      config.ConfigReferent,
-				DesiredConfig: &addonv1alpha1.ConfigSpecHash{
-					ConfigReferent: config.ConfigReferent,
-				},
+		for _, configRef := range installConfigReference {
+			if configRef.DesiredConfig == nil {
+				continue
 			}
-		}
-	}
-	// copy the spechash from cma status InstallProgressions
-	for _, configRef := range installConfigReference {
-		if configRef.DesiredConfig == nil {
-			continue
-		}
-		nodeDesiredConfig, ok := node.desiredConfigs[configRef.ConfigGroupResource]
-		if ok && (nodeDesiredConfig.DesiredConfig.ConfigReferent == configRef.DesiredConfig.ConfigReferent) {
-			nodeDesiredConfig.DesiredConfig.SpecHash = configRef.DesiredConfig.SpecHash
+			node.desiredConfigs[configRef.ConfigGroupResource] = addonv1alpha1.ConfigReference{
+				ConfigGroupResource: configRef.ConfigGroupResource,
+				ConfigReferent:      configRef.DesiredConfig.ConfigReferent,
+				DesiredConfig:       configRef.DesiredConfig.DeepCopy(),
+			}
 		}
 	}
 

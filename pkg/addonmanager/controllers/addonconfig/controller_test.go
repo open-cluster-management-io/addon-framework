@@ -3,11 +3,9 @@ package addonconfig
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"testing"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -55,7 +53,7 @@ func TestSync(t *testing.T) {
 			},
 		},
 		{
-			name:    "update config spec hash and generation",
+			name:    "supported Configs",
 			syncKey: "cluster1/test",
 			managedClusteraddon: []runtime.Object{
 				func() *addonapiv1alpha1.ManagedClusterAddOn {
@@ -91,12 +89,10 @@ func TestSync(t *testing.T) {
 							},
 						},
 					}
-					addon.Status.Conditions = []metav1.Condition{
+					addon.Status.SupportedConfigs = []addonapiv1alpha1.ConfigGroupResource{
 						{
-							Type:    UnsupportedConfigurationType,
-							Status:  metav1.ConditionFalse,
-							Reason:  "ConfigurationSupported",
-							Message: "the config resources are supported",
+							Group:    fakeGVR.Group,
+							Resource: fakeGVR.Resource,
 						},
 					}
 					return addon
@@ -114,13 +110,72 @@ func TestSync(t *testing.T) {
 				if addOn.Status.ConfigReferences[0].LastObservedGeneration != 2 {
 					t.Errorf("Expect addon config generation is 2, but got %v", addOn.Status.ConfigReferences[0].LastObservedGeneration)
 				}
+
 				if addOn.Status.ConfigReferences[0].DesiredConfig.SpecHash != "3e80b3778b3b03766e7be993131c0af2ad05630c5d96fb7fa132d05b77336e04" {
 					t.Errorf("Expect addon config spec hash is 3e80b3778b3b03766e7be993131c0af2ad05630c5d96fb7fa132d05b77336e04, but got %v", addOn.Status.ConfigReferences[0].DesiredConfig.SpecHash)
 				}
 			},
 		},
 		{
-			name:    "only update generation when config is not defined in spec",
+			name:    "unsupported configs",
+			syncKey: "cluster1/test",
+			managedClusteraddon: []runtime.Object{
+				func() *addonapiv1alpha1.ManagedClusterAddOn {
+					addon := addontesting.NewAddon("test", "cluster1")
+					addon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    fakeGVR.Group,
+								Resource: fakeGVR.Resource,
+							},
+							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+								Namespace: "cluster1",
+								Name:      "test",
+							},
+						},
+					}
+					addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    fakeGVR.Group,
+								Resource: fakeGVR.Resource,
+							},
+							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+								Namespace: "cluster1",
+								Name:      "test",
+							},
+							LastObservedGeneration: 1,
+							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+									Namespace: "cluster1",
+									Name:      "test",
+								},
+							},
+						},
+					}
+					return addon
+				}(),
+			},
+			configs: []runtime.Object{newTestConfing("test", "cluster1", 2)},
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				patch := actions[0].(clienttesting.PatchActionImpl).Patch
+				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				err := json.Unmarshal(patch, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if addOn.Status.ConfigReferences[0].LastObservedGeneration != 2 {
+					t.Errorf("Expect addon config generation is 2, but got %v", addOn.Status.ConfigReferences[0].LastObservedGeneration)
+				}
+
+				if addOn.Status.ConfigReferences[0].DesiredConfig.SpecHash != "" {
+					t.Errorf("Expect addon config spec hash is empty, but got %v", addOn.Status.ConfigReferences[0].DesiredConfig.SpecHash)
+				}
+			},
+		},
+		{
+			name:    "update generation for all the configs in status",
 			syncKey: "cluster1/test",
 			managedClusteraddon: []runtime.Object{
 				func() *addonapiv1alpha1.ManagedClusterAddOn {
@@ -144,14 +199,6 @@ func TestSync(t *testing.T) {
 							},
 						},
 					}
-					addon.Status.Conditions = []metav1.Condition{
-						{
-							Type:    UnsupportedConfigurationType,
-							Status:  metav1.ConditionFalse,
-							Reason:  "ConfigurationSupported",
-							Message: "the config resources are supported",
-						},
-					}
 					return addon
 				}(),
 			},
@@ -167,6 +214,7 @@ func TestSync(t *testing.T) {
 				if addOn.Status.ConfigReferences[0].LastObservedGeneration != 2 {
 					t.Errorf("Expect addon config generation is 2, but got %v", addOn.Status.ConfigReferences[0].LastObservedGeneration)
 				}
+
 				if addOn.Status.ConfigReferences[0].DesiredConfig.SpecHash != "" {
 					t.Errorf("Expect addon config spec hash is empty, but got %v", addOn.Status.ConfigReferences[0].DesiredConfig.SpecHash)
 				}
@@ -190,15 +238,6 @@ func TestSync(t *testing.T) {
 							},
 						},
 					}
-					addon.Status.Conditions = []metav1.Condition{
-						{
-							Type:    UnsupportedConfigurationType,
-							Status:  metav1.ConditionFalse,
-							Reason:  "ConfigurationSupported",
-							Message: "the config resources are supported",
-						},
-					}
-
 					return addon
 				}(),
 			},
@@ -244,83 +283,14 @@ func TestSync(t *testing.T) {
 							},
 						},
 					}
-					addon.Status.Conditions = []metav1.Condition{
-						{
-							Type:    UnsupportedConfigurationType,
-							Status:  metav1.ConditionFalse,
-							Reason:  "ConfigurationSupported",
-							Message: "the config resources are supported",
-						},
-					}
+
 					return addon
 				}(),
 			},
 			configs:         []runtime.Object{},
 			validateActions: addontesting.AssertNoActions,
 		},
-		{
-			name:    "unsupported configs",
-			syncKey: "cluster1/test",
-			managedClusteraddon: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
-					addon := addontesting.NewAddon("test", "cluster1")
-					addon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
-						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-								Group:    "other",
-								Resource: "other",
-							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
-								Namespace: "cluster1",
-								Name:      "test",
-							},
-						},
-						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-								Group:    fakeGVR.Group,
-								Resource: fakeGVR.Resource,
-							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
-								Namespace: "cluster1",
-								Name:      "test",
-							},
-						},
-					}
-					addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
-						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-								Group:    fakeGVR.Group,
-								Resource: fakeGVR.Resource,
-							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
-								Namespace: "cluster1",
-								Name:      "test",
-							},
-							LastObservedGeneration: 0,
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
-									Namespace: "cluster1",
-									Name:      "test",
-								},
-							},
-						},
-					}
-					addon.Status.Conditions = []metav1.Condition{
-						{
-							Type:    UnsupportedConfigurationType,
-							Status:  metav1.ConditionTrue,
-							Reason:  "ConfigurationUnsupported",
-							Message: fmt.Sprintf("Configuration with gvr %s/%s is not supported for this addon", "other", "other"),
-						},
-					}
-					return addon
-				}(),
-			},
-			configs: []runtime.Object{newTestConfing("test", "cluster1", 1)},
-			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertNoActions(t, actions)
-			},
-		},
+
 		{
 			name:    "cluster scope config",
 			syncKey: "cluster1/test",
@@ -355,12 +325,10 @@ func TestSync(t *testing.T) {
 							},
 						},
 					}
-					addon.Status.Conditions = []metav1.Condition{
+					addon.Status.SupportedConfigs = []addonapiv1alpha1.ConfigGroupResource{
 						{
-							Type:    UnsupportedConfigurationType,
-							Status:  metav1.ConditionFalse,
-							Reason:  "ConfigurationSupported",
-							Message: "the config resources are supported",
+							Group:    fakeGVR.Group,
+							Resource: fakeGVR.Resource,
 						},
 					}
 					return addon
