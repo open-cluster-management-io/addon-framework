@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	certv1 "k8s.io/api/certificates/v1"
+	certv1beta1 "k8s.io/api/certificates/v1beta1"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -195,12 +198,12 @@ func (a *addonManager) Start(ctx context.Context) error {
 	// by the kube-controller-manager so custom CSR controller should be
 	// disabled to avoid conflict.
 	if v1CSRSupported {
-		csrApproveController = certificate.NewCSRApprovingController(
-			kubeClient,
+		csrApproveController = certificate.NewCSRApprovingController[*certv1.CertificateSigningRequest](
 			clusterInformers.Cluster().V1().ManagedClusters(),
-			kubeInfomers.Certificates().V1().CertificateSigningRequests(),
-			nil,
 			addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+			kubeInfomers.Certificates().V1().CertificateSigningRequests().Informer(),
+			kubeInfomers.Certificates().V1().CertificateSigningRequests().Lister(),
+			certificate.NewCSRV1Approver(kubeClient),
 			a.addonAgents,
 		)
 		csrSignController = certificate.NewCSRSignController(
@@ -211,12 +214,12 @@ func (a *addonManager) Start(ctx context.Context) error {
 			a.addonAgents,
 		)
 	} else if v1beta1Supported {
-		csrApproveController = certificate.NewCSRApprovingController(
-			kubeClient,
+		csrApproveController = certificate.NewCSRApprovingController[*certv1beta1.CertificateSigningRequest](
 			clusterInformers.Cluster().V1().ManagedClusters(),
-			nil,
-			kubeInfomers.Certificates().V1beta1().CertificateSigningRequests(),
 			addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+			kubeInfomers.Certificates().V1beta1().CertificateSigningRequests().Informer(),
+			kubeInfomers.Certificates().V1beta1().CertificateSigningRequests().Lister(),
+			certificate.NewCSRV1beta1Approver(kubeClient),
 			a.addonAgents,
 		)
 	}

@@ -7,7 +7,6 @@ import (
 
 	certv1 "k8s.io/api/certificates/v1"
 	certv1beta1 "k8s.io/api/certificates/v1beta1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeinformers "k8s.io/client-go/informers"
 	fakekube "k8s.io/client-go/kubernetes/fake"
@@ -130,12 +129,12 @@ func TestApproveReconcile(t *testing.T) {
 				}
 			}
 
-			controller := &csrApprovingController{
-				kubeClient:                fakeKubeClient,
+			controller := &csrApprovingController[*certv1.CertificateSigningRequest]{
 				agentAddons:               map[string]agent.AgentAddon{c.testaddon.name: c.testaddon},
 				managedClusterLister:      clusterInformers.Cluster().V1().ManagedClusters().Lister(),
 				managedClusterAddonLister: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
 				csrLister:                 kubeInfomers.Certificates().V1().CertificateSigningRequests().Lister(),
+				approver:                  NewCSRV1Approver(fakeKubeClient),
 			}
 
 			for _, obj := range c.csr {
@@ -196,8 +195,9 @@ func TestApproveBetaReconcile(t *testing.T) {
 			validateCSRActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "update")
 				actual := actions[0].(clienttesting.UpdateActionImpl).Object
-				actualCSR := actual.(metav1.Object)
-				if !isCSRApproved(actualCSR) {
+				actualCSR := actual.(*certv1beta1.CertificateSigningRequest)
+				approver := NewCSRV1beta1Approver(nil)
+				if !approver.isInTerminalState(actualCSR) {
 					t.Errorf("csr is not approved: %v", actualCSR.GetName())
 				}
 			},
@@ -239,12 +239,12 @@ func TestApproveBetaReconcile(t *testing.T) {
 				}
 			}
 
-			controller := &csrApprovingController{
-				kubeClient:                fakeKubeClient,
+			controller := &csrApprovingController[*certv1beta1.CertificateSigningRequest]{
 				agentAddons:               map[string]agent.AgentAddon{c.testaddon.name: c.testaddon},
 				managedClusterLister:      clusterInformers.Cluster().V1().ManagedClusters().Lister(),
 				managedClusterAddonLister: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
-				csrListerBeta:             kubeInfomers.Certificates().V1beta1().CertificateSigningRequests().Lister(),
+				csrLister:                 kubeInfomers.Certificates().V1beta1().CertificateSigningRequests().Lister(),
+				approver:                  NewCSRV1beta1Approver(fakeKubeClient),
 			}
 
 			for _, obj := range c.csr {
