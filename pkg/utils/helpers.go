@@ -300,5 +300,27 @@ func ManagedByAddonManager(cma *addonapiv1alpha1.ClusterManagementAddOn) bool {
 }
 
 func ManagedBySelf(cma *addonapiv1alpha1.ClusterManagementAddOn) bool {
-	return !ManagedByAddonManager(cma)
+	if len(cma.Annotations) == 0 {
+		return true
+	}
+
+	value, ok := cma.Annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey]
+	if !ok {
+		return true
+	}
+
+	return value == addonapiv1alpha1.AddonLifecycleSelfManageAnnotationValue
+}
+
+func IsOwnedByCMA(addon *addonapiv1alpha1.ManagedClusterAddOn) bool {
+	for _, owner := range addon.OwnerReferences {
+		if owner.Kind != "ClusterManagementAddOn" {
+			continue
+		}
+		if owner.Name != addon.Name {
+			continue
+		}
+		return true
+	}
+	return false
 }

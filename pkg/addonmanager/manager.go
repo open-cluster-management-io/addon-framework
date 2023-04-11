@@ -9,7 +9,7 @@ import (
 
 	"open-cluster-management.io/addon-framework/pkg/index"
 	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonconfiguration"
-	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonstatus"
+	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonowner"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -179,10 +179,11 @@ func (a *addonManager) Start(ctx context.Context) error {
 
 	// This is a duplicate controller in general addon-manager. This should be removed when we
 	// alway enable the addon-manager
-	addonStatusController := addonstatus.NewAddonStatusController(
+	addonOwnerController := addonowner.NewAddonOwnerController(
 		addonClient,
 		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 		addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
+		utils.ManagedBySelf,
 	)
 
 	var addonConfigController, managementAddonConfigController, addonConfigurationController factory.Controller
@@ -272,7 +273,7 @@ func (a *addonManager) Start(ctx context.Context) error {
 	go registrationController.Run(ctx, 1)
 	go addonInstallController.Run(ctx, 1)
 	go addonHealthCheckController.Run(ctx, 1)
-	go addonStatusController.Run(ctx, 1)
+	go addonOwnerController.Run(ctx, 1)
 	if addonConfigController != nil {
 		go addonConfigController.Run(ctx, 1)
 	}

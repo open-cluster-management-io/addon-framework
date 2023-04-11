@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
@@ -455,6 +456,10 @@ var _ = ginkgo.Describe("AddConfigs", func() {
 		_, err = hubAddonClient.AddonV1alpha1().AddOnDeploymentConfigs(managedClusterName).Create(context.Background(), addOnConfig, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
+		// empty supported config
+		supportedConfig := testAddOnConfigsImpl.supportedConfigGVRs
+		testAddOnConfigsImpl.supportedConfigGVRs = []schema.GroupVersionResource{}
+
 		// do not update mca status.SupportedConfigs
 		addon := &addonapiv1alpha1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
@@ -515,6 +520,8 @@ var _ = ginkgo.Describe("AddConfigs", func() {
 				SpecHash: "",
 			},
 		})
+
+		testAddOnConfigsImpl.supportedConfigGVRs = supportedConfig
 	})
 })
 
@@ -526,6 +533,9 @@ func createClusterManagementAddOn(name, defaultConfigNamespace, defaultConfigNam
 			&addonapiv1alpha1.ClusterManagementAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: name,
+					Annotations: map[string]string{
+						addonapiv1alpha1.AddonLifecycleAnnotationKey: addonapiv1alpha1.AddonLifecycleAddonManagerAnnotationValue,
+					},
 				},
 				Spec: addonapiv1alpha1.ClusterManagementAddOnSpec{
 					SupportedConfigs: []addonapiv1alpha1.ConfigMeta{
@@ -652,7 +662,7 @@ func assertManagedClusterAddOnConfigReferences(name, namespace string, expect ..
 			actualConfigReference := actual.Status.ConfigReferences[i]
 
 			if !apiequality.Semantic.DeepEqual(actualConfigReference, e) {
-				return fmt.Errorf("Expected config reference is %v, actual: %v", e, actualConfigReference)
+				return fmt.Errorf("Expected config reference is %v, actual: %v, %v", *e.DesiredConfig, *actualConfigReference.DesiredConfig, actual.Status.SupportedConfigs)
 			}
 		}
 
