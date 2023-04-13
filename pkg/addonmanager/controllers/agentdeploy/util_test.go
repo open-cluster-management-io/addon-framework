@@ -118,3 +118,38 @@ func TestAddonRemoveFinalizer(t *testing.T) {
 		})
 	}
 }
+
+func TestAddonAddFinalizer(t *testing.T) {
+	finalizerToAdd := "test"
+	cases := []struct {
+		name               string
+		existingFinalizers []string
+		expectedFinalizers []string
+	}{
+		{
+			name:               "no finalizers",
+			expectedFinalizers: []string{"test"},
+		},
+		{
+			name:               "append finalizer",
+			existingFinalizers: []string{"test1"},
+			expectedFinalizers: []string{"test1", "test"},
+		},
+		{
+			name:               "remove deprecated",
+			existingFinalizers: []string{addonapiv1alpha1.AddonDeprecatedHostingPreDeleteHookFinalizer},
+			expectedFinalizers: []string{"test"},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			addon := &addonapiv1alpha1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{Finalizers: c.existingFinalizers},
+			}
+			addonAddFinalizer(addon, finalizerToAdd)
+			if !reflect.DeepEqual(c.expectedFinalizers, addon.GetFinalizers()) {
+				t.Errorf("expected finalizer is not correct expects %v got %v", c.expectedFinalizers, addon.Finalizers)
+			}
+		})
+	}
+}
