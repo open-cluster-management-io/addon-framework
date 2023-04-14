@@ -3,10 +3,11 @@ package integration
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"k8s.io/apimachinery/pkg/types"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
-	"time"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -18,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
+	"open-cluster-management.io/api/addon/v1alpha1"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
@@ -134,8 +136,21 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 				InstallNamespace: "default",
 			},
 		}
-		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(context.Background(), addon, metav1.CreateOptions{})
+		addon, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(context.Background(), addon, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		// set addon config
+		addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+			{
+				ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "foo"},
+				ConfigReferent:      v1alpha1.ConfigReferent{Name: "test", Namespace: "open-cluster-management"},
+				DesiredConfig: &v1alpha1.ConfigSpecHash{
+					ConfigReferent: v1alpha1.ConfigReferent{Name: "test", Namespace: "open-cluster-management"},
+					SpecHash:       "hash",
+				},
+			},
+		}
+		updateManagedClusterAddOnStatus(context.Background(), addon)
 
 		gomega.Eventually(func() error {
 			work, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), manifestWorkName, metav1.GetOptions{})
@@ -147,6 +162,14 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 				return fmt.Errorf("Unexpected number of work manifests")
 			}
 
+			if _, ok := work.Annotations[workapiv1.ManifestConfigSpecHashAnnotationKey]; !ok {
+				return fmt.Errorf("Expected annotations but not")
+			}
+
+			if work.Annotations[workapiv1.ManifestConfigSpecHashAnnotationKey] != "{\"foo.core/open-cluster-management/test\":\"hash\"}" {
+				return fmt.Errorf("Expected annotations {\"foo.core/open-cluster-management/test\":\"hash\"} but get %v", work.Annotations[workapiv1.ManifestConfigSpecHashAnnotationKey])
+			}
+
 			if apiequality.Semantic.DeepEqual(work.Spec.Workload.Manifests[0].Raw, []byte(deploymentJson)) {
 				return fmt.Errorf("expected manifest is no correct, get %v", work.Spec.Workload.Manifests[0].Raw)
 			}
@@ -156,7 +179,7 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 		// Update work status to trigger addon status
 		work, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), manifestWorkName, metav1.GetOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		meta.SetStatusCondition(&work.Status.Conditions, metav1.Condition{Type: workapiv1.WorkApplied, Status: metav1.ConditionTrue, Reason: "WorkApplied"})
+		meta.SetStatusCondition(&work.Status.Conditions, metav1.Condition{Type: workapiv1.WorkApplied, Status: metav1.ConditionTrue, Reason: "WorkApplied", ObservedGeneration: work.Generation})
 		_, err = hubWorkClient.WorkV1().ManifestWorks(managedClusterName).UpdateStatus(context.Background(), work, metav1.UpdateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -166,8 +189,11 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 				return err
 			}
 
-			if !meta.IsStatusConditionTrue(addon.Status.Conditions, "ManifestApplied") {
+			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnManifestApplied) {
 				return fmt.Errorf("Unexpected addon applied condition, %v", addon.Status.Conditions)
+			}
+			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionProgressing) {
+				return fmt.Errorf("Unexpected addon progressing condition, %v", addon.Status.Conditions)
 			}
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
@@ -175,7 +201,8 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 		// update work to available so addon becomes available
 		work, err = hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), manifestWorkName, metav1.GetOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		meta.SetStatusCondition(&work.Status.Conditions, metav1.Condition{Type: workapiv1.WorkAvailable, Status: metav1.ConditionTrue, Reason: "WorkAvailable"})
+		// set observed
+		meta.SetStatusCondition(&work.Status.Conditions, metav1.Condition{Type: workapiv1.WorkAvailable, Status: metav1.ConditionTrue, Reason: "WorkAvailable", ObservedGeneration: work.Generation})
 		_, err = hubWorkClient.WorkV1().ManifestWorks(managedClusterName).UpdateStatus(context.Background(), work, metav1.UpdateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -185,8 +212,11 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 				return err
 			}
 
-			if !meta.IsStatusConditionTrue(addon.Status.Conditions, "Available") {
+			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionAvailable) {
 				return fmt.Errorf("Unexpected addon available condition, %v", addon.Status.Conditions)
+			}
+			if !meta.IsStatusConditionFalse(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionProgressing) {
+				return fmt.Errorf("Unexpected addon progressing condition, %v", addon.Status.Conditions)
 			}
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())

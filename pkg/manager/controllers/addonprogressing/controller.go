@@ -91,7 +91,7 @@ func (c *addonProgressingController) updateAddonProgressingAndLastApplied(ctx co
 		meta.SetStatusCondition(&newaddon.Status.Conditions, metav1.Condition{
 			Type:    addonapiv1alpha1.ManagedClusterAddOnConditionProgressing,
 			Status:  metav1.ConditionFalse,
-			Reason:  constants.ProgressingConfigurationUnsupported,
+			Reason:  addonapiv1alpha1.ProgressingReasonConfigurationUnsupported,
 			Message: fmt.Sprintf("Configuration with gvr %s/%s is not supported for this addon", config.Group, config.Resource),
 		})
 		return c.patchAddOnProgressingAndLastApplied(ctx, newaddon, oldaddon)
@@ -261,19 +261,19 @@ func setAddOnProgressing(isUpgrade, isSucceed bool, addon *addonapiv1alpha1.Mana
 	if !isSucceed {
 		condition.Status = metav1.ConditionTrue
 		if isUpgrade {
-			condition.Reason = constants.ProgressingUpgrading
+			condition.Reason = addonapiv1alpha1.ProgressingReasonUpgrading
 			condition.Message = "upgrading..."
 		} else {
-			condition.Reason = constants.ProgressingInstalling
+			condition.Reason = addonapiv1alpha1.ProgressingReasonInstalling
 			condition.Message = "installing..."
 		}
 	} else {
 		condition.Status = metav1.ConditionFalse
 		if isUpgrade {
-			condition.Reason = constants.ProgressingUpgradeSucceed
+			condition.Reason = addonapiv1alpha1.ProgressingReasonUpgradeSucceed
 			condition.Message = "upgrade completed with no errors."
 		} else {
-			condition.Reason = constants.ProgressingInstallSucceed
+			condition.Reason = addonapiv1alpha1.ProgressingReasonInstallSucceed
 			condition.Message = "install completed with no errors."
 		}
 	}

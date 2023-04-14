@@ -13,7 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
-	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/api/addon/v1alpha1"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -73,7 +72,31 @@ func TestReconcile(t *testing.T) {
 					},
 				},
 			},
-			validateAddonActions: addontesting.AssertNoActions,
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch")
+				actual := actions[0].(clienttesting.PatchActionImpl).Patch
+				cma := &addonapiv1alpha1.ClusterManagementAddOn{}
+				err := json.Unmarshal(actual, cma)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if len(cma.Status.DefaultConfigReferences) != 0 {
+					t.Errorf("DefaultConfigReferences object is not correct: %v", cma.Status.DefaultConfigReferences)
+				}
+				if cma.Status.InstallProgressions[0].ConfigReferences[0].LastAppliedConfig != nil {
+					t.Errorf("InstallProgressions LastAppliedConfig is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences[0])
+				}
+				if cma.Status.InstallProgressions[0].ConfigReferences[0].LastKnownGoodConfig != nil {
+					t.Errorf("InstallProgressions LastKnownGoodConfig is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences[0])
+				}
+				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonapiv1alpha1.ProgressingReasonInstalling {
+					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions[0].Reason)
+				}
+				if cma.Status.InstallProgressions[0].Conditions[0].Message != "0/2 installing..." {
+					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions[0].Message)
+				}
+			},
 		},
 		{
 			name:                "no placement",
@@ -102,7 +125,7 @@ func TestReconcile(t *testing.T) {
 				meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
 					Type:   addonv1alpha1.ManagedClusterAddOnConditionProgressing,
 					Status: metav1.ConditionFalse,
-					Reason: constants.ProgressingInstalling,
+					Reason: addonapiv1alpha1.ProgressingReasonInstalling,
 				})
 				return addon
 			}()},
@@ -152,7 +175,7 @@ func TestReconcile(t *testing.T) {
 				if cma.Status.InstallProgressions[0].ConfigReferences[0].LastKnownGoodConfig != nil {
 					t.Errorf("InstallProgressions LastKnownGoodConfig is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences[0])
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Reason != constants.ProgressingInstalling {
+				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonapiv1alpha1.ProgressingReasonInstalling {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions[0].Reason)
 				}
 				if cma.Status.InstallProgressions[0].Conditions[0].Message != "1/2 installing..." {
@@ -168,7 +191,7 @@ func TestReconcile(t *testing.T) {
 				meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
 					Type:   addonv1alpha1.ManagedClusterAddOnConditionProgressing,
 					Status: metav1.ConditionFalse,
-					Reason: constants.ProgressingInstallSucceed,
+					Reason: addonapiv1alpha1.ProgressingReasonInstallSucceed,
 				})
 				return addon
 			}()},
@@ -218,7 +241,7 @@ func TestReconcile(t *testing.T) {
 				if !apiequality.Semantic.DeepEqual(cma.Status.InstallProgressions[0].ConfigReferences[0].LastKnownGoodConfig, cma.Status.InstallProgressions[0].ConfigReferences[0].DesiredConfig) {
 					t.Errorf("InstallProgressions LastKnownGoodConfig is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences[0])
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Reason != constants.ProgressingInstallSucceed {
+				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonapiv1alpha1.ProgressingReasonInstallSucceed {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions)
 				}
 				if cma.Status.InstallProgressions[0].Conditions[0].Message != "1/1 install completed with no errors." {
@@ -234,7 +257,7 @@ func TestReconcile(t *testing.T) {
 				meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
 					Type:   addonv1alpha1.ManagedClusterAddOnConditionProgressing,
 					Status: metav1.ConditionFalse,
-					Reason: constants.ProgressingUpgrading,
+					Reason: addonapiv1alpha1.ProgressingReasonUpgrading,
 				})
 				return addon
 			}()},
@@ -284,7 +307,7 @@ func TestReconcile(t *testing.T) {
 				if cma.Status.InstallProgressions[0].ConfigReferences[0].LastKnownGoodConfig != nil {
 					t.Errorf("InstallProgressions LastKnownGoodConfig is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences[0])
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Reason != constants.ProgressingUpgrading {
+				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonapiv1alpha1.ProgressingReasonUpgrading {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions)
 				}
 				if cma.Status.InstallProgressions[0].Conditions[0].Message != "1/2 upgrading..." {
@@ -300,7 +323,7 @@ func TestReconcile(t *testing.T) {
 				meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
 					Type:   addonv1alpha1.ManagedClusterAddOnConditionProgressing,
 					Status: metav1.ConditionFalse,
-					Reason: constants.ProgressingUpgradeSucceed,
+					Reason: addonapiv1alpha1.ProgressingReasonUpgradeSucceed,
 				})
 				return addon
 			}()},
@@ -350,7 +373,7 @@ func TestReconcile(t *testing.T) {
 				if !apiequality.Semantic.DeepEqual(cma.Status.InstallProgressions[0].ConfigReferences[0].LastKnownGoodConfig, cma.Status.InstallProgressions[0].ConfigReferences[0].DesiredConfig) {
 					t.Errorf("InstallProgressions LastKnownGoodConfig is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences[0])
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Reason != constants.ProgressingUpgradeSucceed {
+				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonapiv1alpha1.ProgressingReasonUpgradeSucceed {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions)
 				}
 				if cma.Status.InstallProgressions[0].Conditions[0].Message != "1/1 upgrade completed with no errors." {
@@ -366,7 +389,7 @@ func TestReconcile(t *testing.T) {
 				meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
 					Type:    addonv1alpha1.ManagedClusterAddOnConditionProgressing,
 					Status:  metav1.ConditionFalse,
-					Reason:  constants.ProgressingConfigurationUnsupported,
+					Reason:  addonapiv1alpha1.ProgressingReasonConfigurationUnsupported,
 					Message: fmt.Sprintf("Configuration with gvr core/foo is not supported for this addon"),
 				})
 				return addon
@@ -417,7 +440,7 @@ func TestReconcile(t *testing.T) {
 				if cma.Status.InstallProgressions[0].ConfigReferences[0].LastKnownGoodConfig != nil {
 					t.Errorf("InstallProgressions LastKnownGoodConfig is not correct: %v", cma.Status.InstallProgressions[0].ConfigReferences[0])
 				}
-				if cma.Status.InstallProgressions[0].Conditions[0].Reason != constants.ProgressingConfigurationUnsupported {
+				if cma.Status.InstallProgressions[0].Conditions[0].Reason != addonapiv1alpha1.ProgressingReasonConfigurationUnsupported {
 					t.Errorf("InstallProgressions condition is not correct: %v", cma.Status.InstallProgressions[0].Conditions)
 				}
 				if cma.Status.InstallProgressions[0].Conditions[0].Message != "cluster1/test: Configuration with gvr core/foo is not supported for this addon" {

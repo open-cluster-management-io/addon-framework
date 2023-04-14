@@ -12,13 +12,6 @@ const (
 	InstallModeBuiltinValueKey = "InstallMode"
 	InstallModeHosted          = "Hosted"
 	InstallModeDefault         = "Default"
-
-	// Reasons for addon condition progressing
-	ProgressingInstalling               = "Installing"
-	ProgressingInstallSucceed           = "InstallSucceed"
-	ProgressingUpgrading                = "Upgrading"
-	ProgressingUpgradeSucceed           = "UpgradeSucceed"
-	ProgressingConfigurationUnsupported = "ConfigurationUnsupported"
 )
 
 // DeployWorkNamePrefix returns the prefix of the work name for the addon

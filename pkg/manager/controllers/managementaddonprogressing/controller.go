@@ -22,7 +22,6 @@ import (
 	clusterlisterv1beta1 "open-cluster-management.io/api/client/cluster/listers/cluster/v1beta1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 
-	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
 	"open-cluster-management.io/addon-framework/pkg/index"
 )
@@ -41,13 +40,15 @@ func NewManagementAddonProgressingController(
 	addonClient addonv1alpha1client.Interface,
 	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
 	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
-	placementInformer clusterinformersv1beta1.PlacementInformer,
-	placementDecisionInformer clusterinformersv1beta1.PlacementDecisionInformer,
+	placementInformers clusterinformersv1beta1.PlacementInformer,
+	placementDecisionInformers clusterinformersv1beta1.PlacementDecisionInformer,
 ) factory.Controller {
 	c := &managementAddonProgressingController{
 		addonClient:                  addonClient,
 		managedClusterAddonLister:    addonInformers.Lister(),
 		clusterManagementAddonLister: clusterManagementAddonInformers.Lister(),
+		placementLister:              placementInformers.Lister(),
+		placementDecisionLister:      placementDecisionInformers.Lister(),
 	}
 
 	return factory.New().WithInformersQueueKeysFunc(
@@ -56,8 +57,8 @@ func NewManagementAddonProgressingController(
 			return []string{accessor.GetName()}
 		},
 		addonInformers.Informer(), clusterManagementAddonInformers.Informer()).
-		WithInformersQueueKeysFunc(index.ClusterManagementAddonByPlacementDecisionQueueKey(clusterManagementAddonInformers), placementDecisionInformer.Informer()).
-		WithInformersQueueKeysFunc(index.ClusterManagementAddonByPlacementQueueKey(clusterManagementAddonInformers), placementInformer.Informer()).
+		WithInformersQueueKeysFunc(index.ClusterManagementAddonByPlacementDecisionQueueKey(clusterManagementAddonInformers), placementDecisionInformers.Informer()).
+		WithInformersQueueKeysFunc(index.ClusterManagementAddonByPlacementQueueKey(clusterManagementAddonInformers), placementInformers.Informer()).
 		WithSync(c.sync).ToController("management-addon-status-controller")
 
 }
@@ -109,31 +110,31 @@ func (c *managementAddonProgressingController) sync(ctx context.Context, syncCtx
 			if cond == nil {
 				continue
 			}
-			if cond.Reason == constants.ProgressingConfigurationUnsupported {
+			if cond.Reason == addonv1alpha1.ProgressingReasonConfigurationUnsupported {
 				isConfigurationUnsupported = true
 				meta.SetStatusCondition(&mgmtAddonCopy.Status.InstallProgressions[i].Conditions, metav1.Condition{
 					Type:    addonv1alpha1.ManagedClusterAddOnConditionProgressing,
 					Status:  metav1.ConditionFalse,
-					Reason:  constants.ProgressingConfigurationUnsupported,
+					Reason:  addonv1alpha1.ProgressingReasonConfigurationUnsupported,
 					Message: fmt.Sprintf("%s/%s: %s", addon.Namespace, addonName, cond.Message),
 				})
 				break
 			}
 			switch cond.Reason {
-			case constants.ProgressingInstalling:
+			case addonv1alpha1.ProgressingReasonInstalling:
 				progressing += 1
-			case constants.ProgressingInstallSucceed:
+			case addonv1alpha1.ProgressingReasonInstallSucceed:
 				done += 1
-			case constants.ProgressingUpgrading:
+			case addonv1alpha1.ProgressingReasonUpgrading:
 				isUpgrade = true
 				progressing += 1
-			case constants.ProgressingUpgradeSucceed:
+			case addonv1alpha1.ProgressingReasonUpgradeSucceed:
 				isUpgrade = true
 				done += 1
 			}
 		}
 
-		if len(addons) > 0 && !isConfigurationUnsupported {
+		if !isConfigurationUnsupported {
 			setAddOnInstallProgressions(isUpgrade, progressing, done, len(clusters), &mgmtAddonCopy.Status.InstallProgressions[i])
 		}
 	}
@@ -211,13 +212,13 @@ func setAddOnInstallProgressions(isUpgrade bool, progressing, done, total int, i
 	condition := metav1.Condition{
 		Type: addonv1alpha1.ManagedClusterAddOnConditionProgressing,
 	}
-	if done != total {
+	if (done == total && done == 0) || (done != total) {
 		condition.Status = metav1.ConditionTrue
 		if isUpgrade {
-			condition.Reason = constants.ProgressingUpgrading
+			condition.Reason = addonv1alpha1.ProgressingReasonUpgrading
 			condition.Message = fmt.Sprintf("%d/%d upgrading...", progressing+done, total)
 		} else {
-			condition.Reason = constants.ProgressingInstalling
+			condition.Reason = addonv1alpha1.ProgressingReasonInstalling
 			condition.Message = fmt.Sprintf("%d/%d installing...", progressing+done, total)
 		}
 	} else {
@@ -227,10 +228,10 @@ func setAddOnInstallProgressions(isUpgrade bool, progressing, done, total int, i
 		}
 		condition.Status = metav1.ConditionFalse
 		if isUpgrade {
-			condition.Reason = constants.ProgressingUpgradeSucceed
+			condition.Reason = addonv1alpha1.ProgressingReasonUpgradeSucceed
 			condition.Message = fmt.Sprintf("%d/%d upgrade completed with no errors.", done, total)
 		} else {
-			condition.Reason = constants.ProgressingInstallSucceed
+			condition.Reason = addonv1alpha1.ProgressingReasonInstallSucceed
 			condition.Message = fmt.Sprintf("%d/%d install completed with no errors.", done, total)
 		}
 	}
