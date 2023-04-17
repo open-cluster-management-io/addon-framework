@@ -21,7 +21,6 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonowner"
 	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonprogressing"
 	"open-cluster-management.io/addon-framework/pkg/manager/controllers/managementaddoninstallprogression"
-	"open-cluster-management.io/addon-framework/pkg/manager/controllers/managementaddonprogressing"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 )
 
@@ -100,7 +99,9 @@ func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
 	addonProgressingController := addonprogressing.NewAddonProgressingController(
 		addonClient,
 		addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
+		addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns(),
 		workInformers.Work().V1().ManifestWorks(),
+		utils.ManagedByAddonManager,
 	)
 
 	mgmtAddonInstallProgressionController := managementaddoninstallprogression.NewManagementAddonInstallProgressionController(
@@ -109,20 +110,11 @@ func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
 		addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns(),
 	)
 
-	mgmtAddonProgressingController := managementaddonprogressing.NewManagementAddonProgressingController(
-		addonClient,
-		addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
-		addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns(),
-		clusterInformerFactory.Cluster().V1beta1().Placements(),
-		clusterInformerFactory.Cluster().V1beta1().PlacementDecisions(),
-	)
-
 	go addonManagementController.Run(ctx, 2)
 	go addonConfigurationController.Run(ctx, 2)
 	go addonOwnerController.Run(ctx, 2)
 	go addonProgressingController.Run(ctx, 2)
 	go mgmtAddonInstallProgressionController.Run(ctx, 2)
-	go mgmtAddonProgressingController.Run(ctx, 2)
 
 	go clusterInformerFactory.Start(ctx.Done())
 	go addonInformerFactory.Start(ctx.Done())

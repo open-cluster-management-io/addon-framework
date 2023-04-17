@@ -28,25 +28,38 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/agentdeploy"
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
+	"open-cluster-management.io/addon-framework/pkg/utils"
+)
+
+const (
+	ProgressingDoing   string = "Doing"
+	ProgressingSucceed string = "Succeed"
+	ProgressingFailed  string = "Failed"
 )
 
 // addonProgressingController reconciles instances of managedclusteradd on the hub
 // based to update the status progressing condition and last applied config
 type addonProgressingController struct {
-	addonClient               addonv1alpha1client.Interface
-	managedClusterAddonLister addonlisterv1alpha1.ManagedClusterAddOnLister
-	workLister                worklister.ManifestWorkLister
+	addonClient                  addonv1alpha1client.Interface
+	managedClusterAddonLister    addonlisterv1alpha1.ManagedClusterAddOnLister
+	clusterManagementAddonLister addonlisterv1alpha1.ClusterManagementAddOnLister
+	workLister                   worklister.ManifestWorkLister
+	addonFilterFunc              utils.AddonManagementFilterFunc
 }
 
 func NewAddonProgressingController(
 	addonClient addonv1alpha1client.Interface,
 	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
+	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
 	workInformers workinformers.ManifestWorkInformer,
+	addonFilterFunc utils.AddonManagementFilterFunc,
 ) factory.Controller {
 	c := &addonProgressingController{
-		addonClient:               addonClient,
-		managedClusterAddonLister: addonInformers.Lister(),
-		workLister:                workInformers.Lister(),
+		addonClient:                  addonClient,
+		managedClusterAddonLister:    addonInformers.Lister(),
+		clusterManagementAddonLister: clusterManagementAddonInformers.Lister(),
+		workLister:                   workInformers.Lister(),
+		addonFilterFunc:              addonFilterFunc,
 	}
 
 	return factory.New().WithInformersQueueKeysFunc(
@@ -54,7 +67,8 @@ func NewAddonProgressingController(
 			key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 			return []string{key}
 		},
-		addonInformers.Informer()).
+		addonInformers.Informer(), clusterManagementAddonInformers.Informer()).
+		// TODO: consider hosted manifestwork
 		WithInformersQueueKeysFunc(
 			func(obj runtime.Object) []string {
 				accessor, _ := meta.Accessor(obj)
@@ -81,6 +95,19 @@ func (c *addonProgressingController) sync(ctx context.Context, syncCtx factory.S
 		return err
 	}
 
+	clusterManagementAddon, err := c.clusterManagementAddonLister.Get(addonName)
+	if errors.IsNotFound(err) {
+		return nil
+	}
+
+	if err != nil {
+		return err
+	}
+
+	if !c.addonFilterFunc(clusterManagementAddon) {
+		return nil
+	}
+
 	// update progressing condition and last applied config
 	return c.updateAddonProgressingAndLastApplied(ctx, addon.DeepCopy(), addon)
 }
@@ -97,12 +124,15 @@ func (c *addonProgressingController) updateAddonProgressingAndLastApplied(ctx co
 		return c.patchAddOnProgressingAndLastApplied(ctx, newaddon, oldaddon)
 	}
 
-	// get addon works
-	requirement, _ := labels.NewRequirement(addonapiv1alpha1.AddonLabelKey, selection.Equals, []string{newaddon.Name})
-	selector := labels.NewSelector().Add(*requirement)
-	addonWorks, err := c.workLister.ManifestWorks(newaddon.Namespace).List(selector)
-	if err != nil {
-		return err
+	// wait until addon has ManifestApplied condition
+	if cond := meta.FindStatusCondition(newaddon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnManifestApplied); cond == nil {
+		meta.SetStatusCondition(&newaddon.Status.Conditions, metav1.Condition{
+			Type:    addonapiv1alpha1.ManagedClusterAddOnConditionProgressing,
+			Status:  metav1.ConditionFalse,
+			Reason:  "WaitingForManifestApplied",
+			Message: "Waiting for ManagedClusterAddOn ManifestApplied condition",
+		})
+		return c.patchAddOnProgressingAndLastApplied(ctx, newaddon, oldaddon)
 	}
 
 	// set upgrade flag
@@ -114,8 +144,18 @@ func (c *addonProgressingController) updateAddonProgressingAndLastApplied(ctx co
 		}
 	}
 
+	// get addon works
+	// TODO: consider hosted manifestwork
+	requirement, _ := labels.NewRequirement(addonapiv1alpha1.AddonLabelKey, selection.Equals, []string{newaddon.Name})
+	selector := labels.NewSelector().Add(*requirement)
+	addonWorks, err := c.workLister.ManifestWorks(newaddon.Namespace).List(selector)
+	if err != nil {
+		setAddOnProgressing(isUpgrade, ProgressingFailed, err, newaddon)
+		return c.patchAddOnProgressingAndLastApplied(ctx, newaddon, oldaddon)
+	}
+
 	if len(addonWorks) == 0 {
-		setAddOnProgressing(isUpgrade, false, newaddon)
+		setAddOnProgressing(isUpgrade, ProgressingDoing, nil, newaddon)
 		return c.patchAddOnProgressingAndLastApplied(ctx, newaddon, oldaddon)
 	}
 
@@ -128,13 +168,13 @@ func (c *addonProgressingController) updateAddonProgressingAndLastApplied(ctx co
 
 		// check if work configs matches addon configs
 		if !workConfigsMatchesAddon(work, newaddon) {
-			setAddOnProgressing(isUpgrade, false, newaddon)
+			setAddOnProgressing(isUpgrade, ProgressingDoing, nil, newaddon)
 			return c.patchAddOnProgressingAndLastApplied(ctx, newaddon, oldaddon)
 		}
 
 		// check if work is ready
 		if !workIsReady(work) {
-			setAddOnProgressing(isUpgrade, false, newaddon)
+			setAddOnProgressing(isUpgrade, ProgressingDoing, nil, newaddon)
 			return c.patchAddOnProgressingAndLastApplied(ctx, newaddon, oldaddon)
 		}
 	}
@@ -144,7 +184,7 @@ func (c *addonProgressingController) updateAddonProgressingAndLastApplied(ctx co
 		newaddon.Status.ConfigReferences[i].LastAppliedConfig = configReference.DesiredConfig.DeepCopy()
 	}
 
-	setAddOnProgressing(isUpgrade, true, newaddon)
+	setAddOnProgressing(isUpgrade, ProgressingSucceed, nil, newaddon)
 	return c.patchAddOnProgressingAndLastApplied(ctx, newaddon, oldaddon)
 }
 
@@ -207,7 +247,7 @@ func isConfigurationSupported(addon *addonapiv1alpha1.ManagedClusterAddOn) (bool
 func workConfigsMatchesAddon(work *workapiv1.ManifestWork, addon *addonapiv1alpha1.ManagedClusterAddOn) bool {
 	// get work spec hash
 	if _, ok := work.Annotations[workapiv1.ManifestConfigSpecHashAnnotationKey]; !ok {
-		return false
+		return len(addon.Status.ConfigReferences) == 0
 	}
 
 	// parse work spec hash
@@ -254,11 +294,12 @@ func workIsReady(work *workapiv1.ManifestWork) bool {
 }
 
 // set addon progressing condition
-func setAddOnProgressing(isUpgrade, isSucceed bool, addon *addonapiv1alpha1.ManagedClusterAddOn) {
+func setAddOnProgressing(isUpgrade bool, status string, err error, addon *addonapiv1alpha1.ManagedClusterAddOn) {
 	condition := metav1.Condition{
 		Type: addonapiv1alpha1.ManagedClusterAddOnConditionProgressing,
 	}
-	if !isSucceed {
+	switch status {
+	case ProgressingDoing:
 		condition.Status = metav1.ConditionTrue
 		if isUpgrade {
 			condition.Reason = addonapiv1alpha1.ProgressingReasonUpgrading
@@ -267,7 +308,7 @@ func setAddOnProgressing(isUpgrade, isSucceed bool, addon *addonapiv1alpha1.Mana
 			condition.Reason = addonapiv1alpha1.ProgressingReasonInstalling
 			condition.Message = "installing..."
 		}
-	} else {
+	case ProgressingSucceed:
 		condition.Status = metav1.ConditionFalse
 		if isUpgrade {
 			condition.Reason = addonapiv1alpha1.ProgressingReasonUpgradeSucceed
@@ -275,6 +316,15 @@ func setAddOnProgressing(isUpgrade, isSucceed bool, addon *addonapiv1alpha1.Mana
 		} else {
 			condition.Reason = addonapiv1alpha1.ProgressingReasonInstallSucceed
 			condition.Message = "install completed with no errors."
+		}
+	case ProgressingFailed:
+		condition.Status = metav1.ConditionFalse
+		if isUpgrade {
+			condition.Reason = addonapiv1alpha1.ProgressingReasonUpgradeFailed
+			condition.Message = err.Error()
+		} else {
+			condition.Reason = addonapiv1alpha1.ProgressingReasonInstallFailed
+			condition.Message = err.Error()
 		}
 	}
 	meta.SetStatusCondition(&addon.Status.Conditions, condition)

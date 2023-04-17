@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
+	"open-cluster-management.io/addon-framework/pkg/utils"
 	"open-cluster-management.io/api/addon/v1alpha1"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
@@ -27,46 +28,54 @@ func newClusterManagementOwner(name string) metav1.OwnerReference {
 
 func TestReconcile(t *testing.T) {
 	cases := []struct {
-		name                 string
-		syncKey              string
-		managedClusteraddon  []runtime.Object
-		work                 []runtime.Object
-		validateAddonActions func(t *testing.T, actions []clienttesting.Action)
+		name                   string
+		syncKey                string
+		managedClusteraddon    []runtime.Object
+		clusterManagementAddon []runtime.Object
+		work                   []runtime.Object
+		validateAddonActions   func(t *testing.T, actions []clienttesting.Action)
 	}{
 		{
-			name:                 "no managedClusteraddon",
-			syncKey:              "test/test",
-			managedClusteraddon:  []runtime.Object{},
-			work:                 []runtime.Object{},
-			validateAddonActions: addontesting.AssertNoActions,
+			name:                   "no clustermanagementaddon",
+			syncKey:                "test/test",
+			clusterManagementAddon: []runtime.Object{},
+			managedClusteraddon:    []runtime.Object{},
+			work:                   []runtime.Object{},
+			validateAddonActions:   addontesting.AssertNoActions,
 		},
 		{
-			name:    "no need to update managedclusteraddon",
-			syncKey: "cluster1/test",
+			name:                   "no managedClusteraddon",
+			syncKey:                "test/test",
+			managedClusteraddon:    []runtime.Object{},
+			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "testcrd", "testcr").Build()},
+			work:                   []runtime.Object{},
+			validateAddonActions:   addontesting.AssertNoActions,
+		},
+		{
+			name:    "no work applied condition",
+			syncKey: "test/test",
 			managedClusteraddon: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
-					addon := addontesting.NewAddon("test", "cluster1")
-					addon.Status.Conditions = []metav1.Condition{
-						{
-							Type:    addonapiv1alpha1.ManagedClusterAddOnConditionProgressing,
-							Status:  metav1.ConditionTrue,
-							Reason:  addonapiv1alpha1.ProgressingReasonInstalling,
-							Message: "installing...",
-						},
-					}
-					return addon
-				}(),
+				addontesting.NewAddon("test", "cluster1"),
 			},
-			work:                 []runtime.Object{},
-			validateAddonActions: addontesting.AssertNoActions,
+			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "testcrd", "testcr").Build()},
+			work:                   []runtime.Object{},
+			validateAddonActions:   addontesting.AssertNoActions,
 		},
 		{
 			name:    "update managedclusteraddon to installing when no work",
 			syncKey: "cluster1/test",
-			managedClusteraddon: []runtime.Object{
-				addontesting.NewAddon("test", "cluster1"),
-			},
-			work: []runtime.Object{},
+			managedClusteraddon: []runtime.Object{func() *addonapiv1alpha1.ManagedClusterAddOn {
+				addon := addontesting.NewAddon("test", "cluster1")
+				meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
+					Type:    addonapiv1alpha1.ManagedClusterAddOnManifestApplied,
+					Status:  metav1.ConditionTrue,
+					Reason:  addonapiv1alpha1.AddonManifestAppliedReasonManifestsApplied,
+					Message: "manifests of addon are applied successfully",
+				})
+				return addon
+			}()},
+			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "testcrd", "testcr").Build()},
+			work:                   []runtime.Object{},
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "patch")
 				actual := actions[0].(clienttesting.PatchActionImpl).Patch
@@ -100,8 +109,15 @@ func TestReconcile(t *testing.T) {
 						},
 					},
 				}
+				meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
+					Type:    addonapiv1alpha1.ManagedClusterAddOnManifestApplied,
+					Status:  metav1.ConditionTrue,
+					Reason:  addonapiv1alpha1.AddonManifestAppliedReasonManifestsApplied,
+					Message: "manifests of addon are applied successfully",
+				})
 				return addon
 			}()},
+			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "testcrd", "testcr").Build()},
 			work: []runtime.Object{func() *workapiv1.ManifestWork {
 				work := addontesting.NewManifestWork(
 					"addon-test-deploy",
@@ -163,8 +179,15 @@ func TestReconcile(t *testing.T) {
 						},
 					},
 				}
+				meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
+					Type:    addonapiv1alpha1.ManagedClusterAddOnManifestApplied,
+					Status:  metav1.ConditionTrue,
+					Reason:  addonapiv1alpha1.AddonManifestAppliedReasonManifestsApplied,
+					Message: "manifests of addon are applied successfully",
+				})
 				return addon
 			}()},
+			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "testcrd", "testcr").Build()},
 			work: []runtime.Object{func() *workapiv1.ManifestWork {
 				work := addontesting.NewManifestWork(
 					"addon-test-deploy",
@@ -226,8 +249,15 @@ func TestReconcile(t *testing.T) {
 						},
 					},
 				}
+				meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
+					Type:    addonapiv1alpha1.ManagedClusterAddOnManifestApplied,
+					Status:  metav1.ConditionTrue,
+					Reason:  addonapiv1alpha1.AddonManifestAppliedReasonManifestsApplied,
+					Message: "manifests of addon are applied successfully",
+				})
 				return addon
 			}()},
+			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "testcrd", "testcr").Build()},
 			work: []runtime.Object{func() *workapiv1.ManifestWork {
 				work := addontesting.NewManifestWork(
 					"addon-test-deploy",
@@ -289,8 +319,15 @@ func TestReconcile(t *testing.T) {
 						},
 					},
 				}
+				meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
+					Type:    addonapiv1alpha1.ManagedClusterAddOnManifestApplied,
+					Status:  metav1.ConditionTrue,
+					Reason:  addonapiv1alpha1.AddonManifestAppliedReasonManifestsApplied,
+					Message: "manifests of addon are applied successfully",
+				})
 				return addon
 			}()},
+			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "testcrd", "testcr").Build()},
 			work: []runtime.Object{func() *workapiv1.ManifestWork {
 				work := addontesting.NewManifestWork(
 					"addon-test-deploy",
@@ -352,8 +389,15 @@ func TestReconcile(t *testing.T) {
 						},
 					},
 				}
+				meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
+					Type:    addonapiv1alpha1.ManagedClusterAddOnManifestApplied,
+					Status:  metav1.ConditionTrue,
+					Reason:  addonapiv1alpha1.AddonManifestAppliedReasonManifestsApplied,
+					Message: "manifests of addon are applied successfully",
+				})
 				return addon
 			}()},
+			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "testcrd", "testcr").Build()},
 			work: []runtime.Object{func() *workapiv1.ManifestWork {
 				work := addontesting.NewManifestWork(
 					"addon-test-deploy",
@@ -418,8 +462,15 @@ func TestReconcile(t *testing.T) {
 						},
 					},
 				}
+				meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
+					Type:    addonapiv1alpha1.ManagedClusterAddOnManifestApplied,
+					Status:  metav1.ConditionTrue,
+					Reason:  addonapiv1alpha1.AddonManifestAppliedReasonManifestsApplied,
+					Message: "manifests of addon are applied successfully",
+				})
 				return addon
 			}()},
+			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "testcrd", "testcr").Build()},
 			work: []runtime.Object{func() *workapiv1.ManifestWork {
 				work := addontesting.NewManifestWork(
 					"addon-test-deploy",
@@ -490,10 +541,17 @@ func TestReconcile(t *testing.T) {
 							Resource: "testconfigs",
 						},
 					}
+					meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
+						Type:    addonapiv1alpha1.ManagedClusterAddOnManifestApplied,
+						Status:  metav1.ConditionTrue,
+						Reason:  addonapiv1alpha1.AddonManifestAppliedReasonManifestsApplied,
+						Message: "manifests of addon are applied successfully",
+					})
 					return addon
 				}(),
 			},
-			work: []runtime.Object{},
+			clusterManagementAddon: []runtime.Object{addontesting.NewClusterManagementAddon("test", "testcrd", "testcr").Build()},
+			work:                   []runtime.Object{},
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "patch")
 				patch := actions[0].(clienttesting.PatchAction).GetPatch()
@@ -524,6 +582,11 @@ func TestReconcile(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
+			for _, obj := range c.clusterManagementAddon {
+				if err := addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Informer().GetStore().Add(obj); err != nil {
+					t.Fatal(err)
+				}
+			}
 			for _, obj := range c.work {
 				if err := workInformers.Work().V1().ManifestWorks().Informer().GetStore().Add(obj); err != nil {
 					t.Fatal(err)
@@ -531,9 +594,11 @@ func TestReconcile(t *testing.T) {
 			}
 
 			controller := addonProgressingController{
-				addonClient:               fakeAddonClient,
-				managedClusterAddonLister: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
-				workLister:                workInformers.Work().V1().ManifestWorks().Lister(),
+				addonClient:                  fakeAddonClient,
+				managedClusterAddonLister:    addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
+				clusterManagementAddonLister: addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
+				workLister:                   workInformers.Work().V1().ManifestWorks().Lister(),
+				addonFilterFunc:              utils.ManagedBySelf,
 			}
 
 			syncContext := addontesting.NewFakeSyncContext(t)
