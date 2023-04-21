@@ -149,12 +149,12 @@ func (c *addonProgressingController) updateAddonProgressingAndLastApplied(ctx co
 	selector := labels.NewSelector().Add(*requirement)
 	addonWorks, err := c.workLister.ManifestWorks(newaddon.Namespace).List(selector)
 	if err != nil {
-		setAddOnProgressing(isUpgrade, ProgressingFailed, err, newaddon)
+		setAddOnProgressing(isUpgrade, ProgressingFailed, err.Error(), newaddon)
 		return c.patchAddOnProgressingAndLastApplied(ctx, newaddon, oldaddon)
 	}
 
 	if len(addonWorks) == 0 {
-		setAddOnProgressing(isUpgrade, ProgressingDoing, nil, newaddon)
+		setAddOnProgressing(isUpgrade, ProgressingDoing, "no addon works", newaddon)
 		return c.patchAddOnProgressingAndLastApplied(ctx, newaddon, oldaddon)
 	}
 
@@ -167,13 +167,13 @@ func (c *addonProgressingController) updateAddonProgressingAndLastApplied(ctx co
 
 		// check if work configs matches addon configs
 		if !workConfigsMatchesAddon(work, newaddon) {
-			setAddOnProgressing(isUpgrade, ProgressingDoing, nil, newaddon)
+			setAddOnProgressing(isUpgrade, ProgressingDoing, "configs mismatch", newaddon)
 			return c.patchAddOnProgressingAndLastApplied(ctx, newaddon, oldaddon)
 		}
 
 		// check if work is ready
 		if !workIsReady(work) {
-			setAddOnProgressing(isUpgrade, ProgressingDoing, nil, newaddon)
+			setAddOnProgressing(isUpgrade, ProgressingDoing, "work is not ready", newaddon)
 			return c.patchAddOnProgressingAndLastApplied(ctx, newaddon, oldaddon)
 		}
 	}
@@ -183,7 +183,7 @@ func (c *addonProgressingController) updateAddonProgressingAndLastApplied(ctx co
 		newaddon.Status.ConfigReferences[i].LastAppliedConfig = configReference.DesiredConfig.DeepCopy()
 	}
 
-	setAddOnProgressing(isUpgrade, ProgressingSucceed, nil, newaddon)
+	setAddOnProgressing(isUpgrade, ProgressingSucceed, "", newaddon)
 	return c.patchAddOnProgressingAndLastApplied(ctx, newaddon, oldaddon)
 }
 
@@ -293,7 +293,7 @@ func workIsReady(work *workapiv1.ManifestWork) bool {
 }
 
 // set addon progressing condition
-func setAddOnProgressing(isUpgrade bool, status string, err error, addon *addonapiv1alpha1.ManagedClusterAddOn) {
+func setAddOnProgressing(isUpgrade bool, status string, message string, addon *addonapiv1alpha1.ManagedClusterAddOn) {
 	condition := metav1.Condition{
 		Type: addonapiv1alpha1.ManagedClusterAddOnConditionProgressing,
 	}
@@ -302,10 +302,10 @@ func setAddOnProgressing(isUpgrade bool, status string, err error, addon *addona
 		condition.Status = metav1.ConditionTrue
 		if isUpgrade {
 			condition.Reason = addonapiv1alpha1.ProgressingReasonUpgrading
-			condition.Message = "upgrading..."
+			condition.Message = fmt.Sprintf("upgrading... %v", message)
 		} else {
 			condition.Reason = addonapiv1alpha1.ProgressingReasonInstalling
-			condition.Message = "installing..."
+			condition.Message = fmt.Sprintf("installing... %v", message)
 		}
 	case ProgressingSucceed:
 		condition.Status = metav1.ConditionFalse
@@ -320,10 +320,10 @@ func setAddOnProgressing(isUpgrade bool, status string, err error, addon *addona
 		condition.Status = metav1.ConditionFalse
 		if isUpgrade {
 			condition.Reason = addonapiv1alpha1.ProgressingReasonUpgradeFailed
-			condition.Message = err.Error()
+			condition.Message = message
 		} else {
 			condition.Reason = addonapiv1alpha1.ProgressingReasonInstallFailed
-			condition.Message = err.Error()
+			condition.Message = message
 		}
 	}
 	meta.SetStatusCondition(&addon.Status.Conditions, condition)
