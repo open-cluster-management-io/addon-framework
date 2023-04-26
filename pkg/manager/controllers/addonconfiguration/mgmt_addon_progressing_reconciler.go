@@ -35,14 +35,15 @@ func (d *clusterManagementAddonProgressingReconciler) reconcile(
 		}
 
 		isUpgrade := false
-		for _, configRef := range installProgression.ConfigReferences {
-			if configRef.LastAppliedConfig != nil {
+
+		for _, configReference := range installProgression.ConfigReferences {
+			if configReference.LastAppliedConfig != nil {
 				isUpgrade = true
 				break
 			}
 		}
 
-		setAddOnInstallProgressions(&cmaCopy.Status.InstallProgressions[i],
+		setAddOnInstallProgressionsAndLastApplied(&cmaCopy.Status.InstallProgressions[i],
 			isUpgrade,
 			placementNode.addonUpgrading(),
 			placementNode.addonUpgraded(),
@@ -95,7 +96,19 @@ func (d *clusterManagementAddonProgressingReconciler) patchMgmtAddonStatus(ctx c
 	return err
 }
 
-func setAddOnInstallProgressions(installProgression *addonv1alpha1.InstallProgression, isUpgrade bool, progressing, done, total int) {
+func setAddOnInstallProgressionsAndLastApplied(installProgression *addonv1alpha1.InstallProgression, isUpgrade bool, progressing, done, total int) {
+	// always update progressing condition when there is no config
+	// skip update progressing condition when last applied config already the same as desired
+	skip := len(installProgression.ConfigReferences) > 0
+	for _, configReference := range installProgression.ConfigReferences {
+		if !equality.Semantic.DeepEqual(configReference.LastAppliedConfig, configReference.DesiredConfig) &&
+			!equality.Semantic.DeepEqual(configReference.LastKnownGoodConfig, configReference.DesiredConfig) {
+			skip = false
+		}
+	}
+	if skip {
+		return
+	}
 	condition := metav1.Condition{
 		Type: addonv1alpha1.ManagedClusterAddOnConditionProgressing,
 	}

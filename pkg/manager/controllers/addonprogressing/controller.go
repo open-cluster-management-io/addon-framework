@@ -149,12 +149,12 @@ func (c *addonProgressingController) updateAddonProgressingAndLastApplied(ctx co
 	selector := labels.NewSelector().Add(*requirement)
 	addonWorks, err := c.workLister.ManifestWorks(newaddon.Namespace).List(selector)
 	if err != nil {
-		setAddOnProgressing(isUpgrade, ProgressingFailed, err.Error(), newaddon)
+		setAddOnProgressingAndLastApplied(isUpgrade, ProgressingFailed, err.Error(), newaddon)
 		return c.patchAddOnProgressingAndLastApplied(ctx, newaddon, oldaddon)
 	}
 
 	if len(addonWorks) == 0 {
-		setAddOnProgressing(isUpgrade, ProgressingDoing, "no addon works", newaddon)
+		setAddOnProgressingAndLastApplied(isUpgrade, ProgressingDoing, "no addon works", newaddon)
 		return c.patchAddOnProgressingAndLastApplied(ctx, newaddon, oldaddon)
 	}
 
@@ -167,23 +167,19 @@ func (c *addonProgressingController) updateAddonProgressingAndLastApplied(ctx co
 
 		// check if work configs matches addon configs
 		if !workConfigsMatchesAddon(work, newaddon) {
-			setAddOnProgressing(isUpgrade, ProgressingDoing, "configs mismatch", newaddon)
+			setAddOnProgressingAndLastApplied(isUpgrade, ProgressingDoing, "configs mismatch", newaddon)
 			return c.patchAddOnProgressingAndLastApplied(ctx, newaddon, oldaddon)
 		}
 
 		// check if work is ready
 		if !workIsReady(work) {
-			setAddOnProgressing(isUpgrade, ProgressingDoing, "work is not ready", newaddon)
+			setAddOnProgressingAndLastApplied(isUpgrade, ProgressingDoing, "work is not ready", newaddon)
 			return c.patchAddOnProgressingAndLastApplied(ctx, newaddon, oldaddon)
 		}
 	}
 
 	// set lastAppliedConfig when all the work matches addon and are ready.
-	for i, configReference := range newaddon.Status.ConfigReferences {
-		newaddon.Status.ConfigReferences[i].LastAppliedConfig = configReference.DesiredConfig.DeepCopy()
-	}
-
-	setAddOnProgressing(isUpgrade, ProgressingSucceed, "", newaddon)
+	setAddOnProgressingAndLastApplied(isUpgrade, ProgressingSucceed, "", newaddon)
 	return c.patchAddOnProgressingAndLastApplied(ctx, newaddon, oldaddon)
 }
 
@@ -292,8 +288,20 @@ func workIsReady(work *workapiv1.ManifestWork) bool {
 	return true
 }
 
-// set addon progressing condition
-func setAddOnProgressing(isUpgrade bool, status string, message string, addon *addonapiv1alpha1.ManagedClusterAddOn) {
+// set addon progressing condition and last applied
+func setAddOnProgressingAndLastApplied(isUpgrade bool, status string, message string, addon *addonapiv1alpha1.ManagedClusterAddOn) {
+	// always update progressing condition when there is no config
+	// skip update progressing condition when last applied config already the same as desired
+	skip := len(addon.Status.ConfigReferences) > 0
+	for _, configReference := range addon.Status.ConfigReferences {
+		if !equality.Semantic.DeepEqual(configReference.LastAppliedConfig, configReference.DesiredConfig) {
+			skip = false
+		}
+	}
+	if skip {
+		return
+	}
+
 	condition := metav1.Condition{
 		Type: addonapiv1alpha1.ManagedClusterAddOnConditionProgressing,
 	}
@@ -309,6 +317,9 @@ func setAddOnProgressing(isUpgrade bool, status string, message string, addon *a
 		}
 	case ProgressingSucceed:
 		condition.Status = metav1.ConditionFalse
+		for i, configReference := range addon.Status.ConfigReferences {
+			addon.Status.ConfigReferences[i].LastAppliedConfig = configReference.DesiredConfig.DeepCopy()
+		}
 		if isUpgrade {
 			condition.Reason = addonapiv1alpha1.ProgressingReasonUpgradeSucceed
 			condition.Message = "upgrade completed with no errors."
