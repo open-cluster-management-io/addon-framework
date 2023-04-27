@@ -437,7 +437,7 @@ func TestAddonConfigReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "placement rolling update with MaxConcurrency 25%",
+			name: "placement rolling update with default MaxConcurrency",
 			managedClusteraddon: []runtime.Object{
 				addontesting.NewAddon("test", "cluster1"),
 				addontesting.NewAddon("test", "cluster2"),
@@ -462,7 +462,7 @@ func TestAddonConfigReconcile(t *testing.T) {
 				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
 				RolloutStrategy: addonv1alpha1.RolloutStrategy{
 					Type:          addonv1alpha1.AddonRolloutStrategyRollingUpdate,
-					RollingUpdate: &addonv1alpha1.RollingUpdate{MaxConcurrency: intstr.FromString("25%")}},
+					RollingUpdate: &addonv1alpha1.RollingUpdate{MaxConcurrency: defaultMaxConcurrency}},
 			}).WithInstallProgression(addonv1alpha1.InstallProgression{
 				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
 				ConfigReferences: []addonv1alpha1.InstallConfigReference{

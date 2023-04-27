@@ -12,6 +12,11 @@ import (
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
 
+var (
+	defaultMaxConcurrency = intstr.FromString("25%")
+	maxMaxConcurrency     = intstr.FromString("100%")
+)
+
 // configurationTree is a 2 level snapshot tree on the configuration of addons
 // the first level is a list of nodes that represents a install strategy and a desired configuration for this install
 // strategy. The second level is a list of nodes that represent each mca and its desired configuration
@@ -37,17 +42,19 @@ type installStrategyNode struct {
 type addonNode struct {
 	desiredConfigs addonConfigMap
 	mca            *addonv1alpha1.ManagedClusterAddOn
-	// record if mca upgrade status
-	upgradeStatus int
+	// record mca upgrade status
+	mcaUpgradeStatus upgradeStatus
 }
+
+type upgradeStatus int
 
 const (
 	// mca desired configs not synced from desiredConfigs yet
-	toupgrade = 0
+	toupgrade upgradeStatus = iota
 	// mca desired configs upgraded and last applied configs not upgraded
-	upgrading = 1
+	upgrading
 	// both desired configs and last applied configs are upgraded
-	upgraded = 2
+	upgraded
 )
 
 type addonConfigMap map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference
@@ -55,26 +62,26 @@ type addonConfigMap map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigRe
 // set addon upgrade status
 func (n *addonNode) setUpgradeStatus() {
 	if len(n.mca.Status.ConfigReferences) != len(n.desiredConfigs) {
-		n.upgradeStatus = toupgrade
+		n.mcaUpgradeStatus = toupgrade
 		return
 	}
 
 	for _, actual := range n.mca.Status.ConfigReferences {
 		if desired, ok := n.desiredConfigs[actual.ConfigGroupResource]; ok {
 			if !equality.Semantic.DeepEqual(desired.DesiredConfig, actual.DesiredConfig) {
-				n.upgradeStatus = toupgrade
+				n.mcaUpgradeStatus = toupgrade
 				return
 			} else if !equality.Semantic.DeepEqual(actual.LastAppliedConfig, actual.DesiredConfig) {
-				n.upgradeStatus = upgrading
+				n.mcaUpgradeStatus = upgrading
 				return
 			}
 		} else {
-			n.upgradeStatus = toupgrade
+			n.mcaUpgradeStatus = toupgrade
 			return
 		}
 	}
 
-	n.upgradeStatus = upgraded
+	n.mcaUpgradeStatus = upgraded
 }
 
 func (d addonConfigMap) copy() addonConfigMap {
@@ -89,7 +96,7 @@ func newGraph(supportedConfigs []addonv1alpha1.ConfigMeta, defaultConfigReferenc
 	graph := &configurationGraph{
 		nodes: []*installStrategyNode{},
 		defaults: &installStrategyNode{
-			maxConcurrency: intstr.FromString("100%"),
+			maxConcurrency: maxMaxConcurrency,
 			desiredConfigs: map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference{},
 			children:       map[string]*addonNode{},
 		},
@@ -144,7 +151,7 @@ func (g *configurationGraph) addPlacementNode(
 
 	node := &installStrategyNode{
 		placementRef:   placementRef,
-		maxConcurrency: intstr.FromString("100%"),
+		maxConcurrency: maxMaxConcurrency,
 		desiredConfigs: g.defaults.desiredConfigs,
 		children:       map[string]*addonNode{},
 		clusters:       sets.New[string](clusters...),
@@ -155,7 +162,7 @@ func (g *configurationGraph) addPlacementNode(
 		if installStrategy.RolloutStrategy.RollingUpdate != nil {
 			node.maxConcurrency = installStrategy.RolloutStrategy.RollingUpdate.MaxConcurrency
 		} else {
-			node.maxConcurrency = intstr.FromString("25%")
+			node.maxConcurrency = defaultMaxConcurrency
 		}
 	}
 
@@ -248,7 +255,7 @@ func (n *installStrategyNode) addNode(addon *addonv1alpha1.ManagedClusterAddOn) 
 func (n *installStrategyNode) addonUpgraded() int {
 	count := 0
 	for _, addon := range n.children {
-		if addon.upgradeStatus == upgraded {
+		if addon.mcaUpgradeStatus == upgraded {
 			count += 1
 		}
 	}
@@ -258,7 +265,7 @@ func (n *installStrategyNode) addonUpgraded() int {
 func (n *installStrategyNode) addonUpgrading() int {
 	count := 0
 	for _, addon := range n.children {
-		if addon.upgradeStatus == upgrading {
+		if addon.mcaUpgradeStatus == upgrading {
 			count += 1
 		}
 	}
@@ -288,7 +295,7 @@ func (n *installStrategyNode) addonToUpdate() []*addonNode {
 		}
 
 		addon := n.children[k]
-		if addon.upgradeStatus != upgraded {
+		if addon.mcaUpgradeStatus != upgraded {
 			addons = append(addons, addon)
 		}
 	}
