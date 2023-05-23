@@ -19,7 +19,8 @@ const (
 	helloWorldHelmAddonName = "helloworldhelm"
 	addonInstallNamespace   = "open-cluster-management-agent-addon"
 
-	imageConfigName = "image-config"
+	imageConfigName    = "image-config"
+	overrideImageValue = "quay.io/ocm/addon-examples:latest"
 )
 
 var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
@@ -206,7 +207,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 							Name:      imageConfigName,
 							Namespace: managedClusterName,
 						},
-						Data: map[string]string{"image": "quay.io/test:test", "imagePullPolicy": "Never"},
+						Data: map[string]string{"image": overrideImageValue, "imagePullPolicy": "Never"},
 					},
 					metav1.CreateOptions{},
 				); err != nil {
@@ -278,7 +279,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 				return fmt.Errorf("expect one container, but %v", containers)
 			}
 
-			if containers[0].Image != "quay.io/test:test" {
+			if containers[0].Image != overrideImageValue {
 				return fmt.Errorf("unexpected image %s", containers[0].Image)
 			}
 
@@ -345,7 +346,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 				return fmt.Errorf("expect one container, but %v", containers)
 			}
 
-			if containers[0].Image != "quay.io/ocm/addon-examples:latest" {
+			if containers[0].Image != overrideImageValue {
 				return fmt.Errorf("unexpected image %s", containers[0].Image)
 			}
 
