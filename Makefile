@@ -131,15 +131,4 @@ build-hosted-e2e:
 test-hosted-e2e: build-hosted-e2e deploy-hosted-ocm deploy-addon-manager deploy-helloworld-hosted
 	./e2ehosted.test -test.v -ginkgo.v
 
-RUNTIME ?= podman
-build-images: build-image-manager build-image-examples
-build-image-manager:
-	$(RUNTIME) build \
-		-f ./build/Dockerfile \
-		-t $(MANAGER_IMAGE_NAME) .
-build-image-examples:
-	$(RUNTIME) build \
-		-f ./build/Dockerfile.example \
-		-t $(EXAMPLE_IMAGE_NAME) .
-
 include ./test/integration-test.mk

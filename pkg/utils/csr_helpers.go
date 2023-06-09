@@ -398,7 +398,7 @@ func TemplateCSRSignFunc(
 		getClusterName := func(userName string) string {
 			// the common name of csr is in format of "system:open-cluster-management:{clusterName}:{id}"
 			// get the cluster name from the common name
-			trimedCommonName := strings.TrimLeft(userName, "system:open-cluster-management:")
+			trimedCommonName := strings.TrimPrefix(userName, "system:open-cluster-management:")
 			return strings.Split(trimedCommonName, ":")[0]
 		}
 
