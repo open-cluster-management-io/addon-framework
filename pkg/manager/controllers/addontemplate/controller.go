@@ -6,13 +6,16 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
+	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
@@ -27,10 +30,13 @@ type addonTemplateController struct {
 	// The key is the name of the template type addon.
 	addonManagers map[string]context.CancelFunc
 
-	kubeConfig    *rest.Config
-	addonClient   addonv1alpha1client.Interface
-	hubKubeClient kubernetes.Interface
-	cmaLister     addonlisterv1alpha1.ClusterManagementAddOnLister
+	kubeConfig       *rest.Config
+	addonClient      addonv1alpha1client.Interface
+	hubKubeClient    kubernetes.Interface
+	cmaLister        addonlisterv1alpha1.ClusterManagementAddOnLister
+	addonInformers   addoninformers.SharedInformerFactory
+	clusterInformers clusterv1informers.SharedInformerFactory
+	dynamicInformers dynamicinformer.DynamicSharedInformerFactory
 }
 
 // NewAddonTemplateController returns an instance of addonTemplateController
@@ -39,23 +45,25 @@ func NewAddonTemplateController(
 	hubKubeClient kubernetes.Interface,
 	addonClient addonv1alpha1client.Interface,
 	cmaInformer addoninformerv1alpha1.ClusterManagementAddOnInformer,
+	addonInformers addoninformers.SharedInformerFactory,
+	clusterInformers clusterv1informers.SharedInformerFactory,
+	dynamicInformers dynamicinformer.DynamicSharedInformerFactory,
 ) factory.Controller {
 	c := &addonTemplateController{
-		kubeConfig:    hubKubeconfig,
-		hubKubeClient: hubKubeClient,
-		addonClient:   addonClient,
-		cmaLister:     cmaInformer.Lister(),
-		addonManagers: make(map[string]context.CancelFunc),
+		kubeConfig:       hubKubeconfig,
+		hubKubeClient:    hubKubeClient,
+		addonClient:      addonClient,
+		cmaLister:        cmaInformer.Lister(),
+		addonManagers:    make(map[string]context.CancelFunc),
+		addonInformers:   addonInformers,
+		clusterInformers: clusterInformers,
+		dynamicInformers: dynamicInformers,
 	}
 
-	return factory.New().WithFilteredEventsInformersQueueKeysFunc(
+	return factory.New().WithInformersQueueKeysFunc(
 		func(obj runtime.Object) []string {
 			key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 			return []string{key}
-		},
-		func(obj interface{}) bool {
-			// TODO: filter managed cluster addon that does have addon template configReferences in status.
-			return true
 		},
 		cmaInformer.Informer()).
 		WithSync(c.sync).
@@ -141,10 +149,11 @@ func (c *addonTemplateController) runController(
 		return err
 	}
 
-	err = mgr.Start(ctx)
+	err = mgr.StartWithInformers(ctx, c.addonInformers, c.clusterInformers, c.dynamicInformers)
 	if err != nil {
 		return err
 	}
+
 	<-ctx.Done()
 
 	klog.Infof("Addon %s Manager stopped", addonName)

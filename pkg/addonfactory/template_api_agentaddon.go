@@ -83,7 +83,9 @@ func (a *CRDTemplateAgentAddon) Manifests(
 	if err != nil {
 		return nil, err
 	}
-
+	if template == nil {
+		return nil, fmt.Errorf("addon %s/%s template not found in status", addon.Namespace, addon.Name)
+	}
 	return a.renderObjects(cluster, addon, template)
 }
 

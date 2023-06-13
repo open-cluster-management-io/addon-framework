@@ -297,6 +297,7 @@ func TemplateCSRConfigurationsFunc(
 			utilruntime.HandleError(fmt.Errorf("failed to get addon %s: %v", addonName, err))
 			return nil
 		}
+
 		template, err := GetDesiredAddOnTemplate(addonClient, addon)
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("failed to get addon %s template: %v", addonName, err))

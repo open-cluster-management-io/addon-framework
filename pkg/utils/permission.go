@@ -373,6 +373,10 @@ func TemplatePermissionConfigFunc(
 		if err != nil {
 			return err
 		}
+		if template == nil {
+			return nil
+		}
+
 		for _, registration := range template.Spec.Registration {
 			switch registration.Type {
 			case addonapiv1alpha1.RegistrationTypeKubeClient:

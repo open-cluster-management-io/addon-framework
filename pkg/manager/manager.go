@@ -151,6 +151,9 @@ func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
 		hubKubeClient,
 		addonClient,
 		addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns(),
+		addonInformerFactory,
+		clusterInformerFactory,
+		dynamicInformers,
 	)
 
 	go addonConfigController.Run(ctx, 2)
@@ -161,13 +164,13 @@ func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
 	go addonProgressingController.Run(ctx, 2)
 	go mgmtAddonInstallProgressionController.Run(ctx, 2)
 	// There should be only one instance of addonTemplateController running, since the addonTemplateController will
-	// start a goroutine for each addonTemplate it watches.
+	// start a goroutine for each template-type addon it watches.
 	go addonTemplateController.Run(ctx, 1)
 
-	go clusterInformerFactory.Start(ctx.Done())
-	go addonInformerFactory.Start(ctx.Done())
-	go workInformers.Start(ctx.Done())
-	go dynamicInformers.Start(ctx.Done())
+	clusterInformerFactory.Start(ctx.Done())
+	addonInformerFactory.Start(ctx.Done())
+	workInformers.Start(ctx.Done())
+	dynamicInformers.Start(ctx.Done())
 
 	<-ctx.Done()
 	return nil
