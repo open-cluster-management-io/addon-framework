@@ -100,3 +100,17 @@ spec:
               apiGroup: rbac.authorization.k8s.io
               kind: ClusterRole
               name: cm-admin
+    - customSigner:
+        signerName: example.com/signer-name
+        signingCA:
+          name: ca-secret
+          namespace: default
+        subject:
+          groups:
+          - g1
+          - g2
+          organizationUnit:
+          - o1
+          - o2
+          user: user1
+      type: CustomSigner

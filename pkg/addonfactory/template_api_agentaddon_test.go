@@ -182,10 +182,18 @@ func TestAddonTemplateAgent_Manifests(t *testing.T) {
 						},
 					},
 				},
+				{
+					Name: "cert-example-com-signer-name",
+					VolumeSource: corev1.VolumeSource{
+						Secret: &corev1.SecretVolumeSource{
+							SecretName: "hello-example.com-signer-name-client-cert",
+						},
+					},
+				},
 			}
 
 			if !equality.Semantic.DeepEqual(volumes, expectedVolumes) {
-				t.Errorf("unexpected volumes %v", volumes)
+				t.Errorf("expected volumes %v, but got: %v", expectedVolumes, volumes)
 			}
 
 			volumeMounts := object.Spec.Template.Spec.Containers[0].VolumeMounts
@@ -194,9 +202,13 @@ func TestAddonTemplateAgent_Manifests(t *testing.T) {
 					Name:      "hub-kubeconfig",
 					MountPath: "/managed/hub-kubeconfig",
 				},
+				{
+					Name:      "cert-example-com-signer-name",
+					MountPath: "/managed/example.com-signer-name",
+				},
 			}
 			if !equality.Semantic.DeepEqual(volumeMounts, expectedVolumeMounts) {
-				t.Errorf("unexpected volumeMounts %v", volumeMounts)
+				t.Errorf("expected volumeMounts %v, but got: %v", expectedVolumeMounts, volumeMounts)
 			}
 		}
 	}

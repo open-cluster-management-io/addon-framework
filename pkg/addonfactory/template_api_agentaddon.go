@@ -3,6 +3,7 @@ package addonfactory
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/valyala/fasttemplate"
@@ -140,7 +141,7 @@ func (a *CRDTemplateAgentAddon) renderObjects(
 		return objects, gerr
 	}
 
-	objects, err = a.decorateObjects(objects, presetValues, configValues, privateValues)
+	objects, err = a.decorateObjects(template, objects, presetValues, configValues, privateValues)
 	if err != nil {
 		return objects, err
 	}
@@ -148,6 +149,7 @@ func (a *CRDTemplateAgentAddon) renderObjects(
 }
 
 func (a *CRDTemplateAgentAddon) decorateObjects(
+	template *addonapiv1alpha1.AddOnTemplate,
 	objects []runtime.Object,
 	orderedValues orderedValues,
 	configValues, privateValues Values) ([]runtime.Object, error) {
@@ -162,7 +164,7 @@ func (a *CRDTemplateAgentAddon) decorateObjects(
 			a.injectNodePlacement,
 			a.overrideImages,
 		} {
-			err = decorator(deployment, orderedValues, configValues, privateValues)
+			err = decorator(template, deployment, orderedValues, configValues, privateValues)
 			if err != nil {
 				return objects, err
 			}
@@ -173,10 +175,10 @@ func (a *CRDTemplateAgentAddon) decorateObjects(
 	return objects, nil
 }
 
-type decorateDeployment func(deployment *appsv1.Deployment,
+type decorateDeployment func(template *addonapiv1alpha1.AddOnTemplate, deployment *appsv1.Deployment,
 	orderedValues orderedValues, configValues, privateValues Values) error
 
-func (a *CRDTemplateAgentAddon) injectEnvironments(
+func (a *CRDTemplateAgentAddon) injectEnvironments(_ *addonapiv1alpha1.AddOnTemplate,
 	deployment *appsv1.Deployment, orderedValues orderedValues, _, _ Values) error {
 
 	envVars := make([]corev1.EnvVar, len(orderedValues))
@@ -196,31 +198,65 @@ func (a *CRDTemplateAgentAddon) injectEnvironments(
 	return nil
 }
 
-func (a *CRDTemplateAgentAddon) injectVolumes(
+func (a *CRDTemplateAgentAddon) injectVolumes(template *addonapiv1alpha1.AddOnTemplate,
 	deployment *appsv1.Deployment, _ orderedValues, _, _ Values) error {
+
+	volumeMounts := []corev1.VolumeMount{}
+	volumes := []corev1.Volume{}
+
+	for _, registration := range template.Spec.Registration {
+		if registration.Type == addonapiv1alpha1.RegistrationTypeKubeClient {
+			volumeMounts = append(volumeMounts, corev1.VolumeMount{
+				Name:      "hub-kubeconfig",
+				MountPath: a.hubKubeconfigSecretMountPath(),
+			})
+			volumes = append(volumes, corev1.Volume{
+				Name: "hub-kubeconfig",
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: a.hubKubeconfigSecretName(),
+					},
+				},
+			})
+		}
+
+		if registration.Type == addonapiv1alpha1.RegistrationTypeCustomSigner {
+			if registration.CustomSigner == nil {
+				return fmt.Errorf("custom signer is nil")
+			}
+			name := fmt.Sprintf("cert-%s", strings.ReplaceAll(
+				strings.ReplaceAll(registration.CustomSigner.SignerName, "/", "-"),
+				".", "-"))
+			volumeMounts = append(volumeMounts, corev1.VolumeMount{
+				Name:      name,
+				MountPath: a.customSignedSecretMountPath(registration.CustomSigner.SignerName),
+			})
+			volumes = append(volumes, corev1.Volume{
+				Name: name,
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: a.getCustomSignedSecretName(a.addonName, registration.CustomSigner.SignerName),
+					},
+				},
+			})
+		}
+	}
+
+	if len(volumeMounts) == 0 || len(volumes) == 0 {
+		return nil
+	}
 
 	for j := range deployment.Spec.Template.Spec.Containers {
 		deployment.Spec.Template.Spec.Containers[j].VolumeMounts = append(
-			deployment.Spec.Template.Spec.Containers[j].VolumeMounts,
-			corev1.VolumeMount{
-				Name:      "hub-kubeconfig",
-				MountPath: "/managed/hub-kubeconfig",
-			})
+			deployment.Spec.Template.Spec.Containers[j].VolumeMounts, volumeMounts...)
 	}
 
-	deployment.Spec.Template.Spec.Volumes = append(deployment.Spec.Template.Spec.Volumes, corev1.Volume{
-		Name: "hub-kubeconfig",
-		VolumeSource: corev1.VolumeSource{
-			Secret: &corev1.SecretVolumeSource{
-				SecretName: a.hubKubeconfigSecretName(),
-			},
-		},
-	})
+	deployment.Spec.Template.Spec.Volumes = append(deployment.Spec.Template.Spec.Volumes, volumes...)
 
 	return nil
 }
 
-func (a *CRDTemplateAgentAddon) injectNodePlacement(
+func (a *CRDTemplateAgentAddon) injectNodePlacement(_ *addonapiv1alpha1.AddOnTemplate,
 	deployment *appsv1.Deployment, _ orderedValues, _, privateValues Values) error {
 
 	nodePlacement, ok := privateValues[NodePlacementPrivateValueKey]
@@ -244,7 +280,7 @@ func (a *CRDTemplateAgentAddon) injectNodePlacement(
 	return nil
 }
 
-func (a *CRDTemplateAgentAddon) overrideImages(
+func (a *CRDTemplateAgentAddon) overrideImages(_ *addonapiv1alpha1.AddOnTemplate,
 	deployment *appsv1.Deployment, _ orderedValues, _, privateValues Values) error {
 
 	registries, ok := privateValues[RegistriesPrivateValueKey]
@@ -412,6 +448,18 @@ func (a *CRDTemplateAgentAddon) hubKubeconfigPath() string {
 	return "/managed/hub-kubeconfig/kubeconfig"
 }
 
+func (a *CRDTemplateAgentAddon) hubKubeconfigSecretMountPath() string {
+	return "/managed/hub-kubeconfig"
+}
+
 func (a *CRDTemplateAgentAddon) hubKubeconfigSecretName() string {
 	return fmt.Sprintf("%s-hub-kubeconfig", a.addonName)
+}
+
+func (a *CRDTemplateAgentAddon) getCustomSignedSecretName(addonName, signerName string) string {
+	return fmt.Sprintf("%s-%s-client-cert", addonName, strings.ReplaceAll(signerName, "/", "-"))
+}
+
+func (a *CRDTemplateAgentAddon) customSignedSecretMountPath(signerName string) string {
+	return fmt.Sprintf("/managed/%s", strings.ReplaceAll(signerName, "/", "-"))
 }
