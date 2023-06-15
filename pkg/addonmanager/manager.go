@@ -50,6 +50,7 @@ type AddonManager interface {
 
 	// StartWithInformers starts all registered addon agent with the given informers.
 	StartWithInformers(ctx context.Context,
+		kubeInformers kubeinformers.SharedInformerFactory,
 		addonInformers addoninformers.SharedInformerFactory,
 		clusterInformers clusterv1informers.SharedInformerFactory,
 		dynamicInformers dynamicinformer.DynamicSharedInformerFactory) error
@@ -81,6 +82,11 @@ func (a *addonManager) Trigger(clusterName, addonName string) {
 }
 
 func (a *addonManager) Start(ctx context.Context) error {
+	kubeClient, err := kubernetes.NewForConfig(a.config)
+	if err != nil {
+		return err
+	}
+
 	dynamicClient, err := dynamic.NewForConfig(a.config)
 	if err != nil {
 		return err
@@ -100,10 +106,30 @@ func (a *addonManager) Start(ctx context.Context) error {
 	clusterInformers := clusterv1informers.NewSharedInformerFactory(clusterClient, 10*time.Minute)
 	dynamicInformers := dynamicinformer.NewDynamicSharedInformerFactory(dynamicClient, 10*time.Minute)
 
-	return a.StartWithInformers(ctx, addonInformers, clusterInformers, dynamicInformers)
+	var addonNames []string
+	for key := range a.addonAgents {
+		addonNames = append(addonNames, key)
+	}
+	kubeInformers := kubeinformers.NewSharedInformerFactoryWithOptions(kubeClient, 10*time.Minute,
+		kubeinformers.WithTweakListOptions(func(listOptions *metav1.ListOptions) {
+			selector := &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      addonv1alpha1.AddonLabelKey,
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   addonNames,
+					},
+				},
+			}
+			listOptions.LabelSelector = metav1.FormatLabelSelector(selector)
+		}),
+	)
+
+	return a.StartWithInformers(ctx, kubeInformers, addonInformers, clusterInformers, dynamicInformers)
 }
 
 func (a *addonManager) StartWithInformers(ctx context.Context,
+	kubeInformers kubeinformers.SharedInformerFactory,
 	addonInformers addoninformers.SharedInformerFactory,
 	clusterInformers clusterv1informers.SharedInformerFactory,
 	dynamicInformers dynamicinformer.DynamicSharedInformerFactory) error {
@@ -138,20 +164,6 @@ func (a *addonManager) StartWithInformers(ctx context.Context,
 
 	workInformers := workv1informers.NewSharedInformerFactoryWithOptions(workClient, 10*time.Minute,
 		workv1informers.WithTweakListOptions(func(listOptions *metav1.ListOptions) {
-			selector := &metav1.LabelSelector{
-				MatchExpressions: []metav1.LabelSelectorRequirement{
-					{
-						Key:      addonv1alpha1.AddonLabelKey,
-						Operator: metav1.LabelSelectorOpIn,
-						Values:   addonNames,
-					},
-				},
-			}
-			listOptions.LabelSelector = metav1.FormatLabelSelector(selector)
-		}),
-	)
-	kubeInformers := kubeinformers.NewSharedInformerFactoryWithOptions(kubeClient, 10*time.Minute,
-		kubeinformers.WithTweakListOptions(func(listOptions *metav1.ListOptions) {
 			selector := &metav1.LabelSelector{
 				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
@@ -282,8 +294,8 @@ func (a *addonManager) StartWithInformers(ctx context.Context,
 	a.syncContexts = append(a.syncContexts, deployController.SyncContext())
 
 	workInformers.Start(ctx.Done())
-	kubeInformers.Start(ctx.Done())
 
+	kubeInformers.Start(ctx.Done())
 	addonInformers.Start(ctx.Done())
 	clusterInformers.Start(ctx.Done())
 	dynamicInformers.Start(ctx.Done())

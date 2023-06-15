@@ -1,4 +1,4 @@
-package addonfactory
+package templateagent
 
 import (
 	"os"
@@ -11,19 +11,21 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	kubeinformers "k8s.io/client-go/informers"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
-	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterv1apha1 "open-cluster-management.io/api/cluster/v1alpha1"
+
+	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 )
 
 func TestAddonTemplateAgent_Manifests(t *testing.T) {
 	addonName := "hello"
 	clusterName := "cluster1"
-	data, err := os.ReadFile("./testmanifests/addontemplate/addontemplate.yaml")
+	data, err := os.ReadFile("./testmanifests/addontemplate.yaml")
 	if err != nil {
 		t.Errorf("error reading file: %v", err)
 	}
@@ -39,7 +41,7 @@ func TestAddonTemplateAgent_Manifests(t *testing.T) {
 		},
 	}
 
-	addonTemplateSpecHash, err := utils.GetTemplateSpecHash(addonTemplate)
+	addonTemplateSpecHash, err := GetTemplateSpecHash(addonTemplate)
 	if err != nil {
 		t.Errorf("error getting template spec hash: %v", err)
 	}
@@ -134,21 +136,23 @@ func TestAddonTemplateAgent_Manifests(t *testing.T) {
 	if err := atStore.Add(addonTemplate); err != nil {
 		t.Fatal(err)
 	}
+	kubeInformers := kubeinformers.NewSharedInformerFactoryWithOptions(hubKubeClient, 10*time.Minute)
 
 	agentAddon := NewCRDTemplateAgentAddon(
 		addonName,
 		hubKubeClient,
 		addonClient,
 		addonInformerFactory,
-		GetAddOnDeploymentConfigValues(
-			NewAddOnDeploymentConfigGetter(addonClient),
-			ToAddOnCustomizedVariableValues,
+		kubeInformers.Rbac().V1().RoleBindings().Lister(),
+		addonfactory.GetAddOnDeploymentConfigValues(
+			addonfactory.NewAddOnDeploymentConfigGetter(addonClient),
+			addonfactory.ToAddOnCustomizedVariableValues,
 			ToAddOnNodePlacementPrivateValues,
 			ToAddOnRegistriesPrivateValues,
 		),
 	)
 
-	cluster := NewFakeManagedCluster("cluster1", "1.10.1")
+	cluster := addonfactory.NewFakeManagedCluster("cluster1", "1.10.1")
 
 	objects, err := agentAddon.Manifests(cluster, managedClusterAddon)
 	if err != nil {

@@ -1,9 +1,11 @@
 package utils
 
 import (
+	"fmt"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
 
@@ -68,5 +70,59 @@ func relatedObject(name, namespace, resource string) addonapiv1alpha1.ObjectRefe
 		Name:      name,
 		Namespace: namespace,
 		Resource:  resource,
+	}
+}
+
+func TestGetSpecHash(t *testing.T) {
+	cases := []struct {
+		name         string
+		obj          *unstructured.Unstructured
+		expectedErr  error
+		expectedHash string
+	}{
+		{
+			name:        "nil object",
+			obj:         nil,
+			expectedErr: fmt.Errorf("object is nil"),
+		},
+		{
+			name:        "no spec",
+			obj:         &unstructured.Unstructured{},
+			expectedErr: fmt.Errorf("object has no spec field"),
+		},
+		{
+			name: "hash",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"spec": map[string]interface{}{
+						"test": 1,
+					},
+				},
+			},
+			expectedErr:  nil,
+			expectedHash: "1da06016289bd76a5ada4f52fc805ae0c394612f17ec6d0f0c29b636473c8a9d",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			hash, err := GetSpecHash(c.obj)
+			if c.expectedErr != nil {
+				if err == nil {
+					t.Errorf("Expected error %v, but got nil", c.expectedErr)
+				}
+				if err.Error() != c.expectedErr.Error() {
+					t.Errorf("Expected error %v, but got %v", c.expectedErr, err)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Expected no error, but got %v", err)
+				}
+
+				if hash != c.expectedHash {
+					t.Errorf("Expected hash %s, but got %s", c.expectedHash, hash)
+				}
+			}
+		})
 	}
 }

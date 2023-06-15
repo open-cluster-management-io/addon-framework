@@ -2,15 +2,19 @@ package addontemplate
 
 import (
 	"context"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/dynamic/dynamicinformer"
+	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
@@ -20,7 +24,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
-	"open-cluster-management.io/addon-framework/pkg/utils"
+	"open-cluster-management.io/addon-framework/pkg/manager/templateagent"
 )
 
 // addonTemplateController monitors ManagedClusterAddOns on hub to get all the in-used addon templates,
@@ -32,7 +36,7 @@ type addonTemplateController struct {
 
 	kubeConfig       *rest.Config
 	addonClient      addonv1alpha1client.Interface
-	hubKubeClient    kubernetes.Interface
+	kubeClient       kubernetes.Interface
 	cmaLister        addonlisterv1alpha1.ClusterManagementAddOnLister
 	addonInformers   addoninformers.SharedInformerFactory
 	clusterInformers clusterv1informers.SharedInformerFactory
@@ -51,7 +55,7 @@ func NewAddonTemplateController(
 ) factory.Controller {
 	c := &addonTemplateController{
 		kubeConfig:       hubKubeconfig,
-		hubKubeClient:    hubKubeClient,
+		kubeClient:       hubKubeClient,
 		addonClient:      addonClient,
 		cmaLister:        cmaInformer.Lister(),
 		addonManagers:    make(map[string]context.CancelFunc),
@@ -94,7 +98,7 @@ func (c *addonTemplateController) sync(ctx context.Context, syncCtx factory.Sync
 		return err
 	}
 
-	if !utils.SupportAddOnTemplate(cma) {
+	if !templateagent.SupportAddOnTemplate(cma) {
 		c.stopUnusedManagers(ctx, syncCtx, cma.Name)
 		return nil
 	}
@@ -133,16 +137,32 @@ func (c *addonTemplateController) runController(
 		return err
 	}
 
-	agentAddon := addonfactory.NewCRDTemplateAgentAddon(
+	kubeInformers := kubeinformers.NewSharedInformerFactoryWithOptions(c.kubeClient, 10*time.Minute,
+		kubeinformers.WithTweakListOptions(func(listOptions *metav1.ListOptions) {
+			selector := &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      addonv1alpha1.AddonLabelKey,
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{addonName},
+					},
+				},
+			}
+			listOptions.LabelSelector = metav1.FormatLabelSelector(selector)
+		}),
+	)
+
+	agentAddon := templateagent.NewCRDTemplateAgentAddon(
 		addonName,
-		c.hubKubeClient,
+		c.kubeClient,
 		c.addonClient,
 		c.addonInformers,
+		kubeInformers.Rbac().V1().RoleBindings().Lister(),
 		addonfactory.GetAddOnDeploymentConfigValues(
 			addonfactory.NewAddOnDeploymentConfigGetter(c.addonClient),
 			addonfactory.ToAddOnCustomizedVariableValues,
-			addonfactory.ToAddOnNodePlacementPrivateValues,
-			addonfactory.ToAddOnRegistriesPrivateValues,
+			templateagent.ToAddOnNodePlacementPrivateValues,
+			templateagent.ToAddOnRegistriesPrivateValues,
 		),
 	)
 	err = mgr.AddAgent(agentAddon)
@@ -150,10 +170,12 @@ func (c *addonTemplateController) runController(
 		return err
 	}
 
-	err = mgr.StartWithInformers(ctx, c.addonInformers, c.clusterInformers, c.dynamicInformers)
+	err = mgr.StartWithInformers(ctx, kubeInformers, c.addonInformers, c.clusterInformers, c.dynamicInformers)
 	if err != nil {
 		return err
 	}
+
+	kubeInformers.Start(ctx.Done())
 
 	<-ctx.Done()
 
