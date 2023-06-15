@@ -23,7 +23,7 @@ import (
 	"k8s.io/client-go/restmapper"
 	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -285,20 +285,36 @@ func IsCSRSupported(nativeClient kubernetes.Interface) (bool, bool, error) {
 	return v1CSRSupported, v1beta1CSRSupported, nil
 }
 
+// AddonTemplateGetterFunc returns the desired addon template for the addon, if addon is nil, the clusterName and
+// addonName should not be empty
+type AddonTemplateGetterFunc func(addon *addonapiv1alpha1.ManagedClusterAddOn, clusterName, addonName string) (*addonapiv1alpha1.AddOnTemplate, error)
+
+// DefaultDesiredAddonTemplateGetter returns a function that returns the desired addon template
+// if addon is nil, it will get the addon from cache, then get the desired template by addon status
+func DefaultDesiredAddonTemplateGetter(
+	mcaLister addonlisterv1alpha1.ManagedClusterAddOnLister,
+	atLister addonlisterv1alpha1.AddOnTemplateLister) AddonTemplateGetterFunc {
+	return func(addon *addonapiv1alpha1.ManagedClusterAddOn, clusterName, addonName string) (*addonapiv1alpha1.AddOnTemplate, error) {
+
+		if addon == nil {
+			var err error
+			addon, err = mcaLister.ManagedClusterAddOns(clusterName).Get(addonName)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		return GetDesiredAddOnTemplate(atLister, addon)
+	}
+}
+
 func TemplateCSRConfigurationsFunc(
 	addonName, agentName string,
-	addonClient addonv1alpha1client.Interface,
+	templateGetter AddonTemplateGetterFunc,
 ) func(cluster *clusterv1.ManagedCluster) []addonapiv1alpha1.RegistrationConfig {
 
 	return func(cluster *clusterv1.ManagedCluster) []addonapiv1alpha1.RegistrationConfig {
-		addon, err := addonClient.AddonV1alpha1().ManagedClusterAddOns(cluster.Name).Get(
-			context.TODO(), addonName, metav1.GetOptions{})
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("failed to get addon %s: %v", addonName, err))
-			return nil
-		}
-
-		template, err := GetDesiredAddOnTemplate(addonClient, addon)
+		template, err := templateGetter(nil, cluster.Name, addonName)
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("failed to get addon %s template: %v", addonName, err))
 			return nil
@@ -347,13 +363,13 @@ func TemplateCSRConfigurationsFunc(
 
 func TemplateCSRApproveCheckFunc(
 	addonName, agentName string,
-	addonClient addonv1alpha1client.Interface,
+	templateGetter AddonTemplateGetterFunc,
 ) agent.CSRApproveFunc {
 
 	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn,
 		csr *certificatesv1.CertificateSigningRequest) bool {
 
-		template, err := GetDesiredAddOnTemplate(addonClient, addon)
+		template, err := templateGetter(addon, cluster.Name, addonName)
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("failed to get addon %s template: %v", addonName, err))
 			return false
@@ -390,7 +406,7 @@ func TemplateCSRApproveCheckFunc(
 
 func TemplateCSRSignFunc(
 	addonName, agentName string,
-	addonClient addonv1alpha1client.Interface,
+	templateGetter AddonTemplateGetterFunc,
 	hubKubeClient kubernetes.Interface,
 ) agent.CSRSignerFunc {
 
@@ -404,14 +420,7 @@ func TemplateCSRSignFunc(
 		}
 
 		clusterName := getClusterName(csr.Spec.Username)
-		addon, err := addonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(
-			context.TODO(), addonName, metav1.GetOptions{})
-		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("failed to get addon %s: %v", addonName, err))
-			return nil
-		}
-
-		template, err := GetDesiredAddOnTemplate(addonClient, addon)
+		template, err := templateGetter(nil, clusterName, addonName)
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("failed to get addon %s template: %v", addonName, err))
 			return nil
@@ -445,7 +454,7 @@ func TemplateCSRSignFunc(
 
 // GetDesiredAddOnTemplate returns the desired template of the addon
 func GetDesiredAddOnTemplate(
-	addonClient addonv1alpha1client.Interface,
+	atLister addonlisterv1alpha1.AddOnTemplateLister,
 	addon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.AddOnTemplate, error) {
 	ok, templateRef := AddonTemplateConfigRef(addon.Status.ConfigReferences)
 	if !ok {
@@ -459,11 +468,10 @@ func GetDesiredAddOnTemplate(
 		return nil, fmt.Errorf("addon %s template desired spec hash is empty", addon.Name)
 	}
 
-	template, err := addonClient.AddonV1alpha1().AddOnTemplates().Get(
-		context.TODO(), desiredTemplate.Name, metav1.GetOptions{})
+	template, err := atLister.Get(desiredTemplate.Name)
 	if err != nil {
 		return nil, err
 	}
 
-	return template, nil
+	return template.DeepCopy(), nil
 }

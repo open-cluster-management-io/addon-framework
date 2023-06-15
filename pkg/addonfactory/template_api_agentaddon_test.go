@@ -3,6 +3,7 @@ package addonfactory
 import (
 	"os"
 	"testing"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -15,6 +16,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
+	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterv1apha1 "open-cluster-management.io/api/cluster/v1alpha1"
 )
 
@@ -123,11 +125,21 @@ func TestAddonTemplateAgent_Manifests(t *testing.T) {
 
 	hubKubeClient := fakekube.NewSimpleClientset()
 	addonClient := fakeaddon.NewSimpleClientset(addonTemplate, managedClusterAddon, addonDeploymentConfig)
+	addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 30*time.Minute)
+	mcaStore := addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore()
+	if err := mcaStore.Add(managedClusterAddon); err != nil {
+		t.Fatal(err)
+	}
+	atStore := addonInformerFactory.Addon().V1alpha1().AddOnTemplates().Informer().GetStore()
+	if err := atStore.Add(addonTemplate); err != nil {
+		t.Fatal(err)
+	}
 
 	agentAddon := NewCRDTemplateAgentAddon(
 		addonName,
 		hubKubeClient,
 		addonClient,
+		addonInformerFactory,
 		GetAddOnDeploymentConfigValues(
 			NewAddOnDeploymentConfigGetter(addonClient),
 			ToAddOnCustomizedVariableValues,

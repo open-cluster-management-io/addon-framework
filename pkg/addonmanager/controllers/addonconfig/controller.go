@@ -162,7 +162,7 @@ func (c *addonConfigController) sync(ctx context.Context, syncCtx factory.SyncCo
 
 	addon, err := c.addonLister.ManagedClusterAddOns(addonNamespace).Get(addonName)
 	if errors.IsNotFound(err) {
-		// addon cloud be deleted, ignore
+		// addon could be deleted, ignore
 		return nil
 	}
 	if err != nil {
@@ -171,7 +171,7 @@ func (c *addonConfigController) sync(ctx context.Context, syncCtx factory.SyncCo
 
 	cma, err := c.clusterManagementAddonLister.Get(addonName)
 	if errors.IsNotFound(err) {
-		// addon cloud be deleted, ignore
+		// cluster management addon could be deleted, ignore
 		return nil
 	}
 	if err != nil {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -15,6 +16,7 @@ import (
 	"open-cluster-management.io/api/addon/v1alpha1"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
+	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	v1 "open-cluster-management.io/api/cluster/v1"
 )
@@ -207,7 +209,20 @@ func TestTemplatePermissionConfigFunc(t *testing.T) {
 	for _, c := range cases {
 		addonClient := fakeaddon.NewSimpleClientset(c.template, c.addon)
 		hubKubeClient := fakekube.NewSimpleClientset()
-		f := TemplatePermissionConfigFunc(c.addon.Name, addonClient, hubKubeClient)
+		addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 30*time.Minute)
+		mcaStore := addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore()
+		if err := mcaStore.Add(c.addon); err != nil {
+			t.Fatal(err)
+		}
+		atStore := addonInformerFactory.Addon().V1alpha1().AddOnTemplates().Informer().GetStore()
+		if err := atStore.Add(c.template); err != nil {
+			t.Fatal(err)
+		}
+
+		f := TemplatePermissionConfigFunc(c.addon.Name, DefaultDesiredAddonTemplateGetter(
+			addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
+			addonInformerFactory.Addon().V1alpha1().AddOnTemplates().Lister(),
+		), hubKubeClient)
 		err := f(c.cluster, c.addon)
 		if err != c.expectedErr {
 			t.Errorf("expected registrationConfigs %v, but got %v", c.expectedErr, err)

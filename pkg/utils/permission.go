@@ -15,7 +15,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/utils/pointer"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -364,12 +363,12 @@ func ApplyRoleBinding(ctx context.Context, client rbacclientv1.RoleBindingsGette
 // clusterRole/role
 func TemplatePermissionConfigFunc(
 	addonName string,
-	addonClient addonv1alpha1client.Interface,
+	templateGetter AddonTemplateGetterFunc,
 	hubKubeClient kubernetes.Interface,
 ) agent.PermissionConfigFunc {
 
 	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
-		template, err := GetDesiredAddOnTemplate(addonClient, addon)
+		template, err := templateGetter(addon, cluster.Name, addonName)
 		if err != nil {
 			return err
 		}
@@ -456,17 +455,17 @@ func createPermissionBinding(hubKubeClient kubernetes.Interface,
 		Subjects: subject,
 	}
 
-	// TODO: check the existence of the role, cluster role
-
 	_, err := hubKubeClient.RbacV1().RoleBindings(namespace).Get(context.TODO(), binding.Name, metav1.GetOptions{})
 	switch {
 	case apierrors.IsNotFound(err):
 		_, createErr := hubKubeClient.RbacV1().RoleBindings(namespace).Create(context.TODO(), binding, metav1.CreateOptions{})
-		if createErr != nil {
+		if createErr != nil && !apierrors.IsAlreadyExists(createErr) {
 			return createErr
 		}
 	case err != nil:
 		return err
 	}
+
+	// TODO: update the rolebinding if it is not the same
 	return nil
 }

@@ -137,6 +137,7 @@ func (c *addonTemplateController) runController(
 		addonName,
 		c.hubKubeClient,
 		c.addonClient,
+		c.addonInformers,
 		addonfactory.GetAddOnDeploymentConfigValues(
 			addonfactory.NewAddOnDeploymentConfigGetter(c.addonClient),
 			addonfactory.ToAddOnCustomizedVariableValues,

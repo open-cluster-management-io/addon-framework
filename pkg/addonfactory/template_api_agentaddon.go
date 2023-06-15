@@ -17,6 +17,8 @@ import (
 	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
+	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -50,10 +52,12 @@ type CRDTemplateAgentAddon struct {
 	getValuesFuncs     []GetValuesFunc
 	trimCRDDescription bool
 
-	hubKubeClient kubernetes.Interface
-	addonClient   addonv1alpha1client.Interface
-	addonName     string
-	agentName     string
+	hubKubeClient       kubernetes.Interface
+	addonClient         addonv1alpha1client.Interface
+	addonLister         addonlisterv1alpha1.ManagedClusterAddOnLister
+	addonTemplateLister addonlisterv1alpha1.AddOnTemplateLister
+	addonName           string
+	agentName           string
 }
 
 // NewCRDTemplateAgentAddon creates a CRDTemplateAgentAddon instance
@@ -61,16 +65,19 @@ func NewCRDTemplateAgentAddon(
 	addonName string,
 	hubKubeClient kubernetes.Interface,
 	addonClient addonv1alpha1client.Interface,
+	addonInformers addoninformers.SharedInformerFactory,
 	getValuesFuncs ...GetValuesFunc,
 ) *CRDTemplateAgentAddon {
 	a := &CRDTemplateAgentAddon{
 		getValuesFuncs:     getValuesFuncs,
 		trimCRDDescription: true,
 
-		hubKubeClient: hubKubeClient,
-		addonClient:   addonClient,
-		addonName:     addonName,
-		agentName:     utilrand.String(5),
+		hubKubeClient:       hubKubeClient,
+		addonClient:         addonClient,
+		addonLister:         addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
+		addonTemplateLister: addonInformers.Addon().V1alpha1().AddOnTemplates().Lister(),
+		addonName:           addonName,
+		agentName:           utilrand.String(5),
 	}
 
 	return a
@@ -80,7 +87,7 @@ func (a *CRDTemplateAgentAddon) Manifests(
 	cluster *clusterv1.ManagedCluster,
 	addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
 
-	template, err := utils.GetDesiredAddOnTemplate(a.addonClient, addon)
+	template, err := utils.GetDesiredAddOnTemplate(a.addonTemplateLister, addon)
 	if err != nil {
 		return nil, err
 	}
@@ -98,10 +105,16 @@ func (a *CRDTemplateAgentAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 		// set supportedConfigGVRs to empty to disable the framework to start duplicated config related controllers
 		SupportedConfigGVRs: []schema.GroupVersionResource{},
 		Registration: &agent.RegistrationOption{
-			CSRConfigurations: utils.TemplateCSRConfigurationsFunc(a.addonName, a.agentName, a.addonClient),
-			PermissionConfig:  utils.TemplatePermissionConfigFunc(a.addonName, a.addonClient, a.hubKubeClient),
-			CSRApproveCheck:   utils.TemplateCSRApproveCheckFunc(a.addonName, a.agentName, a.addonClient),
-			CSRSign:           utils.TemplateCSRSignFunc(a.addonName, a.agentName, a.addonClient, a.hubKubeClient),
+			CSRConfigurations: utils.TemplateCSRConfigurationsFunc(a.addonName, a.agentName,
+				utils.DefaultDesiredAddonTemplateGetter(a.addonLister, a.addonTemplateLister)),
+			PermissionConfig: utils.TemplatePermissionConfigFunc(a.addonName,
+				utils.DefaultDesiredAddonTemplateGetter(a.addonLister, a.addonTemplateLister),
+				a.hubKubeClient),
+			CSRApproveCheck: utils.TemplateCSRApproveCheckFunc(a.addonName, a.agentName,
+				utils.DefaultDesiredAddonTemplateGetter(a.addonLister, a.addonTemplateLister)),
+			CSRSign: utils.TemplateCSRSignFunc(a.addonName, a.agentName,
+				utils.DefaultDesiredAddonTemplateGetter(a.addonLister, a.addonTemplateLister),
+				a.hubKubeClient),
 		},
 	}
 }

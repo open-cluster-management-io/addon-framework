@@ -20,6 +20,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
+	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
@@ -303,8 +304,20 @@ func TestTemplateCSRConfigurationsFunc(t *testing.T) {
 	}
 	for _, c := range cases {
 		addonClient := fakeaddon.NewSimpleClientset(c.template, c.addon)
+		addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 30*time.Minute)
+		mcaStore := addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore()
+		if err := mcaStore.Add(c.addon); err != nil {
+			t.Fatal(err)
+		}
+		atStore := addonInformerFactory.Addon().V1alpha1().AddOnTemplates().Informer().GetStore()
+		if err := atStore.Add(c.template); err != nil {
+			t.Fatal(err)
+		}
 
-		f := TemplateCSRConfigurationsFunc(c.addon.Name, c.agentName, addonClient)
+		f := TemplateCSRConfigurationsFunc(c.addon.Name, c.agentName, DefaultDesiredAddonTemplateGetter(
+			addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
+			addonInformerFactory.Addon().V1alpha1().AddOnTemplates().Lister(),
+		))
 		registrationConfigs := f(c.cluster)
 		if !equality.Semantic.DeepEqual(registrationConfigs, c.expectedConfigs) {
 			t.Errorf("expected registrationConfigs %v, but got %v", c.expectedConfigs, registrationConfigs)
@@ -402,8 +415,19 @@ func TestTemplateCSRApproveCheckFunc(t *testing.T) {
 	}
 	for _, c := range cases {
 		addonClient := fakeaddon.NewSimpleClientset(c.template, c.addon)
-
-		f := TemplateCSRApproveCheckFunc(c.addon.Name, c.agentName, addonClient)
+		addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 30*time.Minute)
+		mcaStore := addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore()
+		if err := mcaStore.Add(c.addon); err != nil {
+			t.Fatal(err)
+		}
+		atStore := addonInformerFactory.Addon().V1alpha1().AddOnTemplates().Informer().GetStore()
+		if err := atStore.Add(c.template); err != nil {
+			t.Fatal(err)
+		}
+		f := TemplateCSRApproveCheckFunc(c.addon.Name, c.agentName, DefaultDesiredAddonTemplateGetter(
+			addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
+			addonInformerFactory.Addon().V1alpha1().AddOnTemplates().Lister(),
+		))
 		approve := f(c.cluster, c.addon, c.csr)
 		if approve != c.expectedApprove {
 			t.Errorf("expected approve result %v, but got %v", c.expectedApprove, approve)
@@ -496,8 +520,20 @@ func TestTemplateCSRSignFunc(t *testing.T) {
 	for _, c := range cases {
 		addonClient := fakeaddon.NewSimpleClientset(c.template, c.addon)
 		hubKubeClient := fakekube.NewSimpleClientset()
+		addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 30*time.Minute)
+		mcaStore := addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore()
+		if err := mcaStore.Add(c.addon); err != nil {
+			t.Fatal(err)
+		}
+		atStore := addonInformerFactory.Addon().V1alpha1().AddOnTemplates().Informer().GetStore()
+		if err := atStore.Add(c.template); err != nil {
+			t.Fatal(err)
+		}
 
-		f := TemplateCSRSignFunc(c.addon.Name, c.agentName, addonClient, hubKubeClient)
+		f := TemplateCSRSignFunc(c.addon.Name, c.agentName, DefaultDesiredAddonTemplateGetter(
+			addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
+			addonInformerFactory.Addon().V1alpha1().AddOnTemplates().Lister(),
+		), hubKubeClient)
 		cert := f(c.csr)
 		if !bytes.Equal(cert, c.expectedCert) {
 			t.Errorf("expected cert %v, but got %v", c.expectedCert, cert)
