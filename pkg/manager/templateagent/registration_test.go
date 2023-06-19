@@ -546,16 +546,8 @@ func TestTemplatePermissionConfigFunc(t *testing.T) {
 				if rb.RoleRef.Name != "test" {
 					t.Errorf("expected rolebinding %s, got %s", "test", rb.RoleRef.Name)
 				}
-				if len(rb.OwnerReferences) != 1 {
-					t.Errorf("expected rolebinding to have 1 owner reference, got %d", len(rb.OwnerReferences))
-				}
-				if rb.OwnerReferences[0].Kind != "ManagedCluster" {
-					t.Errorf("expected rolebinding owner reference kind to be ManagedCluster, got %s",
-						rb.OwnerReferences[0].Kind)
-				}
-				if rb.OwnerReferences[0].Name != "cluster1" {
-					t.Errorf("expected rolebinding owner reference name to be cluster1, got %s",
-						rb.OwnerReferences[0].Name)
+				if len(rb.OwnerReferences) != 0 {
+					t.Errorf("expected rolebinding to have 0 owner reference, got %d", len(rb.OwnerReferences))
 				}
 			},
 		},

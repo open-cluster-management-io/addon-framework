@@ -79,7 +79,8 @@ func NewCRDTemplateAgentAddon(
 		addonTemplateLister: addonInformers.Addon().V1alpha1().AddOnTemplates().Lister(),
 		rolebindingLister:   rolebindingLister,
 		addonName:           addonName,
-		agentName:           utilrand.String(5),
+		// TODO: agentName should not be changed after restarting the agent
+		agentName: utilrand.String(5),
 	}
 
 	return a

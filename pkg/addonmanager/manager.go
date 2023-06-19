@@ -51,6 +51,7 @@ type AddonManager interface {
 	// StartWithInformers starts all registered addon agent with the given informers.
 	StartWithInformers(ctx context.Context,
 		kubeInformers kubeinformers.SharedInformerFactory,
+		workInformers workv1informers.SharedInformerFactory,
 		addonInformers addoninformers.SharedInformerFactory,
 		clusterInformers clusterv1informers.SharedInformerFactory,
 		dynamicInformers dynamicinformer.DynamicSharedInformerFactory) error
@@ -83,6 +84,11 @@ func (a *addonManager) Trigger(clusterName, addonName string) {
 
 func (a *addonManager) Start(ctx context.Context) error {
 	kubeClient, err := kubernetes.NewForConfig(a.config)
+	if err != nil {
+		return err
+	}
+
+	workClient, err := workv1client.NewForConfig(a.config)
 	if err != nil {
 		return err
 	}
@@ -125,11 +131,79 @@ func (a *addonManager) Start(ctx context.Context) error {
 		}),
 	)
 
-	return a.StartWithInformers(ctx, kubeInformers, addonInformers, clusterInformers, dynamicInformers)
+	workInformers := workv1informers.NewSharedInformerFactoryWithOptions(workClient, 10*time.Minute,
+		workv1informers.WithTweakListOptions(func(listOptions *metav1.ListOptions) {
+			selector := &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      addonv1alpha1.AddonLabelKey,
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   addonNames,
+					},
+				},
+			}
+			listOptions.LabelSelector = metav1.FormatLabelSelector(selector)
+		}),
+	)
+
+	// addonDeployController
+	err = workInformers.Work().V1().ManifestWorks().Informer().AddIndexers(
+		cache.Indexers{
+			index.ManifestWorkByAddon:           index.IndexManifestWorkByAddon,
+			index.ManifestWorkByHostedAddon:     index.IndexManifestWorkByHostedAddon,
+			index.ManifestWorkHookByHostedAddon: index.IndexManifestWorkHookByHostedAddon,
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	// addonConfigController
+	err = addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().AddIndexers(
+		cache.Indexers{index.AddonByConfig: index.IndexAddonByConfig},
+	)
+	if err != nil {
+		return err
+	}
+
+	// managementAddonConfigController
+	err = addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Informer().AddIndexers(
+		cache.Indexers{index.ClusterManagementAddonByConfig: index.IndexClusterManagementAddonByConfig})
+	if err != nil {
+		return err
+	}
+
+	err = addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Informer().AddIndexers(
+		cache.Indexers{
+			index.ClusterManagementAddonByPlacement: index.IndexClusterManagementAddonByPlacement,
+		})
+	if err != nil {
+		return err
+	}
+	err = addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().AddIndexers(
+		cache.Indexers{
+			index.ManagedClusterAddonByName: index.IndexManagedClusterAddonByName,
+		})
+	if err != nil {
+		return err
+	}
+
+	err = a.StartWithInformers(ctx, kubeInformers, workInformers, addonInformers, clusterInformers, dynamicInformers)
+	if err != nil {
+		return err
+	}
+
+	kubeInformers.Start(ctx.Done())
+	workInformers.Start(ctx.Done())
+	addonInformers.Start(ctx.Done())
+	clusterInformers.Start(ctx.Done())
+	dynamicInformers.Start(ctx.Done())
+	return nil
 }
 
 func (a *addonManager) StartWithInformers(ctx context.Context,
 	kubeInformers kubeinformers.SharedInformerFactory,
+	workInformers workv1informers.SharedInformerFactory,
 	addonInformers addoninformers.SharedInformerFactory,
 	clusterInformers clusterv1informers.SharedInformerFactory,
 	dynamicInformers dynamicinformer.DynamicSharedInformerFactory) error {
@@ -154,28 +228,11 @@ func (a *addonManager) StartWithInformers(ctx context.Context,
 		return err
 	}
 
-	var addonNames []string
-	for key, agentImpl := range a.addonAgents {
-		addonNames = append(addonNames, key)
+	for _, agentImpl := range a.addonAgents {
 		for _, configGVR := range agentImpl.GetAgentAddonOptions().SupportedConfigGVRs {
 			a.addonConfigs[configGVR] = true
 		}
 	}
-
-	workInformers := workv1informers.NewSharedInformerFactoryWithOptions(workClient, 10*time.Minute,
-		workv1informers.WithTweakListOptions(func(listOptions *metav1.ListOptions) {
-			selector := &metav1.LabelSelector{
-				MatchExpressions: []metav1.LabelSelectorRequirement{
-					{
-						Key:      addonv1alpha1.AddonLabelKey,
-						Operator: metav1.LabelSelectorOpIn,
-						Values:   addonNames,
-					},
-				},
-			}
-			listOptions.LabelSelector = metav1.FormatLabelSelector(selector)
-		}),
-	)
 
 	deployController := agentdeploy.NewAddonDeployController(
 		workClient,
@@ -234,21 +291,6 @@ func (a *addonManager) StartWithInformers(ctx context.Context,
 		// start addonConfiguration controller, note this is to handle the case when the general addon-manager
 		// is not started, we should consider to remove this when the general addon-manager are always started.
 		// This controller will also ignore the installStrategy part.
-		err = addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Informer().AddIndexers(
-			cache.Indexers{
-				index.ClusterManagementAddonByPlacement: index.IndexClusterManagementAddonByPlacement,
-			})
-		if err != nil {
-			return err
-		}
-
-		err = addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().AddIndexers(
-			cache.Indexers{
-				index.ManagedClusterAddonByName: index.IndexManagedClusterAddonByName,
-			})
-		if err != nil {
-			return err
-		}
 		addonConfigurationController = addonconfiguration.NewAddonConfigurationController(
 			addonClient,
 			addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
@@ -292,13 +334,6 @@ func (a *addonManager) StartWithInformers(ctx context.Context,
 	}
 
 	a.syncContexts = append(a.syncContexts, deployController.SyncContext())
-
-	workInformers.Start(ctx.Done())
-
-	kubeInformers.Start(ctx.Done())
-	addonInformers.Start(ctx.Done())
-	clusterInformers.Start(ctx.Done())
-	dynamicInformers.Start(ctx.Done())
 
 	go deployController.Run(ctx, 1)
 	go registrationController.Run(ctx, 1)

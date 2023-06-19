@@ -16,6 +16,7 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
+	"open-cluster-management.io/addon-framework/pkg/index"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
@@ -563,7 +564,7 @@ func TestEnqueue(t *testing.T) {
 				queue:        addontesting.NewFakeSyncContext(t).Queue(),
 			}
 
-			if err := addonInformer.AddIndexers(cache.Indexers{byAddOnConfig: ctrl.indexByConfig}); err != nil {
+			if err := addonInformer.AddIndexers(cache.Indexers{index.AddonByConfig: index.IndexAddonByConfig}); err != nil {
 				t.Fatal(err)
 			}
 			addonStore := addonInformer.GetStore()

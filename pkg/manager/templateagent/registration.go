@@ -29,6 +29,9 @@ import (
 const (
 	TLSCACert = "ca.crt"
 	TLSCAKey  = "ca.key"
+	// AddonTemplateLabelKey is the label key to set addon template name. It is to set the resources on the hub relating
+	// to an addon template
+	AddonTemplateLabelKey = "open-cluster-management.io/addon-template-name"
 )
 
 // AddonTemplateGetterFunc returns the desired addon template for the addon, if addon is nil, the clusterName and
@@ -211,10 +214,7 @@ func TemplateCSRSignFunc(
 	return func(csr *certificatesv1.CertificateSigningRequest) []byte {
 		// TODO: consider to change the agent.CSRSignerFun to accept parameter addon
 		getClusterName := func(userName string) string {
-			// the common name of csr is in format of "system:open-cluster-management:{clusterName}:{id}"
-			// get the cluster name from the common name
-			trimedCommonName := strings.TrimPrefix(userName, "system:open-cluster-management:")
-			return strings.Split(trimedCommonName, ":")[0]
+			return csr.Labels[addonapiv1alpha1.AddonNamespaceLabelKey]
 		}
 
 		clusterName := getClusterName(csr.Spec.Username)
@@ -329,7 +329,7 @@ func TemplatePermissionConfigFunc(
 					continue
 				}
 
-				err := createKubeClientPermissions(kcrc, cluster, addon, hubKubeClient, rolebindingLister)
+				err := createKubeClientPermissions(template.Name, kcrc, cluster, addon, hubKubeClient, rolebindingLister)
 				if err != nil {
 					return err
 				}
@@ -348,6 +348,7 @@ func TemplatePermissionConfigFunc(
 }
 
 func createKubeClientPermissions(
+	templateName string,
 	kcrc *addonapiv1alpha1.KubeClientRegistrationConfig,
 	cluster *clusterv1.ManagedCluster,
 	addon *addonapiv1alpha1.ManagedClusterAddOn,
@@ -367,8 +368,8 @@ func createKubeClientPermissions(
 				Name:       addon.Name,
 				UID:        addon.UID,
 			}
-			err := createPermissionBinding(hubKubeClient, rolebindingLister,
-				cluster.Name, addon.Name, cluster.Name, pc.RoleRef, owner)
+			err := createPermissionBinding(hubKubeClient, rolebindingLister, templateName,
+				cluster.Name, addon.Name, cluster.Name, pc.RoleRef, &owner)
 			if err != nil {
 				return err
 			}
@@ -376,14 +377,10 @@ func createKubeClientPermissions(
 			if pc.SingleNamespace == nil {
 				return fmt.Errorf("single namespace is nil")
 			}
-			owner := metav1.OwnerReference{
-				APIVersion: cluster.APIVersion,
-				Kind:       cluster.Kind,
-				Name:       cluster.Name,
-				UID:        cluster.UID,
-			}
-			err := createPermissionBinding(hubKubeClient, rolebindingLister,
-				cluster.Name, addon.Name, pc.SingleNamespace.Namespace, pc.RoleRef, owner)
+			// set owner reference nil since the rolebinding has different namespace with the ManagedClusterAddon
+			// TODO: cleanup the rolebinding when the addon is deleted
+			err := createPermissionBinding(hubKubeClient, rolebindingLister, templateName,
+				cluster.Name, addon.Name, pc.SingleNamespace.Namespace, pc.RoleRef, nil)
 			if err != nil {
 				return err
 			}
@@ -393,7 +390,7 @@ func createKubeClientPermissions(
 }
 
 func createPermissionBinding(hubKubeClient kubernetes.Interface, rolebindingLister rbacv1lister.RoleBindingLister,
-	clusterName, addonName, namespace string, roleRef rbacv1.RoleRef, owner metav1.OwnerReference) error {
+	templateName string, clusterName, addonName, namespace string, roleRef rbacv1.RoleRef, owner *metav1.OwnerReference) error {
 	// TODO: confirm the group
 	groups := agent.DefaultGroups(clusterName, addonName)
 	subject := []rbacv1.Subject{}
@@ -406,16 +403,18 @@ func createPermissionBinding(hubKubeClient kubernetes.Interface, rolebindingList
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("open-cluster-management:%s:%s:agent",
 				addonName, strings.ToLower(roleRef.Kind)),
-			Namespace:       namespace,
-			OwnerReferences: []metav1.OwnerReference{owner},
+			Namespace: namespace,
 			Labels: map[string]string{
 				addonapiv1alpha1.AddonLabelKey: addonName,
+				AddonTemplateLabelKey:          "",
 			},
 		},
 		RoleRef:  roleRef,
 		Subjects: subject,
 	}
-
+	if owner != nil {
+		binding.OwnerReferences = []metav1.OwnerReference{*owner}
+	}
 	_, err := rolebindingLister.RoleBindings(namespace).Get(binding.Name)
 	switch {
 	case apierrors.IsNotFound(err):

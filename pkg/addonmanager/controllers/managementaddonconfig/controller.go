@@ -14,7 +14,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/dynamic/dynamiclister"
 	"k8s.io/client-go/tools/cache"
@@ -26,12 +25,12 @@ import (
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
 
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
+	"open-cluster-management.io/addon-framework/pkg/index"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 )
 
 const (
-	controllerName                 = "management-addon-config-controller"
-	byClusterManagementAddOnConfig = "by-cluster-management-addon-config"
+	controllerName = "management-addon-config-controller"
 )
 
 type enqueueFunc func(obj interface{})
@@ -67,10 +66,6 @@ func NewManagementAddonConfigController(
 	}
 
 	configInformers := c.buildConfigInformers(configInformerFactory, configGVRs)
-
-	if err := clusterManagementAddonInformers.Informer().AddIndexers(cache.Indexers{byClusterManagementAddOnConfig: c.indexByConfig}); err != nil {
-		utilruntime.HandleError(err)
-	}
 
 	return factory.New().
 		WithSyncContext(syncCtx).
@@ -116,7 +111,8 @@ func (c *clusterManagementAddonConfigController) enqueueClusterManagementAddOnsB
 			return
 		}
 
-		objs, err := c.clusterManagementAddonIndexer.ByIndex(byClusterManagementAddOnConfig, fmt.Sprintf("%s/%s/%s", gvr.Group, gvr.Resource, namespaceName))
+		objs, err := c.clusterManagementAddonIndexer.ByIndex(
+			index.ClusterManagementAddonByConfig, fmt.Sprintf("%s/%s/%s", gvr.Group, gvr.Resource, namespaceName))
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("error to get addons: %v", err))
 			return
@@ -130,36 +126,6 @@ func (c *clusterManagementAddonConfigController) enqueueClusterManagementAddOnsB
 			c.queue.Add(key)
 		}
 	}
-}
-
-func (c *clusterManagementAddonConfigController) indexByConfig(obj interface{}) ([]string, error) {
-	cma, ok := obj.(*addonapiv1alpha1.ClusterManagementAddOn)
-	if !ok {
-		return nil, fmt.Errorf("obj is supposed to be a ClusterManagementAddOn, but is %T", obj)
-	}
-
-	configNames := sets.New[string]()
-	for _, defaultConfigRef := range cma.Status.DefaultConfigReferences {
-		if defaultConfigRef.DesiredConfig == nil || defaultConfigRef.DesiredConfig.Name == "" {
-			// bad config reference, ignore
-			continue
-		}
-
-		configNames.Insert(getIndex(defaultConfigRef.ConfigGroupResource, *defaultConfigRef.DesiredConfig))
-	}
-
-	for _, installProgression := range cma.Status.InstallProgressions {
-		for _, configReference := range installProgression.ConfigReferences {
-			if configReference.DesiredConfig == nil || configReference.DesiredConfig.Name == "" {
-				// bad config reference, ignore
-				continue
-			}
-
-			configNames.Insert(getIndex(configReference.ConfigGroupResource, *configReference.DesiredConfig))
-		}
-	}
-
-	return configNames.UnsortedList(), nil
 }
 
 func (c *clusterManagementAddonConfigController) sync(ctx context.Context, syncCtx factory.SyncContext, key string) error {
@@ -304,12 +270,4 @@ func (c *clusterManagementAddonConfigController) getConfigSpecHash(gr addonapiv1
 	}
 
 	return utils.GetSpecHash(config)
-}
-
-func getIndex(configGroupResource addonapiv1alpha1.ConfigGroupResource, configSpecHash addonapiv1alpha1.ConfigSpecHash) string {
-	if configSpecHash.Namespace != "" {
-		return fmt.Sprintf("%s/%s/%s/%s", configGroupResource.Group, configGroupResource.Resource, configSpecHash.Namespace, configSpecHash.Name)
-	}
-
-	return fmt.Sprintf("%s/%s/%s", configGroupResource.Group, configGroupResource.Resource, configSpecHash.Name)
 }

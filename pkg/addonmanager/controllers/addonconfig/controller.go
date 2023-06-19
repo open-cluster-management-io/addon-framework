@@ -25,12 +25,12 @@ import (
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
 
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
+	"open-cluster-management.io/addon-framework/pkg/index"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 )
 
 const (
 	controllerName = "addon-config-controller"
-	byAddOnConfig  = "by-addon-config"
 )
 
 type enqueueFunc func(obj interface{})
@@ -70,9 +70,6 @@ func NewAddonConfigController(
 
 	configInformers := c.buildConfigInformers(configInformerFactory, configGVRs)
 
-	if err := addonInformers.Informer().AddIndexers(cache.Indexers{byAddOnConfig: c.indexByConfig}); err != nil {
-		utilruntime.HandleError(err)
-	}
 	return factory.New().
 		WithSyncContext(syncCtx).
 		WithInformersQueueKeysFunc(func(obj runtime.Object) []string {
@@ -118,7 +115,8 @@ func (c *addonConfigController) enqueueAddOnsByConfig(gvr schema.GroupVersionRes
 			return
 		}
 
-		objs, err := c.addonIndexer.ByIndex(byAddOnConfig, fmt.Sprintf("%s/%s/%s", gvr.Group, gvr.Resource, namespaceName))
+		objs, err := c.addonIndexer.ByIndex(index.AddonByConfig,
+			fmt.Sprintf("%s/%s/%s", gvr.Group, gvr.Resource, namespaceName))
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("error to get addons: %v", err))
 			return
@@ -132,25 +130,6 @@ func (c *addonConfigController) enqueueAddOnsByConfig(gvr schema.GroupVersionRes
 			c.queue.Add(key)
 		}
 	}
-}
-
-func (c *addonConfigController) indexByConfig(obj interface{}) ([]string, error) {
-	addon, ok := obj.(*addonapiv1alpha1.ManagedClusterAddOn)
-	if !ok {
-		return nil, fmt.Errorf("obj is supposed to be a ManagedClusterAddOn, but is %T", obj)
-	}
-
-	configNames := []string{}
-	for _, configReference := range addon.Status.ConfigReferences {
-		if configReference.Name == "" {
-			// bad config reference, ignore
-			continue
-		}
-
-		configNames = append(configNames, getIndex(configReference))
-	}
-
-	return configNames, nil
 }
 
 func (c *addonConfigController) sync(ctx context.Context, syncCtx factory.SyncContext, key string) error {
@@ -294,12 +273,4 @@ func (c *addonConfigController) patchConfigReferences(ctx context.Context, old, 
 		"status",
 	)
 	return err
-}
-
-func getIndex(config addonapiv1alpha1.ConfigReference) string {
-	if config.Namespace != "" {
-		return fmt.Sprintf("%s/%s/%s/%s", config.Group, config.Resource, config.Namespace, config.Name)
-	}
-
-	return fmt.Sprintf("%s/%s/%s", config.Group, config.Resource, config.Name)
 }

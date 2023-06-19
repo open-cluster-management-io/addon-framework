@@ -2,6 +2,9 @@ package agentdeploy
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -10,14 +13,13 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/agent"
+	"open-cluster-management.io/addon-framework/pkg/index"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakework "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	v1 "open-cluster-management.io/api/work/v1"
-	"testing"
-	"time"
 )
 
 var manifestAppliedCondition = metav1.Condition{
@@ -263,9 +265,9 @@ func TestHealthCheckReconcile(t *testing.T) {
 			workInformerFactory := workinformers.NewSharedInformerFactory(fakeWorkClient, 10*time.Minute)
 			err := workInformerFactory.Work().V1().ManifestWorks().Informer().AddIndexers(
 				cache.Indexers{
-					byAddon:           indexByAddon,
-					byHostedAddon:     indexByHostedAddon,
-					hookByHostedAddon: indexHookByHostedAddon,
+					index.ManifestWorkByAddon:           index.IndexManifestWorkByAddon,
+					index.ManifestWorkByHostedAddon:     index.IndexManifestWorkByHostedAddon,
+					index.ManifestWorkHookByHostedAddon: index.IndexManifestWorkHookByHostedAddon,
 				},
 			)
 
@@ -283,7 +285,7 @@ func TestHealthCheckReconcile(t *testing.T) {
 			}
 
 			healthCheckSyncer := healthCheckSyncer{
-				getWorkByAddon: addonDeploymentController.getWorksByAddonFn(byAddon),
+				getWorkByAddon: addonDeploymentController.getWorksByAddonFn(index.ManifestWorkByAddon),
 				agentAddon:     addonDeploymentController.agentAddons[c.testAddon.name],
 			}
 

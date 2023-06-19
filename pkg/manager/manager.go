@@ -72,6 +72,32 @@ func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
 		}),
 	)
 
+	// addonDeployController
+	err = workInformers.Work().V1().ManifestWorks().Informer().AddIndexers(
+		cache.Indexers{
+			index.ManifestWorkByAddon:           index.IndexManifestWorkByAddon,
+			index.ManifestWorkByHostedAddon:     index.IndexManifestWorkByHostedAddon,
+			index.ManifestWorkHookByHostedAddon: index.IndexManifestWorkHookByHostedAddon,
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	// addonConfigController
+	err = addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Informer().AddIndexers(
+		cache.Indexers{index.AddonByConfig: index.IndexAddonByConfig},
+	)
+	if err != nil {
+		return err
+	}
+	// managementAddonConfigController
+	err = addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns().Informer().AddIndexers(
+		cache.Indexers{index.ClusterManagementAddonByConfig: index.IndexClusterManagementAddonByConfig})
+	if err != nil {
+		return err
+	}
+
 	err = addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns().Informer().AddIndexers(
 		cache.Indexers{
 			index.ClusterManagementAddonByPlacement: index.IndexClusterManagementAddonByPlacement,
@@ -154,6 +180,7 @@ func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
 		addonInformerFactory,
 		clusterInformerFactory,
 		dynamicInformers,
+		workInformers,
 	)
 
 	go addonConfigController.Run(ctx, 2)

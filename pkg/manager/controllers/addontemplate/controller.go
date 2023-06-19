@@ -20,6 +20,7 @@ import (
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
+	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions"
 
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
@@ -41,6 +42,7 @@ type addonTemplateController struct {
 	addonInformers   addoninformers.SharedInformerFactory
 	clusterInformers clusterv1informers.SharedInformerFactory
 	dynamicInformers dynamicinformer.DynamicSharedInformerFactory
+	workInformers    workv1informers.SharedInformerFactory
 }
 
 // NewAddonTemplateController returns an instance of addonTemplateController
@@ -52,6 +54,7 @@ func NewAddonTemplateController(
 	addonInformers addoninformers.SharedInformerFactory,
 	clusterInformers clusterv1informers.SharedInformerFactory,
 	dynamicInformers dynamicinformer.DynamicSharedInformerFactory,
+	workInformers workv1informers.SharedInformerFactory,
 ) factory.Controller {
 	c := &addonTemplateController{
 		kubeConfig:       hubKubeconfig,
@@ -62,6 +65,7 @@ func NewAddonTemplateController(
 		addonInformers:   addonInformers,
 		clusterInformers: clusterInformers,
 		dynamicInformers: dynamicInformers,
+		workInformers:    workInformers,
 	}
 
 	return factory.New().WithInformersQueueKeysFunc(
@@ -126,6 +130,16 @@ func (c *addonTemplateController) startManager(
 			klog.Errorf("run controller for addon %s error: %v", addonName, err)
 			utilruntime.HandleError(err)
 		}
+
+		// use the parent context to start all shared informers, otherwise once the context is cancelled,
+		// the informers will stop and all other shared go routines will be impacted.
+		c.workInformers.Start(pctx.Done())
+		c.addonInformers.Start(pctx.Done())
+		c.clusterInformers.Start(pctx.Done())
+		c.dynamicInformers.Start(pctx.Done())
+
+		<-ctx.Done()
+		klog.Infof("Addon %s Manager stopped", addonName)
 	}()
 	return stopFunc
 }
@@ -170,15 +184,12 @@ func (c *addonTemplateController) runController(
 		return err
 	}
 
-	err = mgr.StartWithInformers(ctx, kubeInformers, c.addonInformers, c.clusterInformers, c.dynamicInformers)
+	err = mgr.StartWithInformers(ctx, kubeInformers, c.workInformers, c.addonInformers, c.clusterInformers, c.dynamicInformers)
 	if err != nil {
 		return err
 	}
 
 	kubeInformers.Start(ctx.Done())
 
-	<-ctx.Done()
-
-	klog.Infof("Addon %s Manager stopped", addonName)
 	return nil
 }
