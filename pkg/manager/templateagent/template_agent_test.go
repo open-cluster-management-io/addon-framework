@@ -162,71 +162,71 @@ func TestAddonTemplateAgent_Manifests(t *testing.T) {
 	if len(objects) != 4 {
 		t.Errorf("expected 4 objects, but got %v", len(objects))
 	}
-	for _, o := range objects {
-		switch object := o.(type) {
-		case *appsv1.Deployment:
 
-			nodeSelector := object.Spec.Template.Spec.NodeSelector
-			expectedNodeSelector := map[string]string{"host": "ssd"}
-			if !equality.Semantic.DeepEqual(nodeSelector, expectedNodeSelector) {
-				t.Errorf("unexpected nodeSelector %v", nodeSelector)
-			}
+	object, ok := objects[0].(*appsv1.Deployment)
+	if !ok {
+		t.Errorf("expected object to be *appsv1.Deployment, but got %T", objects[0])
+	}
 
-			tolerations := object.Spec.Template.Spec.Tolerations
-			expectedTolerations := []corev1.Toleration{{Key: "foo", Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoExecute}}
-			if !equality.Semantic.DeepEqual(tolerations, expectedTolerations) {
-				t.Errorf("unexpected tolerations %v", tolerations)
-			}
+	nodeSelector := object.Spec.Template.Spec.NodeSelector
+	expectedNodeSelector := map[string]string{"host": "ssd"}
+	if !equality.Semantic.DeepEqual(nodeSelector, expectedNodeSelector) {
+		t.Errorf("unexpected nodeSelector %v", nodeSelector)
+	}
 
-			envs := object.Spec.Template.Spec.Containers[0].Env
-			expectedEnvs := []corev1.EnvVar{
-				{Name: "LOG_LEVEL", Value: "4"},
-				{Name: "HUB_KUBECONFIG", Value: "/managed/hub-kubeconfig/kubeconfig"},
-				{Name: "CLUSTER_NAME", Value: clusterName},
-				{Name: "INSTALL_NAMESPACE", Value: "open-cluster-management-agent-addon"},
-			}
-			if !equality.Semantic.DeepEqual(envs, expectedEnvs) {
-				t.Errorf("unexpected envs %v", envs)
-			}
+	tolerations := object.Spec.Template.Spec.Tolerations
+	expectedTolerations := []corev1.Toleration{{Key: "foo", Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoExecute}}
+	if !equality.Semantic.DeepEqual(tolerations, expectedTolerations) {
+		t.Errorf("unexpected tolerations %v", tolerations)
+	}
 
-			volumes := object.Spec.Template.Spec.Volumes
-			expectedVolumes := []corev1.Volume{
-				{
-					Name: "hub-kubeconfig",
-					VolumeSource: corev1.VolumeSource{
-						Secret: &corev1.SecretVolumeSource{
-							SecretName: "hello-hub-kubeconfig",
-						},
-					},
+	envs := object.Spec.Template.Spec.Containers[0].Env
+	expectedEnvs := []corev1.EnvVar{
+		{Name: "LOG_LEVEL", Value: "4"},
+		{Name: "HUB_KUBECONFIG", Value: "/managed/hub-kubeconfig/kubeconfig"},
+		{Name: "CLUSTER_NAME", Value: clusterName},
+		{Name: "INSTALL_NAMESPACE", Value: "open-cluster-management-agent-addon"},
+	}
+	if !equality.Semantic.DeepEqual(envs, expectedEnvs) {
+		t.Errorf("unexpected envs %v", envs)
+	}
+
+	volumes := object.Spec.Template.Spec.Volumes
+	expectedVolumes := []corev1.Volume{
+		{
+			Name: "hub-kubeconfig",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "hello-hub-kubeconfig",
 				},
-				{
-					Name: "cert-example-com-signer-name",
-					VolumeSource: corev1.VolumeSource{
-						Secret: &corev1.SecretVolumeSource{
-							SecretName: "hello-example.com-signer-name-client-cert",
-						},
-					},
+			},
+		},
+		{
+			Name: "cert-example-com-signer-name",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "hello-example.com-signer-name-client-cert",
 				},
-			}
+			},
+		},
+	}
 
-			if !equality.Semantic.DeepEqual(volumes, expectedVolumes) {
-				t.Errorf("expected volumes %v, but got: %v", expectedVolumes, volumes)
-			}
+	if !equality.Semantic.DeepEqual(volumes, expectedVolumes) {
+		t.Errorf("expected volumes %v, but got: %v", expectedVolumes, volumes)
+	}
 
-			volumeMounts := object.Spec.Template.Spec.Containers[0].VolumeMounts
-			expectedVolumeMounts := []corev1.VolumeMount{
-				{
-					Name:      "hub-kubeconfig",
-					MountPath: "/managed/hub-kubeconfig",
-				},
-				{
-					Name:      "cert-example-com-signer-name",
-					MountPath: "/managed/example.com-signer-name",
-				},
-			}
-			if !equality.Semantic.DeepEqual(volumeMounts, expectedVolumeMounts) {
-				t.Errorf("expected volumeMounts %v, but got: %v", expectedVolumeMounts, volumeMounts)
-			}
-		}
+	volumeMounts := object.Spec.Template.Spec.Containers[0].VolumeMounts
+	expectedVolumeMounts := []corev1.VolumeMount{
+		{
+			Name:      "hub-kubeconfig",
+			MountPath: "/managed/hub-kubeconfig",
+		},
+		{
+			Name:      "cert-example-com-signer-name",
+			MountPath: "/managed/example.com-signer-name",
+		},
+	}
+	if !equality.Semantic.DeepEqual(volumeMounts, expectedVolumeMounts) {
+		t.Errorf("expected volumeMounts %v, but got: %v", expectedVolumeMounts, volumeMounts)
 	}
 }

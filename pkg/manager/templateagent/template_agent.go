@@ -2,7 +2,6 @@ package templateagent
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/valyala/fasttemplate"
 	appsv1 "k8s.io/api/apps/v1"
@@ -125,28 +124,15 @@ func (a *CRDTemplateAgentAddon) renderObjects(
 	}
 	klog.V(4).Infof("presetValues %v\t configValues: %v\t privateValues: %v", presetValues, configValues, privateValues)
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	var gerr error
-	go func() {
-		defer wg.Done()
-
-		for _, manifest := range template.Spec.AgentSpec.Workload.Manifests {
-
-			t := fasttemplate.New(string(manifest.Raw), "{{", "}}")
-			manifestStr := t.ExecuteString(configValues)
-			klog.V(4).Infof("addon %s/%s render result: %v", addon.Namespace, addon.Name, manifestStr)
-			object := &unstructured.Unstructured{}
-			if err := object.UnmarshalJSON([]byte(manifestStr)); err != nil {
-				gerr = err
-				return
-			}
-			objects = append(objects, object)
+	for _, manifest := range template.Spec.AgentSpec.Workload.Manifests {
+		t := fasttemplate.New(string(manifest.Raw), "{{", "}}")
+		manifestStr := t.ExecuteString(configValues)
+		klog.V(4).Infof("addon %s/%s render result: %v", addon.Namespace, addon.Name, manifestStr)
+		object := &unstructured.Unstructured{}
+		if err := object.UnmarshalJSON([]byte(manifestStr)); err != nil {
+			return objects, err
 		}
-	}()
-	wg.Wait()
-	if gerr != nil {
-		return objects, gerr
+		objects = append(objects, object)
 	}
 
 	objects, err = a.decorateObjects(template, objects, presetValues, configValues, privateValues)
@@ -193,21 +179,16 @@ func (a *CRDTemplateAgentAddon) convertToDeployment(obj runtime.Object) (*appsv1
 
 	deployment := &appsv1.Deployment{}
 	uobj, ok := obj.(*unstructured.Unstructured)
-	if ok {
-		err := runtime.DefaultUnstructuredConverter.
-			FromUnstructured(uobj.Object, deployment)
-		if err != nil {
-			return nil, err
-		}
-		return deployment, nil
+	if !ok {
+		return deployment, fmt.Errorf("not unstructured object, %v", obj.GetObjectKind())
 	}
 
-	deployment, ok = obj.(*appsv1.Deployment)
-	if ok {
-		return deployment, nil
+	err := runtime.DefaultUnstructuredConverter.
+		FromUnstructured(uobj.Object, deployment)
+	if err != nil {
+		return nil, err
 	}
-
-	return nil, fmt.Errorf("not deployment object, %v", obj.GetObjectKind())
+	return deployment, nil
 }
 
 // GetDesiredAddOnTemplateByAddon returns the desired template of the addon

@@ -36,15 +36,18 @@ type addonTemplateController struct {
 	// The key is the name of the template type addon.
 	addonManagers map[string]context.CancelFunc
 
-	kubeConfig       *rest.Config
-	addonClient      addonv1alpha1client.Interface
-	kubeClient       kubernetes.Interface
-	cmaLister        addonlisterv1alpha1.ClusterManagementAddOnLister
-	addonInformers   addoninformers.SharedInformerFactory
-	clusterInformers clusterv1informers.SharedInformerFactory
-	dynamicInformers dynamicinformer.DynamicSharedInformerFactory
-	workInformers    workv1informers.SharedInformerFactory
+	kubeConfig        *rest.Config
+	addonClient       addonv1alpha1client.Interface
+	kubeClient        kubernetes.Interface
+	cmaLister         addonlisterv1alpha1.ClusterManagementAddOnLister
+	addonInformers    addoninformers.SharedInformerFactory
+	clusterInformers  clusterv1informers.SharedInformerFactory
+	dynamicInformers  dynamicinformer.DynamicSharedInformerFactory
+	workInformers     workv1informers.SharedInformerFactory
+	runControllerFunc runController
 }
+
+type runController func(ctx context.Context, addonName string) error
 
 // NewAddonTemplateController returns an instance of addonTemplateController
 func NewAddonTemplateController(
@@ -69,6 +72,8 @@ func NewAddonTemplateController(
 		workInformers:    workInformers,
 	}
 
+	// easy to mock in unit tests
+	c.runControllerFunc = c.runController
 	return factory.New().WithInformersQueueKeysFunc(
 		func(obj runtime.Object) []string {
 			key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
@@ -126,7 +131,7 @@ func (c *addonTemplateController) startManager(
 	addonName string) context.CancelFunc {
 	ctx, stopFunc := context.WithCancel(pctx)
 	go func() {
-		err := c.runController(ctx, addonName)
+		err := c.runControllerFunc(ctx, addonName)
 		if err != nil {
 			klog.Errorf("run controller for addon %s error: %v", addonName, err)
 			utilruntime.HandleError(err)
