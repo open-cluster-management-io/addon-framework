@@ -9,7 +9,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
 	rbacv1lister "k8s.io/client-go/listers/rbac/v1"
 	"k8s.io/klog/v2"
@@ -61,7 +60,7 @@ type CRDTemplateAgentAddon struct {
 
 // NewCRDTemplateAgentAddon creates a CRDTemplateAgentAddon instance
 func NewCRDTemplateAgentAddon(
-	addonName string,
+	addonName, agentName string,
 	hubKubeClient kubernetes.Interface,
 	addonClient addonv1alpha1client.Interface,
 	addonInformers addoninformers.SharedInformerFactory,
@@ -79,8 +78,7 @@ func NewCRDTemplateAgentAddon(
 		addonTemplateLister: addonInformers.Addon().V1alpha1().AddOnTemplates().Lister(),
 		rolebindingLister:   rolebindingLister,
 		addonName:           addonName,
-		// TODO: agentName should not be changed after restarting the agent
-		agentName: utilrand.String(5),
+		agentName:           agentName,
 	}
 
 	return a
@@ -90,7 +88,7 @@ func (a *CRDTemplateAgentAddon) Manifests(
 	cluster *clusterv1.ManagedCluster,
 	addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
 
-	template, err := GetDesiredAddOnTemplate(a.addonTemplateLister, addon)
+	template, err := a.GetDesiredAddOnTemplateByAddon(addon)
 	if err != nil {
 		return nil, err
 	}
@@ -108,16 +106,10 @@ func (a *CRDTemplateAgentAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 		// set supportedConfigGVRs to empty to disable the framework to start duplicated config related controllers
 		SupportedConfigGVRs: []schema.GroupVersionResource{},
 		Registration: &agent.RegistrationOption{
-			CSRConfigurations: TemplateCSRConfigurationsFunc(a.addonName, a.agentName,
-				DefaultDesiredAddonTemplateGetter(a.addonLister, a.addonTemplateLister)),
-			PermissionConfig: TemplatePermissionConfigFunc(a.addonName,
-				DefaultDesiredAddonTemplateGetter(a.addonLister, a.addonTemplateLister),
-				a.hubKubeClient, a.rolebindingLister),
-			CSRApproveCheck: TemplateCSRApproveCheckFunc(a.addonName, a.agentName,
-				DefaultDesiredAddonTemplateGetter(a.addonLister, a.addonTemplateLister)),
-			CSRSign: TemplateCSRSignFunc(a.addonName, a.agentName,
-				DefaultDesiredAddonTemplateGetter(a.addonLister, a.addonTemplateLister),
-				a.hubKubeClient),
+			CSRConfigurations: a.TemplateCSRConfigurationsFunc(),
+			PermissionConfig:  a.TemplatePermissionConfigFunc(),
+			CSRApproveCheck:   a.TemplateCSRApproveCheckFunc(),
+			CSRSign:           a.TemplateCSRSignFunc(),
 		},
 	}
 }
@@ -216,4 +208,27 @@ func (a *CRDTemplateAgentAddon) convertToDeployment(obj runtime.Object) (*appsv1
 	}
 
 	return nil, fmt.Errorf("not deployment object, %v", obj.GetObjectKind())
+}
+
+// GetDesiredAddOnTemplateByAddon returns the desired template of the addon
+func (a *CRDTemplateAgentAddon) GetDesiredAddOnTemplateByAddon(
+	addon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.AddOnTemplate, error) {
+	ok, templateRef := AddonTemplateConfigRef(addon.Status.ConfigReferences)
+	if !ok {
+		klog.V(4).Infof("Addon %s template config in status is empty", addon.Name)
+		return nil, nil
+	}
+
+	desiredTemplate := templateRef.DesiredConfig
+	if desiredTemplate == nil || desiredTemplate.SpecHash == "" {
+		klog.Infof("Addon %s template spec hash is empty", addon.Name)
+		return nil, fmt.Errorf("addon %s template desired spec hash is empty", addon.Name)
+	}
+
+	template, err := a.addonTemplateLister.Get(desiredTemplate.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	return template.DeepCopy(), nil
 }

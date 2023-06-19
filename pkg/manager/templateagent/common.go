@@ -1,40 +1,12 @@
 package templateagent
 
 import (
-	"fmt"
-
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
 
 	"open-cluster-management.io/addon-framework/pkg/utils"
 )
-
-// GetDesiredAddOnTemplate returns the desired template of the addon
-func GetDesiredAddOnTemplate(
-	atLister addonlisterv1alpha1.AddOnTemplateLister,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.AddOnTemplate, error) {
-	ok, templateRef := AddonTemplateConfigRef(addon.Status.ConfigReferences)
-	if !ok {
-		klog.V(4).Infof("Addon %s template config in status is empty", addon.Name)
-		return nil, nil
-	}
-
-	desiredTemplate := templateRef.DesiredConfig
-	if desiredTemplate == nil || desiredTemplate.SpecHash == "" {
-		klog.Infof("Addon %s template spec hash is empty", addon.Name)
-		return nil, fmt.Errorf("addon %s template desired spec hash is empty", addon.Name)
-	}
-
-	template, err := atLister.Get(desiredTemplate.Name)
-	if err != nil {
-		return nil, err
-	}
-
-	return template.DeepCopy(), nil
-}
 
 // AddonTemplateConfigRef return the first addon template config
 func AddonTemplateConfigRef(

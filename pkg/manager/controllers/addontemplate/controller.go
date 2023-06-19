@@ -7,6 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	kubeinformers "k8s.io/client-go/informers"
@@ -168,6 +169,8 @@ func (c *addonTemplateController) runController(
 
 	agentAddon := templateagent.NewCRDTemplateAgentAddon(
 		addonName,
+		// TODO: agentName should not be changed after restarting the agent
+		utilrand.String(5),
 		c.kubeClient,
 		c.addonClient,
 		c.addonInformers,

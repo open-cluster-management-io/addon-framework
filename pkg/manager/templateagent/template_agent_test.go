@@ -140,6 +140,7 @@ func TestAddonTemplateAgent_Manifests(t *testing.T) {
 
 	agentAddon := NewCRDTemplateAgentAddon(
 		addonName,
+		"test-agent",
 		hubKubeClient,
 		addonClient,
 		addonInformerFactory,

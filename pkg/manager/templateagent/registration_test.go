@@ -130,10 +130,8 @@ func TestTemplateCSRConfigurationsFunc(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		f := TemplateCSRConfigurationsFunc(c.addon.Name, c.agentName, DefaultDesiredAddonTemplateGetter(
-			addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
-			addonInformerFactory.Addon().V1alpha1().AddOnTemplates().Lister(),
-		))
+		agent := NewCRDTemplateAgentAddon(c.addon.Name, c.agentName, nil, addonClient, addonInformerFactory, nil, nil)
+		f := agent.TemplateCSRConfigurationsFunc()
 		registrationConfigs := f(c.cluster)
 		if !equality.Semantic.DeepEqual(registrationConfigs, c.expectedConfigs) {
 			t.Errorf("expected registrationConfigs %v, but got %v", c.expectedConfigs, registrationConfigs)
@@ -240,10 +238,8 @@ func TestTemplateCSRApproveCheckFunc(t *testing.T) {
 		if err := atStore.Add(c.template); err != nil {
 			t.Fatal(err)
 		}
-		f := TemplateCSRApproveCheckFunc(c.addon.Name, c.agentName, DefaultDesiredAddonTemplateGetter(
-			addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
-			addonInformerFactory.Addon().V1alpha1().AddOnTemplates().Lister(),
-		))
+		agent := NewCRDTemplateAgentAddon(c.addon.Name, c.agentName, nil, addonClient, addonInformerFactory, nil, nil)
+		f := agent.TemplateCSRApproveCheckFunc()
 		approve := f(c.cluster, c.addon, c.csr)
 		if approve != c.expectedApprove {
 			t.Errorf("expected approve result %v, but got %v", c.expectedApprove, approve)
@@ -346,10 +342,8 @@ func TestTemplateCSRSignFunc(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		f := TemplateCSRSignFunc(c.addon.Name, c.agentName, DefaultDesiredAddonTemplateGetter(
-			addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
-			addonInformerFactory.Addon().V1alpha1().AddOnTemplates().Lister(),
-		), hubKubeClient)
+		agent := NewCRDTemplateAgentAddon(c.addon.Name, c.agentName, hubKubeClient, addonClient, addonInformerFactory, nil, nil)
+		f := agent.TemplateCSRSignFunc()
 		cert := f(c.csr)
 		if !bytes.Equal(cert, c.expectedCert) {
 			t.Errorf("expected cert %v, but got %v", c.expectedCert, cert)
@@ -601,10 +595,10 @@ func TestTemplatePermissionConfigFunc(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		f := TemplatePermissionConfigFunc(c.addon.Name, DefaultDesiredAddonTemplateGetter(
-			addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
-			addonInformerFactory.Addon().V1alpha1().AddOnTemplates().Lister(),
-		), hubKubeClient, kubeInformers.Rbac().V1().RoleBindings().Lister())
+
+		agent := NewCRDTemplateAgentAddon(c.addon.Name, c.agentName, hubKubeClient, addonClient, addonInformerFactory,
+			kubeInformers.Rbac().V1().RoleBindings().Lister(), nil)
+		f := agent.TemplatePermissionConfigFunc()
 		err := f(c.cluster, c.addon)
 		if err != c.expectedErr {
 			t.Errorf("expected registrationConfigs %v, but got %v", c.expectedErr, err)

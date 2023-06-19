@@ -16,10 +16,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
-	rbacv1lister "k8s.io/client-go/listers/rbac/v1"
 	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -34,38 +32,26 @@ const (
 	AddonTemplateLabelKey = "open-cluster-management.io/addon-template-name"
 )
 
-// AddonTemplateGetterFunc returns the desired addon template for the addon, if addon is nil, the clusterName and
-// addonName should not be empty
-type AddonTemplateGetterFunc func(addon *addonapiv1alpha1.ManagedClusterAddOn, clusterName, addonName string) (*addonapiv1alpha1.AddOnTemplate, error)
+func (a *CRDTemplateAgentAddon) GetDesiredAddOnTemplate(addon *addonapiv1alpha1.ManagedClusterAddOn,
+	clusterName, addonName string) (*addonapiv1alpha1.AddOnTemplate, error) {
 
-// DefaultDesiredAddonTemplateGetter returns a function that returns the desired addon template
-// if addon is nil, it will get the addon from cache, then get the desired template by addon status
-func DefaultDesiredAddonTemplateGetter(
-	mcaLister addonlisterv1alpha1.ManagedClusterAddOnLister,
-	atLister addonlisterv1alpha1.AddOnTemplateLister) AddonTemplateGetterFunc {
-	return func(addon *addonapiv1alpha1.ManagedClusterAddOn, clusterName, addonName string) (*addonapiv1alpha1.AddOnTemplate, error) {
-
-		if addon == nil {
-			var err error
-			addon, err = mcaLister.ManagedClusterAddOns(clusterName).Get(addonName)
-			if err != nil {
-				return nil, err
-			}
+	if addon == nil {
+		var err error
+		addon, err = a.addonLister.ManagedClusterAddOns(clusterName).Get(addonName)
+		if err != nil {
+			return nil, err
 		}
-
-		return GetDesiredAddOnTemplate(atLister, addon)
 	}
+
+	return a.GetDesiredAddOnTemplateByAddon(addon)
 }
 
-func TemplateCSRConfigurationsFunc(
-	addonName, agentName string,
-	templateGetter AddonTemplateGetterFunc,
-) func(cluster *clusterv1.ManagedCluster) []addonapiv1alpha1.RegistrationConfig {
+func (a *CRDTemplateAgentAddon) TemplateCSRConfigurationsFunc() func(cluster *clusterv1.ManagedCluster) []addonapiv1alpha1.RegistrationConfig {
 
 	return func(cluster *clusterv1.ManagedCluster) []addonapiv1alpha1.RegistrationConfig {
-		template, err := templateGetter(nil, cluster.Name, addonName)
+		template, err := a.GetDesiredAddOnTemplate(nil, cluster.Name, a.addonName)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("failed to get addon %s template: %v", addonName, err))
+			utilruntime.HandleError(fmt.Errorf("failed to get addon %s template: %v", a.addonName, err))
 			return nil
 		}
 		if template == nil {
@@ -86,7 +72,7 @@ func TemplateCSRConfigurationsFunc(
 			switch registration.Type {
 			case addonapiv1alpha1.RegistrationTypeKubeClient:
 				if !contain(registrationConfigs, certificatesv1.KubeAPIServerClientSignerName) {
-					configs := agent.KubeClientSignerConfigurations(addonName, agentName)(cluster)
+					configs := agent.KubeClientSignerConfigurations(a.addonName, a.agentName)(cluster)
 					registrationConfigs = append(registrationConfigs, configs...)
 				}
 
@@ -96,7 +82,7 @@ func TemplateCSRConfigurationsFunc(
 				}
 				if !contain(registrationConfigs, registration.CustomSigner.SignerName) {
 					configs := CustomSignerConfigurations(
-						addonName, agentName, registration.CustomSigner)(cluster)
+						a.addonName, a.agentName, registration.CustomSigner)(cluster)
 					registrationConfigs = append(registrationConfigs, configs...)
 				}
 
@@ -135,17 +121,14 @@ func CustomSignerConfigurations(addonName, agentName string,
 	}
 }
 
-func TemplateCSRApproveCheckFunc(
-	addonName, agentName string,
-	templateGetter AddonTemplateGetterFunc,
-) agent.CSRApproveFunc {
+func (a *CRDTemplateAgentAddon) TemplateCSRApproveCheckFunc() agent.CSRApproveFunc {
 
 	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn,
 		csr *certificatesv1.CertificateSigningRequest) bool {
 
-		template, err := templateGetter(addon, cluster.Name, addonName)
+		template, err := a.GetDesiredAddOnTemplate(addon, cluster.Name, a.addonName)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("failed to get addon %s template: %v", addonName, err))
+			utilruntime.HandleError(fmt.Errorf("failed to get addon %s template: %v", a.addonName, err))
 			return false
 		}
 		if template == nil {
@@ -157,7 +140,7 @@ func TemplateCSRApproveCheckFunc(
 			case addonapiv1alpha1.RegistrationTypeKubeClient:
 
 				if csr.Spec.SignerName == certificatesv1.KubeAPIServerClientSignerName {
-					return KubeClientCSRApprover(agentName)(cluster, addon, csr)
+					return KubeClientCSRApprover(a.agentName)(cluster, addon, csr)
 				}
 
 			case addonapiv1alpha1.RegistrationTypeCustomSigner:
@@ -165,7 +148,7 @@ func TemplateCSRApproveCheckFunc(
 					continue
 				}
 				if csr.Spec.SignerName == registration.CustomSigner.SignerName {
-					return CustomerSignerCSRApprover(addonName)(cluster, addon, csr)
+					return CustomerSignerCSRApprover(a.addonName)(cluster, addon, csr)
 				}
 
 			default:
@@ -205,11 +188,7 @@ func CustomerSignerCSRApprover(agentName string) agent.CSRApproveFunc {
 	}
 }
 
-func TemplateCSRSignFunc(
-	addonName, agentName string,
-	templateGetter AddonTemplateGetterFunc,
-	hubKubeClient kubernetes.Interface,
-) agent.CSRSignerFunc {
+func (a *CRDTemplateAgentAddon) TemplateCSRSignFunc() agent.CSRSignerFunc {
 
 	return func(csr *certificatesv1.CertificateSigningRequest) []byte {
 		// TODO: consider to change the agent.CSRSignerFun to accept parameter addon
@@ -218,9 +197,9 @@ func TemplateCSRSignFunc(
 		}
 
 		clusterName := getClusterName(csr.Spec.Username)
-		template, err := templateGetter(nil, clusterName, addonName)
+		template, err := a.GetDesiredAddOnTemplate(nil, clusterName, a.addonName)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("failed to get addon %s template: %v", addonName, err))
+			utilruntime.HandleError(fmt.Errorf("failed to get addon %s template: %v", a.addonName, err))
 			return nil
 		}
 		if template == nil {
@@ -237,7 +216,7 @@ func TemplateCSRSignFunc(
 					continue
 				}
 				if csr.Spec.SignerName == registration.CustomSigner.SignerName {
-					return CustomSignerWithExpiry(hubKubeClient, registration.CustomSigner, 24*time.Hour)(csr)
+					return CustomSignerWithExpiry(a.hubKubeClient, registration.CustomSigner, 24*time.Hour)(csr)
 				}
 
 			default:
@@ -305,15 +284,10 @@ func extractCAdata(caCertData, caKeyData []byte) ([]byte, []byte, error) {
 // the returned func will create a rolebinding to bind the clusterRole/role which is
 // specified by the user, so the user is required to make sure the existence of the
 // clusterRole/role
-func TemplatePermissionConfigFunc(
-	addonName string,
-	templateGetter AddonTemplateGetterFunc,
-	hubKubeClient kubernetes.Interface,
-	rolebindingLister rbacv1lister.RoleBindingLister,
-) agent.PermissionConfigFunc {
+func (a *CRDTemplateAgentAddon) TemplatePermissionConfigFunc() agent.PermissionConfigFunc {
 
 	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
-		template, err := templateGetter(addon, cluster.Name, addonName)
+		template, err := a.GetDesiredAddOnTemplate(addon, cluster.Name, a.addonName)
 		if err != nil {
 			return err
 		}
@@ -329,7 +303,7 @@ func TemplatePermissionConfigFunc(
 					continue
 				}
 
-				err := createKubeClientPermissions(template.Name, kcrc, cluster, addon, hubKubeClient, rolebindingLister)
+				err := a.createKubeClientPermissions(template.Name, kcrc, cluster, addon)
 				if err != nil {
 					return err
 				}
@@ -347,13 +321,12 @@ func TemplatePermissionConfigFunc(
 	}
 }
 
-func createKubeClientPermissions(
+func (a *CRDTemplateAgentAddon) createKubeClientPermissions(
 	templateName string,
 	kcrc *addonapiv1alpha1.KubeClientRegistrationConfig,
 	cluster *clusterv1.ManagedCluster,
 	addon *addonapiv1alpha1.ManagedClusterAddOn,
-	hubKubeClient kubernetes.Interface,
-	rolebindingLister rbacv1lister.RoleBindingLister) error {
+) error {
 
 	for _, pc := range kcrc.HubPermissions {
 		switch pc.Type {
@@ -368,7 +341,7 @@ func createKubeClientPermissions(
 				Name:       addon.Name,
 				UID:        addon.UID,
 			}
-			err := createPermissionBinding(hubKubeClient, rolebindingLister, templateName,
+			err := a.createPermissionBinding(templateName,
 				cluster.Name, addon.Name, cluster.Name, pc.RoleRef, &owner)
 			if err != nil {
 				return err
@@ -379,7 +352,7 @@ func createKubeClientPermissions(
 			}
 			// set owner reference nil since the rolebinding has different namespace with the ManagedClusterAddon
 			// TODO: cleanup the rolebinding when the addon is deleted
-			err := createPermissionBinding(hubKubeClient, rolebindingLister, templateName,
+			err := a.createPermissionBinding(templateName,
 				cluster.Name, addon.Name, pc.SingleNamespace.Namespace, pc.RoleRef, nil)
 			if err != nil {
 				return err
@@ -389,8 +362,8 @@ func createKubeClientPermissions(
 	return nil
 }
 
-func createPermissionBinding(hubKubeClient kubernetes.Interface, rolebindingLister rbacv1lister.RoleBindingLister,
-	templateName string, clusterName, addonName, namespace string, roleRef rbacv1.RoleRef, owner *metav1.OwnerReference) error {
+func (a *CRDTemplateAgentAddon) createPermissionBinding(templateName, clusterName, addonName, namespace string,
+	roleRef rbacv1.RoleRef, owner *metav1.OwnerReference) error {
 	// TODO: confirm the group
 	groups := agent.DefaultGroups(clusterName, addonName)
 	subject := []rbacv1.Subject{}
@@ -415,10 +388,11 @@ func createPermissionBinding(hubKubeClient kubernetes.Interface, rolebindingList
 	if owner != nil {
 		binding.OwnerReferences = []metav1.OwnerReference{*owner}
 	}
-	_, err := rolebindingLister.RoleBindings(namespace).Get(binding.Name)
+	_, err := a.rolebindingLister.RoleBindings(namespace).Get(binding.Name)
 	switch {
 	case apierrors.IsNotFound(err):
-		_, createErr := hubKubeClient.RbacV1().RoleBindings(namespace).Create(context.TODO(), binding, metav1.CreateOptions{})
+		_, createErr := a.hubKubeClient.RbacV1().RoleBindings(namespace).Create(
+			context.TODO(), binding, metav1.CreateOptions{})
 		if createErr != nil && !apierrors.IsAlreadyExists(createErr) {
 			return createErr
 		}
