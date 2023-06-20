@@ -193,13 +193,14 @@ func (a *CRDTemplateAgentAddon) TemplateCSRSignFunc() agent.CSRSignerFunc {
 	return func(csr *certificatesv1.CertificateSigningRequest) []byte {
 		// TODO: consider to change the agent.CSRSignerFun to accept parameter addon
 		getClusterName := func(userName string) string {
-			return csr.Labels[addonapiv1alpha1.AddonNamespaceLabelKey]
+			return csr.Labels[clusterv1.ClusterNameLabelKey]
 		}
 
 		clusterName := getClusterName(csr.Spec.Username)
 		template, err := a.GetDesiredAddOnTemplate(nil, clusterName, a.addonName)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("failed to get addon %s template: %v", a.addonName, err))
+			utilruntime.HandleError(fmt.Errorf("failed to get template for addon %s in cluster %s: %v",
+				a.addonName, clusterName, err))
 			return nil
 		}
 		if template == nil {
@@ -251,7 +252,7 @@ func CustomSignerWithExpiry(
 		}
 
 		caData, caKey, err := extractCAdata(caSecret.Data[TLSCACert], caSecret.Data[TLSCAKey])
-		if customSignerConfig == nil {
+		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("get ca %s/%s data failed, %v",
 				customSignerConfig.SigningCA.Namespace, customSignerConfig.SigningCA.Name, err))
 			return nil
@@ -262,11 +263,17 @@ func CustomSignerWithExpiry(
 
 func extractCAdata(caCertData, caKeyData []byte) ([]byte, []byte, error) {
 	certBlock, _ := pem.Decode(caCertData)
+	if certBlock == nil {
+		return nil, nil, errors.New("failed to decode ca cert")
+	}
 	caCert, err := x509.ParseCertificate(certBlock.Bytes)
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "failed to parse ca certificate")
 	}
 	keyBlock, _ := pem.Decode(caKeyData)
+	if keyBlock == nil {
+		return nil, nil, errors.New("failed to decode ca key")
+	}
 	caKey, err := x509.ParsePKCS8PrivateKey(keyBlock.Bytes)
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "failed to parse ca key")
@@ -390,6 +397,10 @@ func (a *CRDTemplateAgentAddon) createPermissionBinding(templateName, clusterNam
 	}
 	_, err := a.rolebindingLister.RoleBindings(namespace).Get(binding.Name)
 	switch {
+	case err == nil:
+		// TODO: update the rolebinding if it is not the same
+		klog.Infof("rolebinding %s already exists", binding.Name)
+		return nil
 	case apierrors.IsNotFound(err):
 		_, createErr := a.hubKubeClient.RbacV1().RoleBindings(namespace).Create(
 			context.TODO(), binding, metav1.CreateOptions{})
@@ -398,10 +409,7 @@ func (a *CRDTemplateAgentAddon) createPermissionBinding(templateName, clusterNam
 		}
 	case err != nil:
 		return err
-	default:
-		klog.Infof("rolebinding %s already exists", binding.Name)
 	}
 
-	// TODO: update the rolebinding if it is not the same
 	return nil
 }
