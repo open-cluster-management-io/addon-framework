@@ -18,8 +18,6 @@ import (
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned"
 	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions"
 
-	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/addonconfig"
-	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/managementaddonconfig"
 	"open-cluster-management.io/addon-framework/pkg/index"
 	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonconfiguration"
 	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonmanagement"
@@ -116,22 +114,6 @@ func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
 
 	dynamicInformers := dynamicinformer.NewDynamicSharedInformerFactory(dynamicClient, 10*time.Minute)
 
-	addonConfigController := addonconfig.NewAddonConfigController(
-		addonClient,
-		addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
-		addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns(),
-		dynamicInformers,
-		utils.BuiltInAddOnConfigGVRs,
-		utils.ManagedByAddonManager,
-	)
-	managementAddonConfigController := managementaddonconfig.NewManagementAddonConfigController(
-		addonClient,
-		addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns(),
-		dynamicInformers,
-		utils.BuiltInAddOnConfigGVRs,
-		utils.ManagedByAddonManager,
-	)
-
 	addonManagementController := addonmanagement.NewAddonManagementController(
 		addonClient,
 		addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
@@ -183,8 +165,6 @@ func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
 		workInformers,
 	)
 
-	go addonConfigController.Run(ctx, 2)
-	go managementAddonConfigController.Run(ctx, 2)
 	go addonManagementController.Run(ctx, 2)
 	go addonConfigurationController.Run(ctx, 2)
 	go addonOwnerController.Run(ctx, 2)

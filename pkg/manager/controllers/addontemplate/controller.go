@@ -90,6 +90,7 @@ func (c *addonTemplateController) stopUnusedManagers(
 	stopFunc, ok := c.addonManagers[addOnName]
 	if ok {
 		stopFunc()
+		klog.Infof("Stop the manager for addon %s", addOnName)
 	}
 }
 

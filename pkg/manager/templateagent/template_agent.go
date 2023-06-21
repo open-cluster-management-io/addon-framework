@@ -19,6 +19,7 @@ import (
 
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/agent"
+	"open-cluster-management.io/addon-framework/pkg/utils"
 )
 
 const (
@@ -98,12 +99,16 @@ func (a *CRDTemplateAgentAddon) Manifests(
 }
 
 func (a *CRDTemplateAgentAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
+	// TODO: consider a new way for developers to define their supported config GVRs
+	supportedConfigGVRs := []schema.GroupVersionResource{}
+	for gvr := range utils.BuiltInAddOnConfigGVRs {
+		supportedConfigGVRs = append(supportedConfigGVRs, gvr)
+	}
 	return agent.AgentAddonOptions{
-		AddonName:       a.addonName,
-		InstallStrategy: nil,
-		HealthProber:    nil,
-		// set supportedConfigGVRs to empty to disable the framework to start duplicated config related controllers
-		SupportedConfigGVRs: []schema.GroupVersionResource{},
+		AddonName:           a.addonName,
+		InstallStrategy:     nil,
+		HealthProber:        nil,
+		SupportedConfigGVRs: supportedConfigGVRs,
 		Registration: &agent.RegistrationOption{
 			CSRConfigurations: a.TemplateCSRConfigurationsFunc(),
 			PermissionConfig:  a.TemplatePermissionConfigFunc(),

@@ -273,18 +273,14 @@ func (a *addonManager) StartWithInformers(ctx context.Context,
 			addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
 			addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
 			dynamicInformers,
-			utils.FilterOutTheBuiltInAddOnConfigGVRs(a.addonConfigs),
-			// even though the MCA has the managed-by-addon-manager label, we still need to handle the GVRs that
-			// is not supported by the addon-manager(not the built-in addonConfig GVRs)
+			a.addonConfigs,
 			utils.FilterByAddonName(a.addonAgents),
 		)
 		managementAddonConfigController = managementaddonconfig.NewManagementAddonConfigController(
 			addonClient,
 			addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
 			dynamicInformers,
-			utils.FilterOutTheBuiltInAddOnConfigGVRs(a.addonConfigs),
-			// even though the MCA has the managed-by-addon-manager label, we still need to handle the GVRs that
-			// is not supported by the addon-manager(not the built-in addonConfig GVRs)
+			a.addonConfigs,
 			utils.FilterByAddonName(a.addonAgents),
 		)
 
