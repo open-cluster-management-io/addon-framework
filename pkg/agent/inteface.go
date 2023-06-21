@@ -178,7 +178,7 @@ type ProbeField struct {
 type HealthProberType string
 
 const (
-	// HealthProberTypeLease indicates the healthiness status will be refreshed, which is
+	// HealthProberTypeNone indicates the healthiness status will be refreshed, which is
 	// leaving the healthiness of ManagedClusterAddon to an empty string.
 	HealthProberTypeNone HealthProberType = "None"
 	// HealthProberTypeLease indicates the healthiness of the addon is connected with the

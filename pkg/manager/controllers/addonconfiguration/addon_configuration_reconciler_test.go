@@ -568,12 +568,11 @@ func TestAddonConfigReconcile(t *testing.T) {
 			}
 
 			controller := &addonConfigurationController{
-				addonClient:                   fakeAddonClient,
-				placementDecisionLister:       clusterInformers.Cluster().V1beta1().PlacementDecisions().Lister(),
-				placementLister:               clusterInformers.Cluster().V1beta1().Placements().Lister(),
-				clusterManagementAddonLister:  addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
-				clusterManagementAddonIndexer: addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Informer().GetIndexer(),
-				managedClusterAddonIndexer:    addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetIndexer(),
+				addonClient:                  fakeAddonClient,
+				placementDecisionLister:      clusterInformers.Cluster().V1beta1().PlacementDecisions().Lister(),
+				placementLister:              clusterInformers.Cluster().V1beta1().Placements().Lister(),
+				clusterManagementAddonLister: addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
+				managedClusterAddonIndexer:   addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetIndexer(),
 			}
 
 			reconcile := &managedClusterAddonConfigurationReconciler{

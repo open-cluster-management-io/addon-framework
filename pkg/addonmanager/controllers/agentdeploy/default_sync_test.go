@@ -26,6 +26,7 @@ import (
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/agent"
+	"open-cluster-management.io/addon-framework/pkg/index"
 )
 
 var registrationAppliedCondition = metav1.Condition{
@@ -255,9 +256,9 @@ func TestDefaultReconcile(t *testing.T) {
 
 			err := workInformerFactory.Work().V1().ManifestWorks().Informer().AddIndexers(
 				cache.Indexers{
-					byAddon:           indexByAddon,
-					byHostedAddon:     indexByHostedAddon,
-					hookByHostedAddon: indexHookByHostedAddon,
+					index.ManifestWorkByAddon:           index.IndexManifestWorkByAddon,
+					index.ManifestWorkByHostedAddon:     index.IndexManifestWorkByHostedAddon,
+					index.ManifestWorkHookByHostedAddon: index.IndexManifestWorkHookByHostedAddon,
 				},
 			)
 

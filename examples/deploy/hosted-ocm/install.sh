@@ -77,13 +77,14 @@ ${KUBECTL} --context="${cluster_context}" -n kube-system scale --replicas=1 depl
 echo "###### loading image: ${EXAMPLE_IMAGE_NAME}"
 ${KIND} load docker-image ${EXAMPLE_IMAGE_NAME} --name ${MANAGED_CLUSTER_NAME}
 
-echo "###### deploy registration-operator"
-rm -rf "$WORK_DIR/registration-operator"
-git clone https://github.com/open-cluster-management-io/registration-operator.git "$WORK_DIR/registration-operator"
-${KUBECTL} apply -k "$WORK_DIR/registration-operator/deploy/cluster-manager/config/manifests"
-${KUBECTL} apply -k "$WORK_DIR/registration-operator/deploy/cluster-manager/config/samples"
-${KUBECTL} apply -k "$WORK_DIR/registration-operator/deploy/klusterlet/config/manifests"
-rm -rf "$WORK_DIR/registration-operator"
+echo "###### deploy operators"
+rm -rf "$WORK_DIR/_repo_ocm"
+git clone --depth 1 --branch main https://github.com/open-cluster-management-io/ocm.git "$WORK_DIR/_repo_ocm"
+
+${KUBECTL} apply -k "$WORK_DIR/_repo_ocm/deploy/cluster-manager/config/manifests"
+${KUBECTL} apply -k "$WORK_DIR/_repo_ocm/deploy/cluster-manager/config/samples"
+${KUBECTL} apply -k "$WORK_DIR/_repo_ocm/deploy/klusterlet/config/manifests"
+rm -rf "$WORK_DIR/_repo_ocm"
 
 ${KUBECTL} get ns open-cluster-management-agent || ${KUBECTL} create ns open-cluster-management-agent
 

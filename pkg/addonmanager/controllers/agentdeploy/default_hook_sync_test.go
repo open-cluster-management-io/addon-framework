@@ -16,6 +16,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
+	"open-cluster-management.io/addon-framework/pkg/index"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
@@ -287,9 +288,9 @@ func TestDefaultHookReconcile(t *testing.T) {
 
 			err := workInformerFactory.Work().V1().ManifestWorks().Informer().AddIndexers(
 				cache.Indexers{
-					byAddon:           indexByAddon,
-					byHostedAddon:     indexByHostedAddon,
-					hookByHostedAddon: indexHookByHostedAddon,
+					index.ManifestWorkByAddon:           index.IndexManifestWorkByAddon,
+					index.ManifestWorkByHostedAddon:     index.IndexManifestWorkByHostedAddon,
+					index.ManifestWorkHookByHostedAddon: index.IndexManifestWorkHookByHostedAddon,
 				},
 			)
 

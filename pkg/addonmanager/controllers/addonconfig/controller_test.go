@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -15,6 +16,7 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
+	"open-cluster-management.io/addon-framework/pkg/index"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
@@ -363,6 +365,14 @@ func TestSync(t *testing.T) {
 				}
 			}
 
+			cmaStore := addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Informer().GetStore()
+			if err := cmaStore.Add(&addonapiv1alpha1.ClusterManagementAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+				},
+			}); err != nil {
+				t.Fatal(err)
+			}
 			fakeDynamicClient := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
 			configInformerFactory := dynamicinformer.NewDynamicSharedInformerFactory(fakeDynamicClient, 0)
 			configInformer := configInformerFactory.ForResource(fakeGVR)
@@ -376,9 +386,12 @@ func TestSync(t *testing.T) {
 			syncContext := addontesting.NewFakeSyncContext(t)
 
 			ctrl := &addonConfigController{
-				addonClient:   fakeAddonClient,
-				addonLister:   addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
-				configListers: map[schema.GroupResource]dynamiclister.Lister{},
+				addonClient:                  fakeAddonClient,
+				addonLister:                  addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
+				clusterManagementAddonLister: addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
+				configListers:                map[schema.GroupResource]dynamiclister.Lister{},
+				addonFilterFunc:              func(obj interface{}) bool { return true },
+				configGVRs:                   map[schema.GroupVersionResource]bool{fakeGVR: true},
 			}
 
 			ctrl.buildConfigInformers(configInformerFactory, map[schema.GroupVersionResource]bool{fakeGVR: true})
@@ -551,7 +564,7 @@ func TestEnqueue(t *testing.T) {
 				queue:        addontesting.NewFakeSyncContext(t).Queue(),
 			}
 
-			if err := addonInformer.AddIndexers(cache.Indexers{byAddOnConfig: ctrl.indexByConfig}); err != nil {
+			if err := addonInformer.AddIndexers(cache.Indexers{index.AddonByConfig: index.IndexAddonByConfig}); err != nil {
 				t.Fatal(err)
 			}
 			addonStore := addonInformer.GetStore()

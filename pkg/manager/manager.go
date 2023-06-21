@@ -5,6 +5,9 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/dynamic/dynamicinformer"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -20,11 +23,17 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonmanagement"
 	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonowner"
 	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addonprogressing"
+	"open-cluster-management.io/addon-framework/pkg/manager/controllers/addontemplate"
 	"open-cluster-management.io/addon-framework/pkg/manager/controllers/managementaddoninstallprogression"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 )
 
 func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
+	hubKubeClient, err := kubernetes.NewForConfig(kubeConfig)
+	if err != nil {
+		return err
+	}
+
 	hubClusterClient, err := clusterclientset.NewForConfig(kubeConfig)
 	if err != nil {
 		return err
@@ -36,6 +45,11 @@ func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
 	}
 
 	workClient, err := workv1client.NewForConfig(kubeConfig)
+	if err != nil {
+		return err
+	}
+
+	dynamicClient, err := dynamic.NewForConfig(kubeConfig)
 	if err != nil {
 		return err
 	}
@@ -56,6 +70,32 @@ func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
 		}),
 	)
 
+	// addonDeployController
+	err = workInformers.Work().V1().ManifestWorks().Informer().AddIndexers(
+		cache.Indexers{
+			index.ManifestWorkByAddon:           index.IndexManifestWorkByAddon,
+			index.ManifestWorkByHostedAddon:     index.IndexManifestWorkByHostedAddon,
+			index.ManifestWorkHookByHostedAddon: index.IndexManifestWorkHookByHostedAddon,
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	// addonConfigController
+	err = addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns().Informer().AddIndexers(
+		cache.Indexers{index.AddonByConfig: index.IndexAddonByConfig},
+	)
+	if err != nil {
+		return err
+	}
+	// managementAddonConfigController
+	err = addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns().Informer().AddIndexers(
+		cache.Indexers{index.ClusterManagementAddonByConfig: index.IndexClusterManagementAddonByConfig})
+	if err != nil {
+		return err
+	}
+
 	err = addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns().Informer().AddIndexers(
 		cache.Indexers{
 			index.ClusterManagementAddonByPlacement: index.IndexClusterManagementAddonByPlacement,
@@ -71,6 +111,8 @@ func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
 	if err != nil {
 		return err
 	}
+
+	dynamicInformers := dynamicinformer.NewDynamicSharedInformerFactory(dynamicClient, 10*time.Minute)
 
 	addonManagementController := addonmanagement.NewAddonManagementController(
 		addonClient,
@@ -112,15 +154,30 @@ func RunManager(ctx context.Context, kubeConfig *rest.Config) error {
 		utils.ManagedByAddonManager,
 	)
 
+	addonTemplateController := addontemplate.NewAddonTemplateController(
+		kubeConfig,
+		hubKubeClient,
+		addonClient,
+		addonInformerFactory.Addon().V1alpha1().ClusterManagementAddOns(),
+		addonInformerFactory,
+		clusterInformerFactory,
+		dynamicInformers,
+		workInformers,
+	)
+
 	go addonManagementController.Run(ctx, 2)
 	go addonConfigurationController.Run(ctx, 2)
 	go addonOwnerController.Run(ctx, 2)
 	go addonProgressingController.Run(ctx, 2)
 	go mgmtAddonInstallProgressionController.Run(ctx, 2)
+	// There should be only one instance of addonTemplateController running, since the addonTemplateController will
+	// start a goroutine for each template-type addon it watches.
+	go addonTemplateController.Run(ctx, 1)
 
-	go clusterInformerFactory.Start(ctx.Done())
-	go addonInformerFactory.Start(ctx.Done())
-	go workInformers.Start(ctx.Done())
+	clusterInformerFactory.Start(ctx.Done())
+	addonInformerFactory.Start(ctx.Done())
+	workInformers.Start(ctx.Done())
+	dynamicInformers.Start(ctx.Done())
 
 	<-ctx.Done()
 	return nil
