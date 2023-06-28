@@ -27,11 +27,9 @@ KUSTOMIZE_VERSION:=4.5.5
 PWD=$(shell pwd)
 
 # Image URL to use all building/pushing image targets;
-MANAGER_IMAGE := addon-manager
 EXAMPLE_IMAGE ?= addon-examples
 IMAGE_REGISTRY ?= quay.io/open-cluster-management
 IMAGE_TAG ?= latest
-export MANAGER_IMAGE_NAME ?= $(IMAGE_REGISTRY)/$(MANAGER_IMAGE):$(IMAGE_TAG)
 export EXAMPLE_IMAGE_NAME ?= $(IMAGE_REGISTRY)/$(EXAMPLE_IMAGE):$(IMAGE_TAG)
 
 GIT_HOST ?= open-cluster-management.io
@@ -47,7 +45,6 @@ GO_TEST_PACKAGES :=./pkg/...
 # $2 - Dockerfile path
 # $3 - context directory for image build
 # It will generate target "image-$(1)" for building the image and binding it as a prerequisite to target "images".
-$(call build-image,$(MANAGER_IMAGE),$(IMAGE_REGISTRY)/$(MANAGER_IMAGE):$(IMAGE_TAG),./build/Dockerfile,.)
 $(call build-image,$(EXAMPLE_IMAGE),$(IMAGE_REGISTRY)/$(EXAMPLE_IMAGE):$(IMAGE_TAG),./build/Dockerfile.example,.)
 
 verify-gocilint:
@@ -61,12 +58,6 @@ deploy-ocm:
 
 deploy-hosted-ocm:
 	examples/deploy/hosted-ocm/install.sh
-
-deploy-addon-manager: ensure-kustomize
-	cp deploy/kustomization.yaml deploy/kustomization.yaml.tmp
-	cd deploy && ../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/addon-manager=$(MANAGER_IMAGE_NAME)
-	$(KUSTOMIZE) build deploy | $(KUBECTL) apply -f -
-	mv deploy/kustomization.yaml.tmp deploy/kustomization.yaml
 
 deploy-busybox: ensure-kustomize
 	cp examples/deploy/addon/busybox/kustomization.yaml examples/deploy/addon/busybox/kustomization.yaml.tmp
@@ -94,8 +85,6 @@ deploy-helloworld-hosted: ensure-kustomize
 
 deploy-helloworld-template: ensure-kustomize
 	$(KUBECTL) create namespace $(MANAGED_CLUSTER_NAME) --dry-run=client -o yaml | $(KUBECTL) apply -f -
-# remove the following line when the registration-operator is supported to install the addon template CRD
-	$(KUBECTL) apply -f ./vendor/open-cluster-management.io/api/addon/v1alpha1/0000_03_addon.open-cluster-management.io_addontemplates.crd.yaml
 	cp examples/deploy/addon/helloworld-template/kustomization.yaml examples/deploy/addon/helloworld-template/kustomization.yaml.tmp
 	cd examples/deploy/addon/helloworld-template && ../../../../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/addon-examples=$(EXAMPLE_IMAGE_NAME)
 	$(KUSTOMIZE) build examples/deploy/addon/helloworld-template | $(KUBECTL) apply -f -
@@ -122,13 +111,13 @@ undeploy-helloworld-hosted: ensure-kustomize
 build-e2e:
 	go test -c ./test/e2e
 
-test-e2e: build-e2e deploy-ocm deploy-addon-manager deploy-helloworld deploy-helloworld-helm deploy-helloworld-template
+test-e2e: build-e2e deploy-ocm deploy-helloworld deploy-helloworld-helm
 	./e2e.test -test.v -ginkgo.v
 
 build-hosted-e2e:
 	go test -c ./test/e2ehosted
 
-test-hosted-e2e: build-hosted-e2e deploy-hosted-ocm deploy-addon-manager deploy-helloworld-hosted
+test-hosted-e2e: build-hosted-e2e deploy-hosted-ocm deploy-helloworld-hosted
 	./e2ehosted.test -test.v -ginkgo.v
 
 include ./test/integration-test.mk

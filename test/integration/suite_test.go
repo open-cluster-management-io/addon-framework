@@ -18,7 +18,6 @@ import (
 
 	certificatesv1 "k8s.io/api/certificates/v1"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
-	"open-cluster-management.io/addon-framework/pkg/manager"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
@@ -45,7 +44,6 @@ var hubKubeClient kubernetes.Interface
 var testAddonImpl *testAddon
 var testHostedAddonImpl *testAddon
 var testInstallByLableAddonImpl *testAddon
-var testAddOnConfigsImpl *testAddon
 var testMultiWorksAddonImpl *testAddon
 var cancel context.CancelFunc
 var mgrContext context.Context
@@ -107,13 +105,6 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 		}),
 	}
 
-	testAddOnConfigsImpl = &testAddon{
-		name:                "test-addon-configs",
-		manifests:           map[string][]runtime.Object{},
-		registrations:       map[string][]addonapiv1alpha1.RegistrationConfig{},
-		supportedConfigGVRs: []schema.GroupVersionResource{addOnDeploymentConfigGVR},
-	}
-
 	testMultiWorksAddonImpl = &testAddon{
 		name:          "test-multi-works",
 		manifests:     map[string][]runtime.Object{},
@@ -131,13 +122,9 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		err = addonManager.AddAgent(testHostedAddonImpl)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		err = addonManager.AddAgent(testAddOnConfigsImpl)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		err = addonManager.AddAgent(testMultiWorksAddonImpl)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		err = addonManager.Start(mgrContext)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		err = manager.RunManager(mgrContext, cfg)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	}()
 
