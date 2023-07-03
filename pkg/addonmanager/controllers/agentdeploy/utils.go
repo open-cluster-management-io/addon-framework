@@ -493,8 +493,7 @@ func getManifestConfigOption(agentAddon agent.AgentAddon,
 	}
 
 	if agentAddon.GetAgentAddonOptions().HealthProber != nil &&
-		agentAddon.GetAgentAddonOptions().HealthProber.Type == addonapiv1alpha1.HealthProberTypeAgentDeploymentAvailable &&
-		agentAddon.GetAgentAddonOptions().HealthProber.WorkProber == nil {
+		agentAddon.GetAgentAddonOptions().HealthProber.Type == agent.HealthProberTypeDeploymentAvailability {
 
 		manifests, err := agentAddon.Manifests(cluster, addon)
 		if err != nil {
@@ -503,19 +502,8 @@ func getManifestConfigOption(agentAddon agent.AgentAddon,
 
 		deployments := utils.FilterDeployments(manifests)
 		for _, deployment := range deployments {
-			manifestConfigs = append(manifestConfigs, workapiv1.ManifestConfigOption{
-				ResourceIdentifier: workapiv1.ResourceIdentifier{
-					Group:     "apps",
-					Resource:  "deployments",
-					Name:      deployment.Name,
-					Namespace: deployment.Namespace,
-				},
-				FeedbackRules: []workapiv1.FeedbackRule{
-					{
-						Type: workapiv1.WellKnownStatusType,
-					},
-				},
-			})
+			manifestConfig := utils.DeploymentWellKnowManifestConfig(deployment)
+			manifestConfigs = append(manifestConfigs, manifestConfig)
 		}
 	}
 

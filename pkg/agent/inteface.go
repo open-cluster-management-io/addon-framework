@@ -151,9 +151,7 @@ type Updater struct {
 }
 
 type HealthProber struct {
-	// Type HealthProberType
-	Type addonapiv1alpha1.HealthProberType
-	// addonapiv1alpha1.HealthProber
+	Type HealthProberType
 
 	WorkProber *WorkHealthProber
 }
@@ -180,21 +178,24 @@ type ProbeField struct {
 type HealthProberType string
 
 const (
-	// // HealthProberTypeNone indicates the healthiness status will be refreshed, which is
-	// // leaving the healthiness of ManagedClusterAddon to an empty string.
-	// HealthProberTypeNone HealthProberType = "None"
-	// // HealthProberTypeLease indicates the healthiness of the addon is connected with the
-	// // corresponding lease resource in the cluster namespace with the same name as the addon.
-	// // Note that the lease object is expected to periodically refresh by a local agent
-	// // deployed in the managed cluster implementing lease.LeaseUpdater interface.
-	// HealthProberTypeLease HealthProberType = "Lease"
-
+	// HealthProberTypeNone indicates the healthiness status will be refreshed, which is
+	// leaving the healthiness of ManagedClusterAddon to an empty string.
+	HealthProberTypeNone HealthProberType = "None"
+	// HealthProberTypeLease indicates the healthiness of the addon is connected with the
+	// corresponding lease resource in the cluster namespace with the same name as the addon.
+	// Note that the lease object is expected to periodically refresh by a local agent
+	// deployed in the managed cluster implementing lease.LeaseUpdater interface.
+	HealthProberTypeLease HealthProberType = "Lease"
 	// HealthProberTypeWork indicates the healthiness of the addon is equal to the overall
 	// dispatching status of the corresponding ManifestWork resource.
 	// It's applicable to those addons that don't have a local agent instance in the managed
 	// clusters. The addon framework will check if the work is Available on the spoke. In addition
 	// user can define a prober to check more detailed status based on status feedback from work.
-	HealthProberTypeWork addonapiv1alpha1.HealthProberType = "Work"
+	HealthProberTypeWork HealthProberType = "Work"
+	// HealthProberTypeDeploymentAvailability indicates the healthiness of the addon is connected
+	// with the availability of the corresponding agent deployment resources on the managed cluster.
+	// It's a special case of HealthProberTypeWork.
+	HealthProberTypeDeploymentAvailability HealthProberType = "DeploymentAvailability"
 )
 
 func KubeClientSignerConfigurations(addonName, agentName string) func(cluster *clusterv1.ManagedCluster) []addonapiv1alpha1.RegistrationConfig {

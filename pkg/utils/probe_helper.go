@@ -36,7 +36,6 @@ func NewDeploymentProber(deployments ...types.NamespacedName) *agent.HealthProbe
 	}
 	return &agent.HealthProber{
 		Type: agent.HealthProberTypeWork,
-
 		WorkProber: &agent.WorkHealthProber{
 			ProbeFields: probeFields,
 			HealthCheck: HealthCheck,
@@ -90,4 +89,20 @@ func FilterDeployments(objects []runtime.Object) []*appsv1.Deployment {
 		}
 	}
 	return deployments
+}
+
+func DeploymentWellKnowManifestConfig(deployment *appsv1.Deployment) workapiv1.ManifestConfigOption {
+	return workapiv1.ManifestConfigOption{
+		ResourceIdentifier: workapiv1.ResourceIdentifier{
+			Group:     "apps",
+			Resource:  "deployments",
+			Name:      deployment.Name,
+			Namespace: deployment.Namespace,
+		},
+		FeedbackRules: []workapiv1.FeedbackRule{
+			{
+				Type: workapiv1.WellKnownStatusType,
+			},
+		},
+	}
 }

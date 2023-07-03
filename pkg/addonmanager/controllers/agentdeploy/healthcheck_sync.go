@@ -34,9 +34,9 @@ func (s *healthCheckSyncer) sync(ctx context.Context,
 	}
 
 	switch s.agentAddon.GetAgentAddonOptions().HealthProber.Type {
-	case agent.HealthProberTypeWork, addonapiv1alpha1.HealthProberTypeNone, addonapiv1alpha1.HealthProberTypeAgentDeploymentAvailable:
+	case agent.HealthProberTypeWork, agent.HealthProberTypeNone, agent.HealthProberTypeDeploymentAvailability:
 		expectedHealthCheckMode = addonapiv1alpha1.HealthCheckModeCustomized
-	case addonapiv1alpha1.HealthProberTypeLease:
+	case agent.HealthProberTypeLease:
 		expectedHealthCheckMode = addonapiv1alpha1.HealthCheckModeLease
 	default:
 		expectedHealthCheckMode = addonapiv1alpha1.HealthCheckModeLease
@@ -56,8 +56,8 @@ func (s *healthCheckSyncer) probeAddonStatus(
 	switch s.agentAddon.GetAgentAddonOptions().HealthProber.Type {
 	case agent.HealthProberTypeWork:
 		return s.probeWorkAddonStatus(cluster, addon)
-	case addonapiv1alpha1.HealthProberTypeAgentDeploymentAvailable:
-		return s.probeAgentDeploymentAvailableAddonStatus(cluster, addon)
+	case agent.HealthProberTypeDeploymentAvailability:
+		return s.probeDeploymentAvailabilityAddonStatus(cluster, addon)
 	default:
 		return nil
 	}
@@ -87,10 +87,10 @@ func (s *healthCheckSyncer) probeWorkAddonStatus(
 	return s.probeAddonStatusByWorks(cluster, addon)
 }
 
-func (s *healthCheckSyncer) probeAgentDeploymentAvailableAddonStatus(
+func (s *healthCheckSyncer) probeDeploymentAvailabilityAddonStatus(
 	cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
 
-	if s.agentAddon.GetAgentAddonOptions().HealthProber.Type != addonapiv1alpha1.HealthProberTypeAgentDeploymentAvailable {
+	if s.agentAddon.GetAgentAddonOptions().HealthProber.Type != agent.HealthProberTypeDeploymentAvailability {
 		return nil
 	}
 
@@ -199,11 +199,29 @@ func (s *healthCheckSyncer) analyzeWorkProber(
 			return workProber.ProbeFields, workProber.HealthCheck, nil
 		}
 		return nil, nil, fmt.Errorf("work prober is not configured")
-	case addonapiv1alpha1.HealthProberTypeAgentDeploymentAvailable:
+	case agent.HealthProberTypeDeploymentAvailability:
 		return s.analyzeDeploymentWorkProber(agentAddon, cluster, addon)
 	default:
 		return nil, nil, fmt.Errorf("unsupported health prober type %s", agentAddon.GetAgentAddonOptions().HealthProber.Type)
 	}
+}
+
+func (s *healthCheckSyncer) deploymentAvailabilityChecker(
+	identifier workapiv1.ResourceIdentifier,
+	result workapiv1.StatusFeedbackResult) error {
+	if identifier.Resource != "deployments" {
+		return fmt.Errorf("unsupported resource type %s", identifier.Resource)
+	}
+	if identifier.Group != "apps" {
+		return fmt.Errorf("unsupported resource group %s", identifier.Group)
+	}
+
+	for _, value := range result.Values {
+		if value.Name == "AvailableReplicas" && value.Value.Integer != nil && *value.Value.Integer >= 1 {
+			return nil
+		}
+	}
+	return fmt.Errorf("no available replicas")
 }
 
 func (s *healthCheckSyncer) analyzeDeploymentWorkProber(
@@ -212,21 +230,6 @@ func (s *healthCheckSyncer) analyzeDeploymentWorkProber(
 	addon *addonapiv1alpha1.ManagedClusterAddOn,
 ) ([]agent.ProbeField, agent.AddonHealthCheckFunc, error) {
 	probeFields := []agent.ProbeField{}
-	healthChecker := func(identifier workapiv1.ResourceIdentifier, result workapiv1.StatusFeedbackResult) error {
-		if identifier.Resource != "deployments" {
-			return fmt.Errorf("unsupported resource type %s", identifier.Resource)
-		}
-		if identifier.Group != "apps" {
-			return fmt.Errorf("unsupported resource group %s", identifier.Group)
-		}
-
-		for _, value := range result.Values {
-			if value.Name == "AvailableReplicas" && value.Value.Integer != nil && *value.Value.Integer >= 1 {
-				return nil
-			}
-		}
-		return fmt.Errorf("no available replicas")
-	}
 
 	manifests, err := agentAddon.Manifests(cluster, addon)
 	if err != nil {
@@ -235,22 +238,14 @@ func (s *healthCheckSyncer) analyzeDeploymentWorkProber(
 
 	deployments := utils.FilterDeployments(manifests)
 	for _, deployment := range deployments {
+		manifestConfig := utils.DeploymentWellKnowManifestConfig(deployment)
 		probeFields = append(probeFields, agent.ProbeField{
-			ResourceIdentifier: workapiv1.ResourceIdentifier{
-				Group:     "apps",
-				Resource:  "deployments",
-				Name:      deployment.Name,
-				Namespace: deployment.Namespace,
-			},
-			ProbeRules: []workapiv1.FeedbackRule{
-				{
-					Type: workapiv1.WellKnownStatusType,
-				},
-			},
+			ResourceIdentifier: manifestConfig.ResourceIdentifier,
+			ProbeRules:         manifestConfig.FeedbackRules,
 		})
 	}
 
-	return probeFields, healthChecker, nil
+	return probeFields, s.deploymentAvailabilityChecker, nil
 }
 
 func findResultByIdentifier(identifier workapiv1.ResourceIdentifier, manifestConditions []workapiv1.ManifestCondition) *workapiv1.StatusFeedbackResult {

@@ -1226,7 +1226,7 @@ k8s.io/utils/path
 k8s.io/utils/pointer
 k8s.io/utils/strings/slices
 k8s.io/utils/trace
-# open-cluster-management.io/api v0.11.1-0.20230609103311-088e8fe86139 => /home/go/src/open-cluster-management.io/api
+# open-cluster-management.io/api v0.11.1-0.20230609103311-088e8fe86139
 ## explicit; go 1.19
 open-cluster-management.io/api/addon/v1alpha1
 open-cluster-management.io/api/client/addon/clientset/versioned
@@ -1319,4 +1319,3 @@ sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.3.0
 ## explicit; go 1.12
 sigs.k8s.io/yaml
-# open-cluster-management.io/api => /home/go/src/open-cluster-management.io/api

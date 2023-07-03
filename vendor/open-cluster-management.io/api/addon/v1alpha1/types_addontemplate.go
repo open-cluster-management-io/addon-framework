@@ -44,43 +44,7 @@ type AddOnTemplateSpec struct {
 	// Registration holds the registration configuration for the addon
 	// +optional
 	Registration []RegistrationSpec `json:"registration"`
-
-	// HealthProber defines how is the healthiness status of the ManagedClusterAddon probed.
-	// Note that the prescribed prober type here only applies to the automatically installed
-	// addons configured via InstallStrategy.
-	// If nil, will be defaulted to "Lease" type.
-	// +optional
-	HealthProber *HealthProber `json:"healthProber,omitempty"`
 }
-
-type HealthProber struct {
-	Type HealthProberType
-}
-
-type HealthProberType string
-
-const (
-	// HealthProberTypeNone indicates the healthiness status will be refreshed, which is
-	// leaving the healthiness of ManagedClusterAddon to an empty string.
-	HealthProberTypeNone HealthProberType = "None"
-	// HealthProberTypeLease indicates the healthiness of the addon is connected with the
-	// corresponding lease resource in the cluster namespace with the same name as the addon.
-	// Note that the lease object is expected to periodically refresh by a local agent
-	// deployed in the managed cluster implementing lease.LeaseUpdater interface.
-	HealthProberTypeLease HealthProberType = "Lease"
-	// // HealthProberTypeWork indicates the healthiness of the addon is equal to the overall
-	// // dispatching status of the corresponding ManifestWork resource.
-	// // It's applicable to those addons that don't have a local agent instance in the managed
-	// // clusters. The addon framework will check if the work is Available on the spoke. In addition
-	// // user can define a prober to check more detailed status based on status feedback from work.
-	// HealthProberTypeWork HealthProberType = "Work"
-
-	// HealthProberTypeAgentDeploymentAvailable indicates the healthiness of the addon is equal to the
-	// overall dispatching status of the corresponding agent deployment resource.
-	// For this type, the addon agent should be deployed as a deployment resource on the managed cluster.
-	// The addon framework/manager will check if the deployment is Available on the spoke cluster.
-	HealthProberTypeAgentDeploymentAvailable HealthProberType = "AgentDeploymentAvailable"
-)
 
 // RegistrationType represents the type of the registration configuration,
 // it could be KubeClient or CustomSigner
@@ -191,14 +155,16 @@ type CustomSignerRegistrationConfig struct {
 	Subject *Subject `json:"subject,omitempty"`
 
 	// SigningCA represents the reference of the secret on the hub cluster to sign the CSR
-	// the secret namespace must be "open-cluster-management-hub", and the secret type must be "kubernetes.io/tls"
 	// +kubebuilder:validation:Required
 	SigningCA SigningCARef `json:"signingCA"`
 }
 
-// SigningCARef is the reference to the signing CA secret which type must be "kubernetes.io/tls" and
-// the namespace must be "open-cluster-management-hub"
+// SigningCARef is the reference to the signing CA secret that must contain the
+// certificate authority data with key "ca.crt" and the private key data with key "ca.key"
 type SigningCARef struct {
+	// Namespace of the signing CA secret
+	// +kubebuilder:validation:Required
+	Namespace string `json:"namespace"`
 	// Name of the signing CA secret
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`

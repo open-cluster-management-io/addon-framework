@@ -68,7 +68,7 @@ func TestHealthCheckReconcile(t *testing.T) {
 		{
 			name: "Health check mode is none",
 			testAddon: &healthCheckTestAgent{name: "test", health: &agent.HealthProber{
-				Type: addonapiv1alpha1.HealthProberTypeNone,
+				Type: agent.HealthProberTypeNone,
 			}},
 			addon:                   addontesting.NewAddon("test", "cluster1"),
 			expectedErr:             nil,
@@ -77,7 +77,7 @@ func TestHealthCheckReconcile(t *testing.T) {
 		{
 			name: "Health check mode is lease",
 			testAddon: &healthCheckTestAgent{name: "test", health: &agent.HealthProber{
-				Type: addonapiv1alpha1.HealthProberTypeLease,
+				Type: agent.HealthProberTypeLease,
 			}},
 			addon:                   addontesting.NewAddon("test", "cluster1"),
 			expectedErr:             nil,
