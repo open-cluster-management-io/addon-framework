@@ -3,6 +3,8 @@ package utils
 import (
 	"fmt"
 
+	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
@@ -34,6 +36,7 @@ func NewDeploymentProber(deployments ...types.NamespacedName) *agent.HealthProbe
 	}
 	return &agent.HealthProber{
 		Type: agent.HealthProberTypeWork,
+
 		WorkProber: &agent.WorkHealthProber{
 			ProbeFields: probeFields,
 			HealthCheck: HealthCheck,
@@ -77,4 +80,14 @@ func HealthCheck(identifier workapiv1.ResourceIdentifier, result workapiv1.Statu
 		return fmt.Errorf("readyReplica is %d for deployment %s/%s", *value.Value.Integer, identifier.Namespace, identifier.Name)
 	}
 	return fmt.Errorf("readyReplica is not probed")
+}
+
+func FilterDeployments(objects []runtime.Object) []*appsv1.Deployment {
+	deployments := []*appsv1.Deployment{}
+	for _, obj := range objects {
+		if deployment, ok := obj.(*appsv1.Deployment); ok {
+			deployments = append(deployments, deployment)
+		}
+	}
+	return deployments
 }
