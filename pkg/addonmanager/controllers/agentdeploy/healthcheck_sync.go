@@ -206,24 +206,6 @@ func (s *healthCheckSyncer) analyzeWorkProber(
 	}
 }
 
-func (s *healthCheckSyncer) deploymentAvailabilityChecker(
-	identifier workapiv1.ResourceIdentifier,
-	result workapiv1.StatusFeedbackResult) error {
-	if identifier.Resource != "deployments" {
-		return fmt.Errorf("unsupported resource type %s", identifier.Resource)
-	}
-	if identifier.Group != "apps" {
-		return fmt.Errorf("unsupported resource group %s", identifier.Group)
-	}
-
-	for _, value := range result.Values {
-		if value.Name == "AvailableReplicas" && value.Value.Integer != nil && *value.Value.Integer >= 1 {
-			return nil
-		}
-	}
-	return fmt.Errorf("no available replicas")
-}
-
 func (s *healthCheckSyncer) analyzeDeploymentWorkProber(
 	agentAddon agent.AgentAddon,
 	cluster *clusterv1.ManagedCluster,
@@ -238,14 +220,14 @@ func (s *healthCheckSyncer) analyzeDeploymentWorkProber(
 
 	deployments := utils.FilterDeployments(manifests)
 	for _, deployment := range deployments {
-		manifestConfig := utils.DeploymentWellKnowManifestConfig(deployment)
+		manifestConfig := utils.DeploymentWellKnowManifestConfig(deployment.Namespace, deployment.Name)
 		probeFields = append(probeFields, agent.ProbeField{
 			ResourceIdentifier: manifestConfig.ResourceIdentifier,
 			ProbeRules:         manifestConfig.FeedbackRules,
 		})
 	}
 
-	return probeFields, s.deploymentAvailabilityChecker, nil
+	return probeFields, utils.DeploymentAvailabilityHealthCheck, nil
 }
 
 func findResultByIdentifier(identifier workapiv1.ResourceIdentifier, manifestConditions []workapiv1.ManifestCondition) *workapiv1.StatusFeedbackResult {

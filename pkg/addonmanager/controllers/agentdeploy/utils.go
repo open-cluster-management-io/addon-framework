@@ -502,7 +502,7 @@ func getManifestConfigOption(agentAddon agent.AgentAddon,
 
 		deployments := utils.FilterDeployments(manifests)
 		for _, deployment := range deployments {
-			manifestConfig := utils.DeploymentWellKnowManifestConfig(deployment)
+			manifestConfig := utils.DeploymentWellKnowManifestConfig(deployment.Namespace, deployment.Name)
 			manifestConfigs = append(manifestConfigs, manifestConfig)
 		}
 	}

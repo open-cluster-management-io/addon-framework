@@ -1,13 +1,19 @@
 package agentdeploy
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
+	"open-cluster-management.io/addon-framework/pkg/agent"
+	"open-cluster-management.io/addon-framework/pkg/utils"
 )
 
 func TestConfigsToAnnotations(t *testing.T) {
@@ -152,4 +158,81 @@ func TestAddonAddFinalizer(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetManifestConfigOption(t *testing.T) {
+	cases := []struct {
+		name                         string
+		agentAddon                   agent.AgentAddon
+		expectedManifestConfigOption []workapiv1.ManifestConfigOption
+	}{
+		{
+			name: "no manifest config option",
+			agentAddon: &testAgent{
+				name: "test",
+				objects: []runtime.Object{
+					addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
+				},
+			},
+			expectedManifestConfigOption: []workapiv1.ManifestConfigOption{},
+		},
+		{
+			name: "work type",
+			agentAddon: &testAgent{
+				name: "test",
+				objects: []runtime.Object{
+					addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
+				},
+				healthProber: utils.NewDeploymentProber(types.NamespacedName{Name: "test-deployment", Namespace: "default"}),
+			},
+			expectedManifestConfigOption: []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Group:     "apps",
+						Resource:  "deployments",
+						Name:      "test-deployment",
+						Namespace: "default",
+					},
+					FeedbackRules: []workapiv1.FeedbackRule{
+						{
+							Type: workapiv1.WellKnownStatusType,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "deployment availability type",
+			agentAddon: &testAgent{
+				name: "test",
+				objects: []runtime.Object{
+					NewFakeDeployment("test-deployment", "default"),
+				},
+				healthProber: &agent.HealthProber{Type: agent.HealthProberTypeDeploymentAvailability},
+			},
+			expectedManifestConfigOption: []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Group:     "apps",
+						Resource:  "deployments",
+						Name:      "test-deployment",
+						Namespace: "default",
+					},
+					FeedbackRules: []workapiv1.FeedbackRule{
+						{
+							Type: workapiv1.WellKnownStatusType,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			manifestConfigOptions := getManifestConfigOption(c.agentAddon, nil, nil)
+			assert.Equal(t, c.expectedManifestConfigOption, manifestConfigOptions)
+		})
+	}
+
 }
