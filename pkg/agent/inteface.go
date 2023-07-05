@@ -52,6 +52,7 @@ type AgentAddonOptions struct {
 	// InstallStrategy defines that addon should be created in which clusters.
 	// Addon will not be installed automatically until a ManagedClusterAddon is applied to the cluster's
 	// namespace if InstallStrategy is nil.
+	// Deprecated: use installStrategy config in ClusterManagementAddOn API instead
 	// +optional
 	InstallStrategy *InstallStrategy
 
