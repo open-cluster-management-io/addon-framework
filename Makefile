@@ -87,14 +87,23 @@ deploy-helloworld-template: ensure-kustomize
 	$(KUBECTL) create namespace $(MANAGED_CLUSTER_NAME) --dry-run=client -o yaml | $(KUBECTL) apply -f -
 	cp examples/deploy/addon/helloworld-template/kustomization.yaml examples/deploy/addon/helloworld-template/kustomization.yaml.tmp
 	cd examples/deploy/addon/helloworld-template && ../../../../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/addon-examples=$(EXAMPLE_IMAGE_NAME)
-	$(KUSTOMIZE) build examples/deploy/addon/helloworld-template | $(KUBECTL) apply -f -
+	$(KUSTOMIZE) build examples/deploy/addon/helloworld-template | sed -e "s,cluster1,$(MANAGED_CLUSTER_NAME)," | $(KUBECTL) apply -f -
 	mv examples/deploy/addon/helloworld-template/kustomization.yaml.tmp examples/deploy/addon/helloworld-template/kustomization.yaml
+
+deploy-kubernetes-dashboard: ensure-kustomize
+	$(KUBECTL) create namespace $(MANAGED_CLUSTER_NAME) --dry-run=client -o yaml | $(KUBECTL) apply -f -
+	cp examples/deploy/addon/kubernetes-dashboard/kustomization.yaml examples/deploy/addon/kubernetes-dashboard/kustomization.yaml.tmp
+	cd examples/deploy/addon/kubernetes-dashboard && ../../../../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/addon-examples=$(EXAMPLE_IMAGE_NAME)
+	$(KUSTOMIZE) build examples/deploy/addon/kubernetes-dashboard | sed -e "s,cluster1,$(MANAGED_CLUSTER_NAME)," | $(KUBECTL) apply -f -
+	mv examples/deploy/addon/kubernetes-dashboard/kustomization.yaml.tmp examples/deploy/addon/kubernetes-dashboard/kustomization.yaml
 
 undeploy-addon:
 	$(KUBECTL) delete -f examples/deploy/addon/helloworld-hosted/resources/helloworld_hosted_clustermanagementaddon.yaml --ignore-not-found
 	$(KUBECTL) delete -f examples/deploy/addon/helloworld-helm/resources/helloworld_helm_clustermanagementaddon.yaml --ignore-not-found
 	$(KUBECTL) delete -f examples/deploy/addon/helloworld/resources/helloworld_clustermanagementaddon.yaml --ignore-not-found
 	$(KUBECTL) delete -f examples/deploy/addon/busybox/resources/busybox_clustermanagementaddon.yaml --ignore-not-found
+	$(KUBECTL) delete -f examples/deploy/addon/helloworld-template/resources/cluster_management_addon.yaml --ignore-not-found
+	$(KUBECTL) delete -f examples/deploy/addon/kubernetes-dashboard/resources/cluster_management_addon.yaml --ignore-not-found
 
 undeploy-busybox: ensure-kustomize
 	$(KUSTOMIZE) build examples/deploy/addon/busybox | $(KUBECTL) delete --ignore-not-found -f -
@@ -107,6 +116,12 @@ undeploy-helloworld-helm: ensure-kustomize
 
 undeploy-helloworld-hosted: ensure-kustomize
 	$(KUSTOMIZE) build examples/deploy/addon/helloworld-hosted | $(KUBECTL) delete --ignore-not-found -f -
+
+undeploy-helloworld-template: ensure-kustomize
+	$(KUSTOMIZE) build examples/deploy/addon/helloworld-template | $(KUBECTL) delete --ignore-not-found -f -
+
+undeploy-kubernetes-dashboard: ensure-kustomize
+	$(KUSTOMIZE) build examples/deploy/addon/kubernetes-dashboard | $(KUBECTL) delete --ignore-not-found -f -
 
 build-e2e:
 	go test -c ./test/e2e

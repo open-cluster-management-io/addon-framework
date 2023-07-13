@@ -17,4 +17,4 @@ spec:
     resource: addondeploymentconfigs
     defaultConfig:
       name: hello-template
-      namespace: hub
+      namespace: cluster1

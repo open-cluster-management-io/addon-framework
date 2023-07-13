@@ -1,7 +1,9 @@
 apiVersion: addon.open-cluster-management.io/v1alpha1
 kind: ManagedClusterAddOn
 metadata:
-  name: hello-template
+  name: helloworldhosted
   namespace: cluster1
+  annotations:
+    addon.open-cluster-management.io/hosting-cluster-name: hosting1
 spec:
   installNamespace: open-cluster-management-agent-addon
