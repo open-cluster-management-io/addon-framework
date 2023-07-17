@@ -4,14 +4,15 @@ kind: Kustomization
 namespace: cluster1
 
 resources:
-- resources/addon_deployment_config.yaml
 - resources/addon_template.yaml
 - resources/cluster_management_addon.yaml
 - resources/managed_cluster_addon.yaml
-- resources/cluster_role.yaml
 
 
 images:
-- name: quay.io/open-cluster-management/addon-examples
-  newName: quay.io/open-cluster-management/addon-examples
-  newTag: latest
+- name: kubernetesui/dashboard
+  newName: kubernetesui/dashboard
+  newTag: v2.7.0
+- name: kubernetesui/metrics-scraper
+  newName: kubernetesui/metrics-scraper
+  newTag: v1.0.8

@@ -2,7 +2,7 @@ apiVersion: addon.open-cluster-management.io/v1alpha1
 kind: AddOnDeploymentConfig
 metadata:
   name: hello-template
-  namespace: hub
+  namespace: cluster1
 spec:
   customizedVariables:
   - name: LOG_LEVEL

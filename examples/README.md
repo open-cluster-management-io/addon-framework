@@ -3,7 +3,15 @@
 
 We have several AddOn examples for user to understand how Addon works and how to develop an AddOn.
 
-The [helloworld example](helloworld) is implemented using Go templates, and the [helloworld_helm example](helloworld_helm) is implemented using Helm Chart.
+- the [helloworld example](helloworld) is implemented using Go templates
+- the [helloworld_helm example](helloworld_helm) is implemented using Helm Chart.
+- the [helloworld_hosted example](helloworld_hosted) is implemented using Go templateds, and support running the agent
+  deployment on a hosting cluster cluster.
+- the [helloworld-template example](deplpy/addon/helloworld-template) is implemented using the AddOnTemplate API, it
+  is managed by the global addon-manager, so there is no dedicated addon-manager pod running on the hub cluster for it.
+- the [kubernetes-dashboard](deplpy/addon/kubernetes-dashboard) is another addon implemented using the AddOnTemplate API
+  to install [a kubernetes dashboard](https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/)
+  for a managed cluster.
 
 You can get more details in the [docs](../docs).
 
@@ -40,25 +48,74 @@ And then deploy the example AddOns controller on hub cluster.
 ```sh
 make deploy-helloworld
 make deploy-helloworld-helm
+make deploy-helloworld-hosted
 ```
 
-The helloworld AddOn controller will create one `ManagedClusterAddOn` for each managed cluster automatically to install the helloworld agent on the managed cluster.
+**helloworld addon**
 
-After a successful deployment, check on the managed cluster and see the helloworld AddOn agent has been deployed from the hub cluster.
+The helloworld AddOn controller will create one `ManagedClusterAddOn` for each managed cluster automatically to install
+the helloworld agent on the managed cluster.
+
+After a successful deployment, check on the managed cluster and see the helloworld AddOn agent has been deployed from
+the hub cluster.
 ```sh
 kubectl --kubeconfig </path/to/managed_cluster/kubeconfig> -n default get pods
 NAME                               READY   STATUS    RESTARTS   AGE
 helloworld-agent-b99d47f76-v2j6h   1/1     Running   0          53s
 ```
 
+**helloworld_helm addon**
+
 The helloworld_helm AddOn controller cannot create `ManagedClusterAddOn` automatically.
 
-We can create a `ManagedClusterAddOn` in the managedCluster namespace on the Hub cluster to enable the installation of the AddOn on the managed cluster.
+We can create a `ManagedClusterAddOn` in the managedCluster namespace on the Hub cluster to enable the installation of
+the AddOn on the managed cluster.
 ```sh
-kubectl apply -f examples/deploy/addon-cr/helloworld_helm_addon_cr.yaml
+export MANAGED_CLUSTER_NAME=<managed-cluster-name> && \
+sed -e "s,cluster1,$MANAGED_CLUSTER_NAME," examples/deploy/addon-cr/helloworld_helm_addon_cr.yaml | \
+kubectl apply -f -
 ```
 
 We can check the helloworld_helm AddOn agent is deployed in the `installNamespace` on the managed cluster. 
+
+**helloworld_hosted addon**
+
+The helloworld_hosted AddOn controller also cannot create `ManagedClusterAddOn` automatically.
+
+We can create a `ManagedClusterAddOn` in the managedCluster namespace on the Hub cluster to enable the installation of
+the AddOn on the managed cluster.
+
+Note: when installing the addon in Hosted mode, the klusterlet installation mode of the managed cluster should also be
+in Hosted mode. here we should specify the HOSTING_CLUSTER_NAME, it should be a managed cluster of the hub and the same
+hosting cluster of the klustelet.
+
+```sh
+export MANAGED_CLUSTER_NAME=<managed-cluster-name> && \
+export HOSTING_CLUSTER_NAME=<hosting-cluster-name> && \
+sed -e "s,cluster1,$MANAGED_CLUSTER_NAME," -e "s,hosting1,$HOSTING_CLUSTER_NAME," examples/deploy/addon-cr/helloworld_hosted_addon_cr.yaml | \
+kubectl apply -f -
+```
+
+Then create a `helloworldhosted-managed-kubeconfig` secret containing the kubeconfig of the managed cluster in the
+`installNamespace` on the hosting cluster:
+
+```sh
+oc create secret generic helloworldhosted-managed-kubeconfig -n <installNamespace> --from-file=kubeconfig=<managed-cluster-kubeconfig-file>
+```
+
+We can check the helloworld_hosted AddOn agent is deployed in the `installNamespace` on the hosting cluster.
+
+**helloworld_template addon**
+
+```sh
+MANAGED_CLUSTER_NAME=<managed-cluster-name> make deploy-helloworld-template
+```
+
+**kubernetes-dashboard addon**
+
+```sh
+MANAGED_CLUSTER_NAME=<managed-cluster-name> make deploy-kubernetes-dashboard
+```
 
 ## Configure the example add-ons
 
@@ -123,6 +180,9 @@ Undeploy example AddOn controllers from hub cluster after all managedClusterAddo
 ```sh
 make undeploy-helloworld
 make undeploy-helloworld-helm
+make undeploy-helloworld-hosted
+make undeploy-helloworld-template
+make undeploy-kubernetes-dashboard
 ```
 
 Remove the AddOn CR from hub cluster. It will undeploy the AddOn agent from the managed cluster as well.
