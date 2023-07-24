@@ -37,27 +37,33 @@ type enqueueFunc func(obj interface{})
 
 // addonConfigController reconciles all interested addon config types (GroupVersionResource) on the hub.
 type addonConfigController struct {
-	addonClient   addonv1alpha1client.Interface
-	addonLister   addonlisterv1alpha1.ManagedClusterAddOnLister
-	addonIndexer  cache.Indexer
-	configListers map[schema.GroupResource]dynamiclister.Lister
-	queue         workqueue.RateLimitingInterface
+	addonClient                  addonv1alpha1client.Interface
+	addonLister                  addonlisterv1alpha1.ManagedClusterAddOnLister
+	addonIndexer                 cache.Indexer
+	configListers                map[schema.GroupResource]dynamiclister.Lister
+	queue                        workqueue.RateLimitingInterface
+	addonFilterFunc              factory.EventFilterFunc
+	clusterManagementAddonLister addonlisterv1alpha1.ClusterManagementAddOnLister
 }
 
 func NewAddonConfigController(
 	addonClient addonv1alpha1client.Interface,
 	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
+	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
 	configInformerFactory dynamicinformer.DynamicSharedInformerFactory,
 	configGVRs map[schema.GroupVersionResource]bool,
+	addonFilterFunc factory.EventFilterFunc,
 ) factory.Controller {
 	syncCtx := factory.NewSyncContext(controllerName)
 
 	c := &addonConfigController{
-		addonClient:   addonClient,
-		addonLister:   addonInformers.Lister(),
-		addonIndexer:  addonInformers.Informer().GetIndexer(),
-		configListers: map[schema.GroupResource]dynamiclister.Lister{},
-		queue:         syncCtx.Queue(),
+		addonClient:                  addonClient,
+		addonLister:                  addonInformers.Lister(),
+		addonIndexer:                 addonInformers.Informer().GetIndexer(),
+		configListers:                map[schema.GroupResource]dynamiclister.Lister{},
+		queue:                        syncCtx.Queue(),
+		addonFilterFunc:              addonFilterFunc,
+		clusterManagementAddonLister: clusterManagementAddonInformers.Lister(),
 	}
 
 	configInformers := c.buildConfigInformers(configInformerFactory, configGVRs)
@@ -81,7 +87,8 @@ func (c *addonConfigController) buildConfigInformers(
 	configGVRs map[schema.GroupVersionResource]bool,
 ) []factory.Informer {
 	configInformers := []factory.Informer{}
-	for gvr := range configGVRs {
+	for gvrRaw := range configGVRs {
+		gvr := gvrRaw // copy the value since it will be used in the closure
 		genericInformer := configInformerFactory.ForResource(gvr)
 		indexInformer := genericInformer.Informer()
 		_, err := indexInformer.AddEventHandler(
@@ -154,11 +161,24 @@ func (c *addonConfigController) sync(ctx context.Context, syncCtx factory.SyncCo
 
 	addon, err := c.addonLister.ManagedClusterAddOns(addonNamespace).Get(addonName)
 	if errors.IsNotFound(err) {
-		// addon cloud be deleted, ignore
+		// addon could be deleted, ignore
 		return nil
 	}
 	if err != nil {
 		return err
+	}
+
+	cma, err := c.clusterManagementAddonLister.Get(addonName)
+	if errors.IsNotFound(err) {
+		// cluster management addon could be deleted, ignore
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	if !c.addonFilterFunc(cma) {
+		return nil
 	}
 
 	addonCopy := addon.DeepCopy()

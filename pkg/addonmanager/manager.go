@@ -183,14 +183,17 @@ func (a *addonManager) Start(ctx context.Context) error {
 		addonConfigController = addonconfig.NewAddonConfigController(
 			addonClient,
 			addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+			addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
 			dynamicInformers,
 			a.addonConfigs,
+			utils.FilterByAddonName(a.addonAgents),
 		)
 		managementAddonConfigController = managementaddonconfig.NewManagementAddonConfigController(
 			addonClient,
 			addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
 			dynamicInformers,
 			a.addonConfigs,
+			utils.FilterByAddonName(a.addonAgents),
 		)
 
 		// start addonConfiguration controller, note this is to handle the case when the general addon-manager
