@@ -1,6 +1,11 @@
 # Changelog 
 All notable changes to this project will be documented in this file.
 
+## v0.7.1
+
+### Bug Fixes
+* Filter cluster management addon when running spec hash updating controllers. ([#193](https://github.com/open-cluster-management-io/addon-framework/pull/193) [@zhujian7](https://github.com/zhujian7))
+
 ## v0.7.0
 
 ### New Features
