@@ -5,18 +5,18 @@ set -o pipefail
 
 KUBECTL=${KUBECTL:-kubectl}
 
-rm -rf registration-operator
+rm -rf _repo_ocm
 
-echo "############  Cloning registration-operator"
-git clone https://github.com/open-cluster-management-io/registration-operator.git
+echo "############  Cloning ocm repo"
+git clone --depth 1 --branch main https://github.com/open-cluster-management-io/ocm.git _repo_ocm
 
-cd registration-operator || {
-  printf "cd failed, registration-operator does not exist"
+cd _repo_ocm || {
+  printf "cd failed, _repo_ocm does not exist"
   return 1
 }
 
-echo "############  Deploying"
-make deploy
+echo "############  Deploying operators"
+make deploy-hub cluster-ip deploy-spoke-operator apply-spoke-cr
 if [ $? -ne 0 ]; then
  echo "############  Failed to deploy"
  exit 1
@@ -72,6 +72,6 @@ echo "############  All-in-one env is installed successfully!!"
 
 echo "############  Cleanup"
 cd ../ || exist
-rm -rf registration-operator
+rm -rf _repo_ocm
 
 echo "############  Finished installation!!!"
