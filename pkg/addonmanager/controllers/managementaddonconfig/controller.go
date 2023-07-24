@@ -43,6 +43,7 @@ type clusterManagementAddonConfigController struct {
 	clusterManagementAddonIndexer cache.Indexer
 	configListers                 map[schema.GroupResource]dynamiclister.Lister
 	queue                         workqueue.RateLimitingInterface
+	addonFilterFunc               factory.EventFilterFunc
 }
 
 func NewManagementAddonConfigController(
@@ -50,6 +51,7 @@ func NewManagementAddonConfigController(
 	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
 	configInformerFactory dynamicinformer.DynamicSharedInformerFactory,
 	configGVRs map[schema.GroupVersionResource]bool,
+	addonFilterFunc factory.EventFilterFunc,
 ) factory.Controller {
 	syncCtx := factory.NewSyncContext(controllerName)
 
@@ -59,6 +61,7 @@ func NewManagementAddonConfigController(
 		clusterManagementAddonIndexer: clusterManagementAddonInformers.Informer().GetIndexer(),
 		configListers:                 map[schema.GroupResource]dynamiclister.Lister{},
 		queue:                         syncCtx.Queue(),
+		addonFilterFunc:               addonFilterFunc,
 	}
 
 	configInformers := c.buildConfigInformers(configInformerFactory, configGVRs)
@@ -82,7 +85,8 @@ func (c *clusterManagementAddonConfigController) buildConfigInformers(
 	configGVRs map[schema.GroupVersionResource]bool,
 ) []factory.Informer {
 	configInformers := []factory.Informer{}
-	for gvr := range configGVRs {
+	for gvrRaw := range configGVRs {
+		gvr := gvrRaw // copy the value since it will be used in the closure
 		indexInformer := configInformerFactory.ForResource(gvr).Informer()
 		_, err := indexInformer.AddEventHandler(
 			cache.ResourceEventHandlerFuncs{
@@ -170,6 +174,10 @@ func (c *clusterManagementAddonConfigController) sync(ctx context.Context, syncC
 	}
 	if err != nil {
 		return err
+	}
+
+	if !c.addonFilterFunc(cma) {
+		return nil
 	}
 
 	cmaCopy := cma.DeepCopy()

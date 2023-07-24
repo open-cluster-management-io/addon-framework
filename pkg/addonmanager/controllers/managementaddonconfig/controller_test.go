@@ -257,6 +257,7 @@ func TestSync(t *testing.T) {
 				addonClient:                  fakeAddonClient,
 				clusterManagementAddonLister: addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
 				configListers:                map[schema.GroupResource]dynamiclister.Lister{},
+				addonFilterFunc:              func(obj interface{}) bool { return true },
 			}
 
 			ctrl.buildConfigInformers(configInformerFactory, map[schema.GroupVersionResource]bool{fakeGVR: true})
