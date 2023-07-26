@@ -107,12 +107,12 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 		).
 		WithGetValuesFuncs(
 			helloworld_helm.GetDefaultValues,
+			addonfactory.ToImageOverrideValuesFromClusterAnnotationFunc(
+				"global.imageOverrides.helloWorldHelm",
+				helloworld.DefaultHelloWorldExampleImage),
 			addonfactory.GetAddOnDeploymentConfigValues(
 				addonfactory.NewAddOnDeploymentConfigGetter(addonClient),
 				addonfactory.ToAddOnNodePlacementValues,
-				addonfactory.ToImageOverrideValuesFunc(
-					"global.imageOverrides.helloWorldHelm",
-					helloworld.DefaultHelloWorldExampleImage),
 			),
 			helloworld_helm.GetImageValues(kubeClient),
 			addonfactory.GetValuesFromAddonAnnotation,

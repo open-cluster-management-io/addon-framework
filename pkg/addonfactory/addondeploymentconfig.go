@@ -2,11 +2,13 @@ package addonfactory
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -229,37 +231,97 @@ func ToAddOnDeploymentConfigValues(config addonapiv1alpha1.AddOnDeploymentConfig
 // the imageKey is "helloWorldImage", the image is "quay.io/open-cluster-management/addon-agent:v1"
 // after transformed, the Values object will be: {"helloWorldImage": "quay.io/ocm/addon-agent:v1"}
 //
-// Note: the imageKey can support the nested key, for example: "global.imageOverrides.helloWorldImage", the output
-// will be: {"global": {"imageOverrides": {"helloWorldImage": "quay.io/ocm/addon-agent:v1"}}}
+// Note:
+//   - the imageKey can support the nested key, for example: "global.imageOverrides.helloWorldImage", the output
+//     will be: {"global": {"imageOverrides": {"helloWorldImage": "quay.io/ocm/addon-agent:v1"}}}
+//   - ToImageOverrideValuesFunc and ToImageOverrideValuesFromClusterAnnotationFunc are mutually exclusive,
+//     only one of them can be used by the same addon
 func ToImageOverrideValuesFunc(imageKey, image string) AddOnDeploymentConfigToValuesFunc {
 	return func(config addonapiv1alpha1.AddOnDeploymentConfig) (Values, error) {
-		if len(imageKey) == 0 {
-			return nil, fmt.Errorf("imageKey is empty")
+		getRegistries := func() ([]addonapiv1alpha1.ImageMirror, error) {
+			return config.Spec.Registries, nil
 		}
-		if len(image) == 0 {
-			return nil, fmt.Errorf("image is empty")
+		return overrideImageWithKeyValue(imageKey, image, getRegistries)
+	}
+}
+
+func overrideImageWithKeyValue(imageKey, image string, getRegistries func() ([]addonapiv1alpha1.ImageMirror, error),
+) (Values, error) {
+	if len(imageKey) == 0 {
+		return nil, fmt.Errorf("imageKey is empty")
+	}
+	if len(image) == 0 {
+		return nil, fmt.Errorf("image is empty")
+	}
+
+	nestedMap := make(map[string]interface{})
+
+	keys := strings.Split(imageKey, ".")
+	currentMap := nestedMap
+
+	for i := 0; i < len(keys)-1; i++ {
+		key := keys[i]
+		nextMap := make(map[string]interface{})
+		currentMap[key] = nextMap
+		currentMap = nextMap
+	}
+
+	lastKey := keys[len(keys)-1]
+	currentMap[lastKey] = image
+
+	registries, err := getRegistries()
+	if err != nil {
+		klog.Errorf("failed to get image registries, err %v", err)
+		return nestedMap, err
+	}
+
+	klog.V(4).Infof("Image registries values %v", registries)
+	if registries != nil {
+		currentMap[lastKey] = OverrideImage(registries, image)
+	}
+
+	return nestedMap, nil
+}
+
+const ClusterImageRegistriesAnnotation = "open-cluster-management.io/image-registries"
+
+// ToImageOverrideValuesFromClusterAnnotationFunc return a func that can use the registries configed by the annotation
+// "open-cluster-management.io/image-registries" on the managed cluster resource to override image.
+// then return the overridden value with key imageKey.
+//
+// for example: the annotation on the managed cluster resource is:
+// open-cluster-management.io/image-registries: '{"registries":[{"mirror":"quay.io/ocm","source":"quay.io/open-cluster-management"}]}'
+// the imageKey is "helloWorldImage", the image is "quay.io/open-cluster-management/addon-agent:v1"
+// after transformed, the Values object will be: {"helloWorldImage": "quay.io/ocm/addon-agent:v1"}
+//
+// Note:
+//   - the imageKey can support the nested key, for example: "global.imageOverrides.helloWorldImage", the output
+//     will be: {"global": {"imageOverrides": {"helloWorldImage": "quay.io/ocm/addon-agent:v1"}}}
+//   - ToImageOverrideValuesFromClusterAnnotationFunc and ToImageOverrideValuesFunc are mutually exclusive,
+//     only one of them can be used by the same addon
+func ToImageOverrideValuesFromClusterAnnotationFunc(imageKey, image string) GetValuesFunc {
+	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
+
+		getRegistries := func() ([]addonapiv1alpha1.ImageMirror, error) {
+			annotations := cluster.GetAnnotations()
+			klog.V(4).Infof("Try to get image registries from annotation %v", annotations[ClusterImageRegistriesAnnotation])
+			if len(annotations[ClusterImageRegistriesAnnotation]) == 0 {
+				return nil, nil
+			}
+			type ImageRegistries struct {
+				Registries []addonapiv1alpha1.ImageMirror `json:"registries"`
+			}
+
+			imageRegistries := ImageRegistries{}
+			err := json.Unmarshal([]byte(annotations[ClusterImageRegistriesAnnotation]), &imageRegistries)
+			if err != nil {
+				klog.Errorf("failed to unmarshal the annotation %v, err %v", annotations[ClusterImageRegistriesAnnotation], err)
+				return nil, err
+			}
+			return imageRegistries.Registries, nil
 		}
 
-		nestedMap := make(map[string]interface{})
-
-		keys := strings.Split(imageKey, ".")
-		currentMap := nestedMap
-
-		for i := 0; i < len(keys)-1; i++ {
-			key := keys[i]
-			nextMap := make(map[string]interface{})
-			currentMap[key] = nextMap
-			currentMap = nextMap
-		}
-
-		lastKey := keys[len(keys)-1]
-		currentMap[lastKey] = image
-
-		if config.Spec.Registries != nil {
-			currentMap[lastKey] = OverrideImage(config.Spec.Registries, image)
-		}
-
-		return nestedMap, nil
+		return overrideImageWithKeyValue(imageKey, image, getRegistries)
 	}
 }
 

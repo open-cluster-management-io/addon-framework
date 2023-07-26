@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,6 +13,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
 var (
@@ -360,6 +362,146 @@ func TestToImageOverrideValuesFunc(t *testing.T) {
 				if c.expectedErr != nil {
 					t.Errorf("expected error %v, but got no error", c.expectedErr)
 				}
+			}
+
+			if !equality.Semantic.DeepEqual(values, c.expectedValues) {
+				t.Errorf("expected values %v, but got values %v", c.expectedValues, values)
+			}
+		})
+	}
+}
+
+func TestToImageOverrideValuesFromClusterAnnotationFunc(t *testing.T) {
+	cases := []struct {
+		name           string
+		imageKey       string
+		imageValue     string
+		cluster        *clusterv1.ManagedCluster
+		expectedValues Values
+		expectedError  string
+	}{
+		{
+			name:       "no nested imagekey",
+			imageKey:   "image",
+			imageValue: "a/b/c:v1",
+			cluster: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						ClusterImageRegistriesAnnotation: `{"registries":[{"mirror":"x/y","source":"a/b"}]}`,
+					},
+				},
+			},
+			expectedValues: Values{
+				"image": "x/y/c:v1",
+			},
+		},
+		{
+			name:       "nested imagekey",
+			imageKey:   "global.imageOverride.image",
+			imageValue: "a/b/c:v1",
+			cluster: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						ClusterImageRegistriesAnnotation: `{"registries":[{"mirror":"x","source":"a"}]}`,
+					},
+				},
+			},
+			expectedValues: Values{
+				"global": map[string]interface{}{
+					"imageOverride": map[string]interface{}{
+						"image": "x/b/c:v1",
+					},
+				},
+			},
+		},
+		{
+			name:       "empty imagekey",
+			imageKey:   "",
+			imageValue: "a/b/c:v1",
+			cluster: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						ClusterImageRegistriesAnnotation: `{"registries":[{"mirror":"x","source":"a"}]}`,
+					},
+				},
+			},
+			expectedError: "imageKey is empty",
+		},
+		{
+			name:       "empty image",
+			imageKey:   "global.imageOverride.image",
+			imageValue: "",
+			cluster: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						ClusterImageRegistriesAnnotation: `{"registries":[{"mirror":"x","source":"a"}]}`,
+					},
+				},
+			},
+			expectedError: "image is empty",
+		},
+		{
+			name:       "source not match",
+			imageKey:   "global.imageOverride.image",
+			imageValue: "a/b/c",
+			cluster: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						ClusterImageRegistriesAnnotation: `{"registries":[{"mirror":"x","source":"b"}]}`,
+					},
+				},
+			},
+			expectedValues: Values{
+				"global": map[string]interface{}{
+					"imageOverride": map[string]interface{}{
+						"image": "a/b/c",
+					},
+				},
+			},
+		},
+		{
+			name:       "source empty",
+			imageKey:   "global.imageOverride.image",
+			imageValue: "a/b/c:v1",
+			cluster: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						ClusterImageRegistriesAnnotation: `{"registries":[{"mirror":"y"}]}`,
+					},
+				},
+			},
+			expectedValues: Values{
+				"global": map[string]interface{}{
+					"imageOverride": map[string]interface{}{
+						"image": "y/c:v1",
+					},
+				},
+			},
+		},
+		{
+			name:       "annotation invalid",
+			imageKey:   "image",
+			imageValue: "a/b/c:v1",
+			cluster: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						ClusterImageRegistriesAnnotation: `{"registries":`,
+					},
+				},
+			},
+			expectedValues: Values{
+				"image": "a/b/c:v1",
+			},
+			expectedError: "unexpected end of JSON input",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+
+			values, err := ToImageOverrideValuesFromClusterAnnotationFunc(c.imageKey, c.imageValue)(c.cluster, nil)
+			if err != nil || len(c.expectedError) > 0 {
+				assert.ErrorContains(t, err, c.expectedError, "expected error: %v, got: %v", c.expectedError, err)
 			}
 
 			if !equality.Semantic.DeepEqual(values, c.expectedValues) {
