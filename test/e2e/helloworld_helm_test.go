@@ -14,6 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
 const (
@@ -350,7 +351,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 			if annotations == nil {
 				annotations = make(map[string]string)
 			}
-			annotations["open-cluster-management.io/image-registries"] = string(registriesJson)
+			annotations[clusterv1.ClusterImageRegistriesAnnotationKey] = string(registriesJson)
 
 			newCluster.Annotations = annotations
 			_, err = hubClusterClient.ClusterV1().ManagedClusters().Update(
@@ -421,7 +422,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 			}
 
 			newCluster := cluster.DeepCopy()
-			delete(newCluster.Annotations, "open-cluster-management.io/image-registries")
+			delete(newCluster.Annotations, clusterv1.ClusterImageRegistriesAnnotationKey)
 			_, err = hubClusterClient.ClusterV1().ManagedClusters().Update(
 				context.Background(), newCluster, metav1.UpdateOptions{})
 			return err
@@ -448,7 +449,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 			if annotations == nil {
 				annotations = make(map[string]string)
 			}
-			annotations["open-cluster-management.io/image-registries"] = string(registriesJson)
+			annotations[clusterv1.ClusterImageRegistriesAnnotationKey] = string(registriesJson)
 
 			newCluster.Annotations = annotations
 			_, err = hubClusterClient.ClusterV1().ManagedClusters().Update(
@@ -510,7 +511,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 			}
 
 			newCluster := cluster.DeepCopy()
-			delete(newCluster.Annotations, "open-cluster-management.io/image-registries")
+			delete(newCluster.Annotations, clusterv1.ClusterImageRegistriesAnnotationKey)
 			_, err = hubClusterClient.ClusterV1().ManagedClusters().Update(
 				context.Background(), newCluster, metav1.UpdateOptions{})
 			return err

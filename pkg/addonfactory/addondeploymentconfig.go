@@ -242,8 +242,9 @@ func ToAddOnDeploymentConfigValues(config addonapiv1alpha1.AddOnDeploymentConfig
 // Note:
 //   - the imageKey can support the nested key, for example: "global.imageOverrides.helloWorldImage", the output
 //     will be: {"global": {"imageOverrides": {"helloWorldImage": "quay.io/ocm/addon-agent:v1"}}}
-//
-// Deprecated: use GetAgentImageValues instead.
+//   - If you want to override the image with the value from the AddOnDeploymentConfig.spec.Registries first, and
+//     if it is not changed, then override it with the value from the cluster annotation, you can use the function
+//     GetAgentImageValues instead.
 func ToImageOverrideValuesFunc(imageKey, image string) AddOnDeploymentConfigToValuesFunc {
 	return func(config addonapiv1alpha1.AddOnDeploymentConfig) (Values, error) {
 		values, _, err := overrideImageWithKeyValue(imageKey, image, getRegistriesFromAddonDeploymentConfig(config))
@@ -265,8 +266,8 @@ func getRegistriesFromClusterAnnotation(
 			return nil, nil
 		}
 		annotations := cluster.GetAnnotations()
-		klog.V(4).Infof("Try to get image registries from annotation %v", annotations[ClusterImageRegistriesAnnotation])
-		if len(annotations[ClusterImageRegistriesAnnotation]) == 0 {
+		klog.V(4).Infof("Try to get image registries from annotation %v", annotations[clusterv1.ClusterImageRegistriesAnnotationKey])
+		if len(annotations[clusterv1.ClusterImageRegistriesAnnotationKey]) == 0 {
 			return nil, nil
 		}
 		type ImageRegistries struct {
@@ -274,9 +275,9 @@ func getRegistriesFromClusterAnnotation(
 		}
 
 		imageRegistries := ImageRegistries{}
-		err := json.Unmarshal([]byte(annotations[ClusterImageRegistriesAnnotation]), &imageRegistries)
+		err := json.Unmarshal([]byte(annotations[clusterv1.ClusterImageRegistriesAnnotationKey]), &imageRegistries)
 		if err != nil {
-			klog.Errorf("failed to unmarshal the annotation %v, err %v", annotations[ClusterImageRegistriesAnnotation], err)
+			klog.Errorf("failed to unmarshal the annotation %v, err %v", annotations[clusterv1.ClusterImageRegistriesAnnotationKey], err)
 			return nil, err
 		}
 		return imageRegistries.Registries, nil
@@ -382,8 +383,6 @@ func overrideImageWithKeyValue(imageKey, image string, getRegistries func() ([]a
 
 	return nestedMap, overrode, nil
 }
-
-const ClusterImageRegistriesAnnotation = "open-cluster-management.io/image-registries"
 
 // OverrideImage checks whether the source configured in registries can match the imagedName, if yes will use the
 // mirror value in the registries to override the imageName

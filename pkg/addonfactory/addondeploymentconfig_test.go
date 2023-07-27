@@ -389,7 +389,7 @@ func TestGetAgentImageValues(t *testing.T) {
 			cluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						ClusterImageRegistriesAnnotation: `{"registries":[{"mirror":"x/y","source":"a/b"}]}`,
+						clusterv1.ClusterImageRegistriesAnnotationKey: `{"registries":[{"mirror":"x/y","source":"a/b"}]}`,
 					},
 				},
 			},
@@ -404,7 +404,7 @@ func TestGetAgentImageValues(t *testing.T) {
 			cluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						ClusterImageRegistriesAnnotation: `{"registries":[{"mirror":"x","source":"a"}]}`,
+						clusterv1.ClusterImageRegistriesAnnotationKey: `{"registries":[{"mirror":"x","source":"a"}]}`,
 					},
 				},
 			},
@@ -423,7 +423,7 @@ func TestGetAgentImageValues(t *testing.T) {
 			cluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						ClusterImageRegistriesAnnotation: `{"registries":[{"mirror":"x","source":"a"}]}`,
+						clusterv1.ClusterImageRegistriesAnnotationKey: `{"registries":[{"mirror":"x","source":"a"}]}`,
 					},
 				},
 			},
@@ -436,7 +436,7 @@ func TestGetAgentImageValues(t *testing.T) {
 			cluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						ClusterImageRegistriesAnnotation: `{"registries":[{"mirror":"x","source":"a"}]}`,
+						clusterv1.ClusterImageRegistriesAnnotationKey: `{"registries":[{"mirror":"x","source":"a"}]}`,
 					},
 				},
 			},
@@ -449,7 +449,7 @@ func TestGetAgentImageValues(t *testing.T) {
 			cluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						ClusterImageRegistriesAnnotation: `{"registries":[{"mirror":"x","source":"b"}]}`,
+						clusterv1.ClusterImageRegistriesAnnotationKey: `{"registries":[{"mirror":"x","source":"b"}]}`,
 					},
 				},
 			},
@@ -468,7 +468,7 @@ func TestGetAgentImageValues(t *testing.T) {
 			cluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						ClusterImageRegistriesAnnotation: `{"registries":[{"mirror":"y"}]}`,
+						clusterv1.ClusterImageRegistriesAnnotationKey: `{"registries":[{"mirror":"y"}]}`,
 					},
 				},
 			},
@@ -487,7 +487,7 @@ func TestGetAgentImageValues(t *testing.T) {
 			cluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						ClusterImageRegistriesAnnotation: `{"registries":`,
+						clusterv1.ClusterImageRegistriesAnnotationKey: `{"registries":`,
 					},
 				},
 			},
@@ -506,7 +506,7 @@ func TestGetAgentImageValues(t *testing.T) {
 			cluster: &clusterv1.ManagedCluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						ClusterImageRegistriesAnnotation: `{"registries":[{"mirror":"x","source":"a"}]}`,
+						clusterv1.ClusterImageRegistriesAnnotationKey: `{"registries":[{"mirror":"x","source":"a"}]}`,
 					},
 				},
 			},
