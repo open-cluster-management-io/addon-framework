@@ -371,14 +371,16 @@ func TestToImageOverrideValuesFunc(t *testing.T) {
 	}
 }
 
-func TestToImageOverrideValuesFromClusterAnnotationFunc(t *testing.T) {
+func TestGetAgentImageValues(t *testing.T) {
 	cases := []struct {
-		name           string
-		imageKey       string
-		imageValue     string
-		cluster        *clusterv1.ManagedCluster
-		expectedValues Values
-		expectedError  string
+		name                  string
+		imageKey              string
+		imageValue            string
+		cluster               *clusterv1.ManagedCluster
+		addon                 *addonapiv1alpha1.ManagedClusterAddOn
+		addonDeploymentConfig []runtime.Object
+		expectedValues        Values
+		expectedError         string
 	}{
 		{
 			name:       "no nested imagekey",
@@ -494,12 +496,90 @@ func TestToImageOverrideValuesFromClusterAnnotationFunc(t *testing.T) {
 			},
 			expectedError: "unexpected end of JSON input",
 		},
+		{
+			name:       "addon deployment config takes precedence",
+			imageKey:   "image",
+			imageValue: "a/b/c:v1",
+			expectedValues: Values{
+				"image": "y/b/c:v1",
+			},
+			cluster: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						ClusterImageRegistriesAnnotation: `{"registries":[{"mirror":"x","source":"a"}]}`,
+					},
+				},
+			},
+			addon: func() *addonapiv1alpha1.ManagedClusterAddOn {
+				addon := addontesting.NewAddon("test", "cluster1")
+				addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+					{
+						ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							Group:    "addon.open-cluster-management.io",
+							Resource: "addondeploymentconfigs",
+						},
+						ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							Namespace: "cluster1",
+							Name:      "config1",
+						},
+					},
+					{
+						ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							Group:    "addon.open-cluster-management.io",
+							Resource: "addondeploymentconfigs",
+						},
+						ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							Namespace: "cluster1",
+							Name:      "config2",
+						},
+					},
+				}
+				return addon
+			}(),
+			addonDeploymentConfig: []runtime.Object{
+				&addonapiv1alpha1.AddOnDeploymentConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "config1",
+						Namespace: "cluster1",
+					},
+					Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+						CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+							{Name: "Test", Value: "test1"},
+						},
+					},
+				},
+				&addonapiv1alpha1.AddOnDeploymentConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "config2",
+						Namespace: "cluster1",
+					},
+					Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+						Registries: []addonapiv1alpha1.ImageMirror{
+							{
+								Source: "a",
+								Mirror: "y",
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-
-			values, err := ToImageOverrideValuesFromClusterAnnotationFunc(c.imageKey, c.imageValue)(c.cluster, nil)
+			var addonObjects []runtime.Object
+			if c.addon != nil {
+				addonObjects = append(addonObjects, c.addon)
+			}
+			addonObjects = append(addonObjects, c.addonDeploymentConfig...)
+			fakeAddonClient := fakeaddon.NewSimpleClientset(addonObjects...)
+			getter := NewAddOnDeploymentConfigGetter(fakeAddonClient)
+			addon := addontesting.NewAddon("test", "cluster1")
+			if c.addon != nil {
+				addon = c.addon
+			}
+			values, err := GetAgentImageValues(getter, c.imageKey, c.imageValue)(c.cluster, addon)
 			if err != nil || len(c.expectedError) > 0 {
 				assert.ErrorContains(t, err, c.expectedError, "expected error: %v, got: %v", c.expectedError, err)
 			}
