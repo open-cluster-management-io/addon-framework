@@ -14,7 +14,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
@@ -35,15 +37,21 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/index"
 )
 
+const (
+	controllerName = "addon-deploy-controller"
+)
+
 // addonDeployController deploy addon agent resources on the managed cluster.
 type addonDeployController struct {
-	workApplier               *workapplier.WorkApplier
-	workBuilder               *workbuilder.WorkBuilder
-	addonClient               addonv1alpha1client.Interface
-	managedClusterLister      clusterlister.ManagedClusterLister
-	managedClusterAddonLister addonlisterv1alpha1.ManagedClusterAddOnLister
-	workIndexer               cache.Indexer
-	agentAddons               map[string]agent.AgentAddon
+	workApplier                *workapplier.WorkApplier
+	workBuilder                *workbuilder.WorkBuilder
+	addonClient                addonv1alpha1client.Interface
+	managedClusterLister       clusterlister.ManagedClusterLister
+	managedClusterAddonLister  addonlisterv1alpha1.ManagedClusterAddOnLister
+	managedClusterAddonIndexer cache.Indexer
+	workIndexer                cache.Indexer
+	agentAddons                map[string]agent.AgentAddon
+	queue                      workqueue.RateLimitingInterface
 }
 
 func NewAddonDeployController(
@@ -54,16 +62,42 @@ func NewAddonDeployController(
 	workInformers workinformers.ManifestWorkInformer,
 	agentAddons map[string]agent.AgentAddon,
 ) factory.Controller {
+	syncCtx := factory.NewSyncContext(controllerName)
+
 	c := &addonDeployController{
+		queue:       syncCtx.Queue(),
 		workApplier: workapplier.NewWorkApplierWithTypedClient(workClient, workInformers.Lister()),
 		// the default manifest limit in a work is 500k
 		// TODO: make the limit configurable
-		workBuilder:               workbuilder.NewWorkBuilder().WithManifestsLimit(500 * 1024),
-		addonClient:               addonClient,
-		managedClusterLister:      clusterInformers.Lister(),
-		managedClusterAddonLister: addonInformers.Lister(),
-		workIndexer:               workInformers.Informer().GetIndexer(),
-		agentAddons:               agentAddons,
+		workBuilder:                workbuilder.NewWorkBuilder().WithManifestsLimit(500 * 1024),
+		addonClient:                addonClient,
+		managedClusterLister:       clusterInformers.Lister(),
+		managedClusterAddonLister:  addonInformers.Lister(),
+		managedClusterAddonIndexer: addonInformers.Informer().GetIndexer(),
+		workIndexer:                workInformers.Informer().GetIndexer(),
+		agentAddons:                agentAddons,
+	}
+
+	_, err := clusterInformers.Informer().AddEventHandler(
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				oldCluster, ook := oldObj.(*clusterv1.ManagedCluster)
+				newCluster, nok := newObj.(*clusterv1.ManagedCluster)
+				if !ook || !nok {
+					return
+				}
+
+				// Only enqueue addons if the cluster annotation is changed.
+				if !equality.Semantic.DeepEqual(oldCluster.Annotations, newCluster.Annotations) {
+					c.enqueueAddOnsByCluster()(newObj)
+				}
+			},
+			DeleteFunc: func(obj interface{}) {},
+		},
+	)
+	if err != nil {
+		utilruntime.HandleError(err)
 	}
 
 	return factory.New().WithFilteredEventsInformersQueueKeysFunc(
@@ -115,7 +149,29 @@ func NewAddonDeployController(
 			},
 			workInformers.Informer(),
 		).
-		WithSync(c.sync).ToController("addon-deploy-controller")
+		WithBareInformers(clusterInformers.Informer()).
+		WithSync(c.sync).ToController(controllerName)
+}
+
+func (c *addonDeployController) enqueueAddOnsByCluster() func(obj interface{}) {
+	return func(obj interface{}) {
+		accessor, _ := meta.Accessor(obj)
+		addons, err := c.managedClusterAddonIndexer.ByIndex(index.ManagedClusterAddonByNamespace, accessor.GetName())
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("failed to get addons by cluster %s , err: %v", accessor.GetName(), err))
+			return
+		}
+		var addonNames []string
+		for _, addon := range addons {
+			if addon == nil {
+				continue
+			}
+			key, _ := cache.MetaNamespaceKeyFunc(addon)
+			c.queue.Add(key)
+			addonNames = append(addonNames, key)
+		}
+		klog.V(5).Infof("Enqueue addons by cluster %s, addons: %v", accessor.GetName(), addonNames)
+	}
 }
 
 type addonDeploySyncer interface {
