@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,6 +13,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
 var (
@@ -360,6 +362,226 @@ func TestToImageOverrideValuesFunc(t *testing.T) {
 				if c.expectedErr != nil {
 					t.Errorf("expected error %v, but got no error", c.expectedErr)
 				}
+			}
+
+			if !equality.Semantic.DeepEqual(values, c.expectedValues) {
+				t.Errorf("expected values %v, but got values %v", c.expectedValues, values)
+			}
+		})
+	}
+}
+
+func TestGetAgentImageValues(t *testing.T) {
+	cases := []struct {
+		name                  string
+		imageKey              string
+		imageValue            string
+		cluster               *clusterv1.ManagedCluster
+		addon                 *addonapiv1alpha1.ManagedClusterAddOn
+		addonDeploymentConfig []runtime.Object
+		expectedValues        Values
+		expectedError         string
+	}{
+		{
+			name:       "no nested imagekey",
+			imageKey:   "image",
+			imageValue: "a/b/c:v1",
+			cluster: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						clusterv1.ClusterImageRegistriesAnnotationKey: `{"registries":[{"mirror":"x/y","source":"a/b"}]}`,
+					},
+				},
+			},
+			expectedValues: Values{
+				"image": "x/y/c:v1",
+			},
+		},
+		{
+			name:       "nested imagekey",
+			imageKey:   "global.imageOverride.image",
+			imageValue: "a/b/c:v1",
+			cluster: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						clusterv1.ClusterImageRegistriesAnnotationKey: `{"registries":[{"mirror":"x","source":"a"}]}`,
+					},
+				},
+			},
+			expectedValues: Values{
+				"global": map[string]interface{}{
+					"imageOverride": map[string]interface{}{
+						"image": "x/b/c:v1",
+					},
+				},
+			},
+		},
+		{
+			name:       "empty imagekey",
+			imageKey:   "",
+			imageValue: "a/b/c:v1",
+			cluster: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						clusterv1.ClusterImageRegistriesAnnotationKey: `{"registries":[{"mirror":"x","source":"a"}]}`,
+					},
+				},
+			},
+			expectedError: "imageKey is empty",
+		},
+		{
+			name:       "empty image",
+			imageKey:   "global.imageOverride.image",
+			imageValue: "",
+			cluster: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						clusterv1.ClusterImageRegistriesAnnotationKey: `{"registries":[{"mirror":"x","source":"a"}]}`,
+					},
+				},
+			},
+			expectedError: "image is empty",
+		},
+		{
+			name:       "source not match",
+			imageKey:   "global.imageOverride.image",
+			imageValue: "a/b/c",
+			cluster: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						clusterv1.ClusterImageRegistriesAnnotationKey: `{"registries":[{"mirror":"x","source":"b"}]}`,
+					},
+				},
+			},
+			expectedValues: Values{
+				"global": map[string]interface{}{
+					"imageOverride": map[string]interface{}{
+						"image": "a/b/c",
+					},
+				},
+			},
+		},
+		{
+			name:       "source empty",
+			imageKey:   "global.imageOverride.image",
+			imageValue: "a/b/c:v1",
+			cluster: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						clusterv1.ClusterImageRegistriesAnnotationKey: `{"registries":[{"mirror":"y"}]}`,
+					},
+				},
+			},
+			expectedValues: Values{
+				"global": map[string]interface{}{
+					"imageOverride": map[string]interface{}{
+						"image": "y/c:v1",
+					},
+				},
+			},
+		},
+		{
+			name:       "annotation invalid",
+			imageKey:   "image",
+			imageValue: "a/b/c:v1",
+			cluster: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						clusterv1.ClusterImageRegistriesAnnotationKey: `{"registries":`,
+					},
+				},
+			},
+			expectedValues: Values{
+				"image": "a/b/c:v1",
+			},
+			expectedError: "unexpected end of JSON input",
+		},
+		{
+			name:       "addon deployment config takes precedence",
+			imageKey:   "image",
+			imageValue: "a/b/c:v1",
+			expectedValues: Values{
+				"image": "y/b/c:v1",
+			},
+			cluster: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						clusterv1.ClusterImageRegistriesAnnotationKey: `{"registries":[{"mirror":"x","source":"a"}]}`,
+					},
+				},
+			},
+			addon: func() *addonapiv1alpha1.ManagedClusterAddOn {
+				addon := addontesting.NewAddon("test", "cluster1")
+				addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+					{
+						ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							Group:    "addon.open-cluster-management.io",
+							Resource: "addondeploymentconfigs",
+						},
+						ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							Namespace: "cluster1",
+							Name:      "config1",
+						},
+					},
+					{
+						ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							Group:    "addon.open-cluster-management.io",
+							Resource: "addondeploymentconfigs",
+						},
+						ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							Namespace: "cluster1",
+							Name:      "config2",
+						},
+					},
+				}
+				return addon
+			}(),
+			addonDeploymentConfig: []runtime.Object{
+				&addonapiv1alpha1.AddOnDeploymentConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "config1",
+						Namespace: "cluster1",
+					},
+					Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+						CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+							{Name: "Test", Value: "test1"},
+						},
+					},
+				},
+				&addonapiv1alpha1.AddOnDeploymentConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "config2",
+						Namespace: "cluster1",
+					},
+					Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+						Registries: []addonapiv1alpha1.ImageMirror{
+							{
+								Source: "a",
+								Mirror: "y",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var addonObjects []runtime.Object
+			if c.addon != nil {
+				addonObjects = append(addonObjects, c.addon)
+			}
+			addonObjects = append(addonObjects, c.addonDeploymentConfig...)
+			fakeAddonClient := fakeaddon.NewSimpleClientset(addonObjects...)
+			getter := NewAddOnDeploymentConfigGetter(fakeAddonClient)
+			addon := addontesting.NewAddon("test", "cluster1")
+			if c.addon != nil {
+				addon = c.addon
+			}
+			values, err := GetAgentImageValues(getter, c.imageKey, c.imageValue)(c.cluster, addon)
+			if err != nil || len(c.expectedError) > 0 {
+				assert.ErrorContains(t, err, c.expectedError, "expected error: %v, got: %v", c.expectedError, err)
 			}
 
 			if !equality.Semantic.DeepEqual(values, c.expectedValues) {
