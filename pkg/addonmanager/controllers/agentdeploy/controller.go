@@ -78,42 +78,21 @@ func NewAddonDeployController(
 		agentAddons:                agentAddons,
 	}
 
-	_, err := clusterInformers.Informer().AddEventHandler(
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {},
-			UpdateFunc: func(oldObj, newObj interface{}) {
-				oldCluster, ook := oldObj.(*clusterv1.ManagedCluster)
-				newCluster, nok := newObj.(*clusterv1.ManagedCluster)
-				if !ook || !nok {
-					return
-				}
-
-				// Only enqueue addons if the cluster annotation is changed.
-				if !equality.Semantic.DeepEqual(oldCluster.Annotations, newCluster.Annotations) {
-					c.enqueueAddOnsByCluster()(newObj)
-				}
+	f := factory.New().WithSyncContext(syncCtx).
+		WithFilteredEventsInformersQueueKeysFunc(
+			func(obj runtime.Object) []string {
+				key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+				return []string{key}
 			},
-			DeleteFunc: func(obj interface{}) {},
-		},
-	)
-	if err != nil {
-		utilruntime.HandleError(err)
-	}
+			func(obj interface{}) bool {
+				accessor, _ := meta.Accessor(obj)
+				if _, ok := c.agentAddons[accessor.GetName()]; !ok {
+					return false
+				}
 
-	return factory.New().WithFilteredEventsInformersQueueKeysFunc(
-		func(obj runtime.Object) []string {
-			key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-			return []string{key}
-		},
-		func(obj interface{}) bool {
-			accessor, _ := meta.Accessor(obj)
-			if _, ok := c.agentAddons[accessor.GetName()]; !ok {
-				return false
-			}
-
-			return true
-		},
-		addonInformers.Informer()).
+				return true
+			},
+			addonInformers.Informer()).
 		WithFilteredEventsInformersQueueKeysFunc(
 			func(obj runtime.Object) []string {
 				accessor, _ := meta.Accessor(obj)
@@ -149,10 +128,51 @@ func NewAddonDeployController(
 			},
 			workInformers.Informer(),
 		).
-		WithBareInformers(clusterInformers.Informer()).
-		WithSync(c.sync).ToController(controllerName)
+		WithSync(c.sync)
+
+	if c.watchManagedCluster(clusterInformers) {
+		f.WithBareInformers(clusterInformers.Informer())
+	}
+	return f.ToController(controllerName)
 }
 
+func (c addonDeployController) watchManagedCluster(clusterInformers clusterinformers.ManagedClusterInformer) bool {
+	var filters []func(old, new *clusterv1.ManagedCluster) bool
+	for _, addon := range c.agentAddons {
+		if addon.GetAgentAddonOptions().AgentDeployTriggerClusterFilter != nil {
+			filters = append(filters, addon.GetAgentAddonOptions().AgentDeployTriggerClusterFilter)
+		}
+	}
+	if len(filters) == 0 {
+		return false
+	}
+
+	_, err := clusterInformers.Informer().AddEventHandler(
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				oldCluster, ook := oldObj.(*clusterv1.ManagedCluster)
+				newCluster, nok := newObj.(*clusterv1.ManagedCluster)
+				if !ook || !nok {
+					return
+				}
+
+				// enqueue the addon if one of cluster filters is matched.
+				for _, filter := range filters {
+					if filter(oldCluster, newCluster) {
+						c.enqueueAddOnsByCluster()(newObj)
+						break
+					}
+				}
+			},
+			DeleteFunc: func(obj interface{}) {},
+		},
+	)
+	if err != nil {
+		utilruntime.HandleError(err)
+	}
+	return true
+}
 func (c *addonDeployController) enqueueAddOnsByCluster() func(obj interface{}) {
 	return func(obj interface{}) {
 		accessor, _ := meta.Accessor(obj)
@@ -196,6 +216,7 @@ func (c *addonDeployController) getWorksByAddonFn(index string) func(addonName, 
 }
 
 func (c *addonDeployController) sync(ctx context.Context, syncCtx factory.SyncContext, key string) error {
+	klog.V(4).Infof("%s sync addon key %s", controllerName, key)
 	clusterName, addonName, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		// ignore addon whose key is not in format: namespace/name

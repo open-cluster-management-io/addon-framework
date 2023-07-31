@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
@@ -18,6 +19,7 @@ import (
 	logs "k8s.io/component-base/logs/api/v1"
 	"k8s.io/klog/v2"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	"open-cluster-management.io/addon-framework/examples/helloworld"
 	"open-cluster-management.io/addon-framework/examples/helloworld_agent"
@@ -105,6 +107,9 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 			schema.GroupVersionResource{Version: "v1", Resource: "configmaps"},
 			utils.AddOnDeploymentConfigGVR,
 		).
+		WithAgentDeployTriggerClusterFilter(func(old, new *clusterv1.ManagedCluster) bool {
+			return !equality.Semantic.DeepEqual(old.Annotations, new.Annotations)
+		}).
 		WithGetValuesFuncs(
 			helloworld_helm.GetDefaultValues,
 			addonfactory.GetAddOnDeploymentConfigValues(
