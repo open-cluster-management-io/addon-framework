@@ -103,6 +103,15 @@ var _ = ginkgo.BeforeSuite(func() {
 				return err
 			}
 
+			// make the e2e test idempotent to ease debugging in local environment
+			for _, condition := range csr.Status.Conditions {
+				if condition.Type == certificatesv1.CertificateApproved {
+					if condition.Status == corev1.ConditionTrue {
+						return nil
+					}
+				}
+			}
+
 			csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1.CertificateSigningRequestCondition{
 				Type:    certificatesv1.CertificateApproved,
 				Status:  corev1.ConditionTrue,

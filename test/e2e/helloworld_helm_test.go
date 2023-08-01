@@ -457,30 +457,6 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 			return err
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
-		// TODO: make the addon-framework deploy controller watch the ManagedCluster resurce, after that
-		// we can remove this
-		ginkgo.By("UPDATE ManagedClusterAddOn to trigger reconcile")
-		gomega.Eventually(func() error {
-			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(
-				context.Background(), helloWorldHelmAddonName, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			newAddon := addon.DeepCopy()
-			annotations := addon.Annotations
-			if annotations == nil {
-				annotations = make(map[string]string)
-			}
-			annotations["test"] = rand.String(6)
-			newAddon.Annotations = annotations
-			_, err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Update(
-				context.Background(), newAddon, metav1.UpdateOptions{})
-			if err != nil {
-				return err
-			}
-			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
-
 		ginkgo.By("Make sure addon is configured")
 		gomega.Eventually(func() error {
 			agentDeploy, err := hubKubeClient.AppsV1().Deployments(addonInstallNamespace).Get(
