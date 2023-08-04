@@ -42,6 +42,21 @@ spec:
       - name: helloworld-agent
         image: {{ .Image }}
         imagePullPolicy: IfNotPresent
+{{- if or .HTTPProxy .HTTPSProxy}}
+        env:
+        {{- if .HTTPProxy }}
+          - name: HTTP_PROXY
+            value: {{ .HTTPProxy }}
+        {{- end }}
+        {{- if .HTTPSProxy }}
+          - name: HTTPS_PROXY
+            value: {{ .HTTPSProxy }}
+        {{- end }}
+        {{- if .NoProxy }}
+          - name: NO_PROXY
+            value: {{ .NoProxy }}
+        {{- end }}
+{{- end }}
         args:
           - "/helloworld"
           - "agent"

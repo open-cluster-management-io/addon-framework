@@ -144,6 +144,52 @@ func ToAddOnNodePlacementValues(config addonapiv1alpha1.AddOnDeploymentConfig) (
 	return values, nil
 }
 
+// ToAddOnProxyConfigValues transform the spec.proxyConfig of AddOnDeploymentConfig into Values object that has
+// a specific for helm chart values
+// for example: the spec of one AddOnDeploymentConfig is:
+//
+//	{
+//	 proxyConfig: {"httpProxy": "http://10.11.12.13:3128", "httpsProxy": "https://10.11.12.13:3129", "noProxy": "example.com"},
+//	}
+//
+// after transformed, the Values will be:
+// map[global:map[proxyConfig:map[httpProxy:http://10.11.12.13:3128 httpsProxy:https://10.11.12.13:3129 noProxy:example.com]]]
+func ToAddOnProxyConfigValues(config addonapiv1alpha1.AddOnDeploymentConfig) (Values, error) {
+	proxyConfig := map[string]string{}
+	if len(config.Spec.ProxyConfig.HTTPProxy) > 0 {
+		proxyConfig["HTTP_PROXY"] = config.Spec.ProxyConfig.HTTPProxy
+	}
+	if len(config.Spec.ProxyConfig.HTTPSProxy) > 0 {
+		proxyConfig["HTTPS_PROXY"] = config.Spec.ProxyConfig.HTTPSProxy
+	}
+	if len(proxyConfig) == 0 {
+		return nil, nil
+	}
+
+	if len(config.Spec.ProxyConfig.NoProxy) > 0 {
+		proxyConfig["NO_PROXY"] = config.Spec.ProxyConfig.NoProxy
+	}
+
+	type global struct {
+		ProxyConfig map[string]string `json:"proxyConfig"`
+	}
+
+	jsonStruct := struct {
+		Global global `json:"global"`
+	}{
+		Global: global{
+			ProxyConfig: proxyConfig,
+		},
+	}
+
+	values, err := JsonStructToValues(jsonStruct)
+	if err != nil {
+		return nil, err
+	}
+
+	return values, nil
+}
+
 // ToAddOnCustomizedVariableValues only transform the CustomizedVariables in the spec of AddOnDeploymentConfig into Values object.
 // for example: the spec of one AddOnDeploymentConfig is:
 //
@@ -226,6 +272,17 @@ func ToAddOnDeploymentConfigValues(config addonapiv1alpha1.AddOnDeploymentConfig
 	if config.Spec.NodePlacement != nil {
 		values["NodeSelector"] = config.Spec.NodePlacement.NodeSelector
 		values["Tolerations"] = config.Spec.NodePlacement.Tolerations
+	}
+
+	// load add-on proxy settings
+	if len(config.Spec.ProxyConfig.HTTPProxy) > 0 {
+		values["HTTPProxy"] = config.Spec.ProxyConfig.HTTPProxy
+	}
+	if len(config.Spec.ProxyConfig.HTTPSProxy) > 0 {
+		values["HTTPSProxy"] = config.Spec.ProxyConfig.HTTPSProxy
+	}
+	if len(config.Spec.ProxyConfig.NoProxy) > 0 {
+		values["NoProxy"] = config.Spec.ProxyConfig.NoProxy
 	}
 
 	return values, nil

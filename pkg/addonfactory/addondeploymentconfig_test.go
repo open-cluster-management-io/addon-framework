@@ -199,6 +199,90 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 				"managedKubeConfigSecret": "external-managed-kubeconfig",
 			},
 		},
+		{
+			name:          "to addon proxy config",
+			toValuesFuncs: []AddOnDeploymentConfigToValuesFunc{ToAddOnDeploymentConfigValues},
+			addOnObjs: []runtime.Object{
+				func() *addonapiv1alpha1.ManagedClusterAddOn {
+					addon := addontesting.NewAddon("test", "cluster1")
+					addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "addon.open-cluster-management.io",
+								Resource: "addondeploymentconfigs",
+							},
+							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+								Namespace: "cluster1",
+								Name:      "config",
+							},
+						},
+					}
+					return addon
+				}(),
+				&addonapiv1alpha1.AddOnDeploymentConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "config",
+						Namespace: "cluster1",
+					},
+					Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+						ProxyConfig: addonapiv1alpha1.ProxyConfig{
+							HTTPProxy:  "http://10.2.3.4:3128",
+							HTTPSProxy: "https://10.2.3.4.3129",
+							NoProxy:    "example.com",
+						},
+					},
+				},
+			},
+			expectedValues: Values{
+				"HTTPProxy":  "http://10.2.3.4:3128",
+				"HTTPSProxy": "https://10.2.3.4.3129",
+				"NoProxy":    "example.com",
+			},
+		},
+		{
+			name:          "to addon proxy config for helm chart",
+			toValuesFuncs: []AddOnDeploymentConfigToValuesFunc{ToAddOnProxyConfigValues},
+			addOnObjs: []runtime.Object{
+				func() *addonapiv1alpha1.ManagedClusterAddOn {
+					addon := addontesting.NewAddon("test", "cluster1")
+					addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "addon.open-cluster-management.io",
+								Resource: "addondeploymentconfigs",
+							},
+							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+								Namespace: "cluster1",
+								Name:      "config",
+							},
+						},
+					}
+					return addon
+				}(),
+				&addonapiv1alpha1.AddOnDeploymentConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "config",
+						Namespace: "cluster1",
+					},
+					Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+						ProxyConfig: addonapiv1alpha1.ProxyConfig{
+							HTTPProxy:  "http://10.2.3.4:3128",
+							HTTPSProxy: "https://10.2.3.4:3129",
+							NoProxy:    "example.com",
+						},
+					},
+				},
+			},
+			expectedValues: Values{
+				"global": map[string]interface{}{
+					"proxyConfig": map[string]interface{}{
+						"HTTP_PROXY":  "http://10.2.3.4:3128",
+						"HTTPS_PROXY": "https://10.2.3.4:3129",
+						"NO_PROXY":    "example.com",
+					},
+				},
+			},
+		},
 	}
 
 	for _, c := range cases {

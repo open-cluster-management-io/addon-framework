@@ -494,4 +494,75 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
 
+	ginkgo.It("addon should pick up the proxy settings from addondeploymentconfig", func() {
+		ginkgo.By("Prepare a AddOnDeploymentConfig for proxy settings")
+		gomega.Eventually(func() error {
+			return prepareProxyConfigAddOnDeploymentConfig(managedClusterName)
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		ginkgo.By("Add the configs to ManagedClusterAddOn")
+		gomega.Eventually(func() error {
+			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(
+				context.Background(), helloWorldHelmAddonName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			newAddon := addon.DeepCopy()
+			newAddon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+				{
+					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+						Group:    "addon.open-cluster-management.io",
+						Resource: "addondeploymentconfigs",
+					},
+					ConfigReferent: addonapiv1alpha1.ConfigReferent{
+						Namespace: managedClusterName,
+						Name:      deployProxyConfigName,
+					},
+				},
+			}
+			_, err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Update(
+				context.Background(), newAddon, metav1.UpdateOptions{})
+			if err != nil {
+				return err
+			}
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		ginkgo.By("Make sure addon is configured")
+		gomega.Eventually(func() error {
+			agentDeploy, err := hubKubeClient.AppsV1().Deployments(addonInstallNamespace).Get(
+				context.Background(), "helloworldhelm-agent", metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			containers := agentDeploy.Spec.Template.Spec.Containers
+			if len(containers) != 1 {
+				return fmt.Errorf("expect one container, but %v", containers)
+			}
+
+			// check the proxy settings
+			deployProxyConfig := addonapiv1alpha1.ProxyConfig{}
+			for _, envVar := range containers[0].Env {
+				if envVar.Name == "HTTP_PROXY" {
+					deployProxyConfig.HTTPProxy = envVar.Value
+				}
+
+				if envVar.Name == "HTTPS_PROXY" {
+					deployProxyConfig.HTTPSProxy = envVar.Value
+				}
+
+				if envVar.Name == "NO_PROXY" {
+					deployProxyConfig.NoProxy = envVar.Value
+				}
+			}
+
+			if !equality.Semantic.DeepEqual(proxyConfig, deployProxyConfig) {
+				return fmt.Errorf("expected proxy settings %v, but got %v", proxyConfig, deployProxyConfig)
+			}
+
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+	})
+
 })
