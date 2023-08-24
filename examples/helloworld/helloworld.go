@@ -30,7 +30,6 @@ func NewRegistrationOption(kubeConfig *rest.Config, addonName, agentName string)
 		CSRConfigurations: agent.KubeClientSignerConfigurations(addonName, agentName),
 		CSRApproveCheck:   utils.DefaultCSRApprover(agentName),
 		PermissionConfig:  rbac.AddonRBAC(kubeConfig),
-		Namespace:         InstallationNamespace,
 	}
 }
 

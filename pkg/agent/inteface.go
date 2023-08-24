@@ -108,8 +108,11 @@ type RegistrationOption struct {
 	// +required
 	CSRConfigurations func(cluster *clusterv1.ManagedCluster) []addonapiv1alpha1.RegistrationConfig
 
-	// Namespace is the namespace where registraiton credential will be put on the managed cluster. It
-	// will be overridden by installNamespace on ManagedClusterAddon spec if set
+	// Namespace is the namespace where registration credential will be put on the managed cluster. If it is not
+	// empty it will override the installNamespace on ManagedClusterAddon spec.
+	// Note: Set this very carefully. If this is set, the addon agent must be deployed in the same namespace, which
+	// means when implementing Manifests function in AgentAddon interface, the namespace of the addon agent must be
+	// set to this value as well.
 	Namespace string
 
 	// CSRApproveCheck checks whether the addon agent registration should be approved by the hub.

@@ -92,6 +92,7 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 		helloworld.AddonName,
 		utilrand.String(5),
 	)
+	registrationOption.Namespace = helloworld.InstallationNamespace
 
 	agentAddon, err := addonfactory.NewAgentAddonFactory(helloworld.AddonName, helloworld.FS, "manifests/templates").
 		WithConfigGVRs(utils.AddOnDeploymentConfigGVR).
@@ -104,7 +105,8 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 			),
 		).
 		WithAgentRegistrationOption(registrationOption).
-		WithInstallStrategy(addonagent.InstallAllStrategy(helloworld.InstallationNamespace)).
+		// set the install namespace to a wrong value, it should be ignored when the registrationOption.Namespace is set
+		WithInstallStrategy(addonagent.InstallAllStrategy("test")).
 		WithAgentHealthProber(helloworld.AgentHealthProber()).
 		BuildTemplateAgentAddon()
 	if err != nil {

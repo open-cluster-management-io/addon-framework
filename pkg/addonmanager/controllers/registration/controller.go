@@ -151,9 +151,9 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 
 	managedClusterAddonCopy.Status.Registrations = configs
 
-	managedClusterAddonCopy.Status.Namespace = registrationOption.Namespace
-	if len(managedClusterAddonCopy.Spec.InstallNamespace) > 0 {
-		managedClusterAddonCopy.Status.Namespace = managedClusterAddonCopy.Spec.InstallNamespace
+	managedClusterAddonCopy.Status.Namespace = managedClusterAddonCopy.Spec.InstallNamespace
+	if len(registrationOption.Namespace) > 0 {
+		managedClusterAddonCopy.Status.Namespace = registrationOption.Namespace
 	}
 
 	meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{

@@ -166,7 +166,7 @@ func TestReconcile(t *testing.T) {
 				if addOn.Status.Registrations[0].SignerName != "test" {
 					t.Errorf("Registration config is not updated")
 				}
-				if addOn.Status.Namespace != "default2" {
+				if addOn.Status.Namespace != "default" {
 					t.Errorf("Namespace in status is not correct")
 				}
 			},
