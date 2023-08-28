@@ -23,9 +23,10 @@ import (
 )
 
 type testAgent struct {
-	name          string
-	namespace     string
-	registrations []addonapiv1alpha1.RegistrationConfig
+	name                  string
+	namespace             string
+	registrations         []addonapiv1alpha1.RegistrationConfig
+	agentInstallNamespace func(addon *addonapiv1alpha1.ManagedClusterAddOn) string
 }
 
 func (t *testAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
@@ -38,7 +39,7 @@ func (t *testAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
 			AddonName: t.name,
 		}
 	}
-	return agent.AgentAddonOptions{
+	agentOption := agent.AgentAddonOptions{
 		AddonName: t.name,
 		Registration: &agent.RegistrationOption{
 			CSRConfigurations: func(cluster *clusterv1.ManagedCluster) []addonapiv1alpha1.RegistrationConfig {
@@ -50,6 +51,11 @@ func (t *testAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
 			Namespace: t.namespace,
 		},
 	}
+
+	if t.agentInstallNamespace != nil {
+		agentOption.Registration.AgentInstallNamespace = t.agentInstallNamespace
+	}
+	return agentOption
 }
 
 func TestReconcile(t *testing.T) {
@@ -175,6 +181,39 @@ func TestReconcile(t *testing.T) {
 					SignerName: "test",
 				},
 			}},
+		},
+		{
+			name:    "with registrations and override namespace by agentInstallNamespace",
+			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			addon: []runtime.Object{
+				func() *addonapiv1alpha1.ManagedClusterAddOn {
+					addon := addontesting.NewAddon("test", "cluster1", metav1.OwnerReference{
+						Kind: "ClusterManagementAddOn",
+						Name: "test",
+					})
+					addon.Spec.InstallNamespace = "default2"
+					return addon
+				}(),
+			},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch")
+				actual := actions[0].(clienttesting.PatchActionImpl).Patch
+				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				err := json.Unmarshal(actual, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if addOn.Status.Registrations[0].SignerName != "test" {
+					t.Errorf("Registration config is not updated")
+				}
+				if addOn.Status.Namespace != "default3" {
+					t.Errorf("Namespace in status is not correct")
+				}
+			},
+			testaddon: &testAgent{name: "test", namespace: "default",
+				registrations:         []addonapiv1alpha1.RegistrationConfig{{SignerName: "test"}},
+				agentInstallNamespace: func(addon *addonapiv1alpha1.ManagedClusterAddOn) string { return "default3" },
+			},
 		},
 	}
 
