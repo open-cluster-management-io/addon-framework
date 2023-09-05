@@ -48,7 +48,7 @@ GO_TEST_PACKAGES :=./pkg/...
 $(call build-image,$(EXAMPLE_IMAGE),$(IMAGE_REGISTRY)/$(EXAMPLE_IMAGE):$(IMAGE_TAG),./build/Dockerfile.example,.)
 
 verify-gocilint:
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.46.2
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.54.2
 	golangci-lint run --timeout=3m --modules-download-mode vendor ./...
 
 verify: verify-gocilint

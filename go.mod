@@ -1,6 +1,6 @@
 module open-cluster-management.io/addon-framework
 
-go 1.19
+go 1.20
 
 require (
 	github.com/evanphx/json-patch v5.6.0+incompatible
