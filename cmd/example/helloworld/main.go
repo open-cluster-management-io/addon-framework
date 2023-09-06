@@ -93,12 +93,17 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 		utilrand.String(5),
 	)
 
+	// Set agent install namespace from addon deployment config if it exists
+	registrationOption.AgentInstallNamespace = utils.AgentInstallNamespaceFromDeploymentConfigFunc(
+		utils.NewAddOnDeploymentConfigGetter(addonClient),
+	)
+
 	agentAddon, err := addonfactory.NewAgentAddonFactory(helloworld.AddonName, helloworld.FS, "manifests/templates").
 		WithConfigGVRs(utils.AddOnDeploymentConfigGVR).
 		WithGetValuesFuncs(
 			helloworld.GetDefaultValues,
 			addonfactory.GetAddOnDeploymentConfigValues(
-				addonfactory.NewAddOnDeploymentConfigGetter(addonClient),
+				utils.NewAddOnDeploymentConfigGetter(addonClient),
 				addonfactory.ToAddOnDeploymentConfigValues,
 				addonfactory.ToImageOverrideValuesFunc("Image", helloworld.DefaultHelloWorldExampleImage),
 			),

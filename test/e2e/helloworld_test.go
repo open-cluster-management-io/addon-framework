@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -22,10 +23,11 @@ const (
 )
 
 const (
-	addonName                     = "helloworld"
-	deployConfigName              = "deploy-config"
-	deployImageOverrideConfigName = "image-override-deploy-config"
-	deployProxyConfigName         = "proxy-deploy-config"
+	addonName                             = "helloworld"
+	deployConfigName                      = "deploy-config"
+	deployImageOverrideConfigName         = "image-override-deploy-config"
+	deployProxyConfigName                 = "proxy-deploy-config"
+	deployAgentInstallNamespaceConfigName = "agent-install-namespace-deploy-config"
 )
 
 var (
@@ -44,6 +46,8 @@ var (
 		HTTPProxy: "http://127.0.0.1:3128",
 		NoProxy:   "example.com",
 	}
+
+	agentInstallNamespaceConfig = "test-ns"
 )
 
 var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
@@ -58,7 +62,40 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 			if err != nil {
 				return err
 			}
+
+			testNs := &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: agentInstallNamespaceConfig,
+				},
+			}
+			_, err = hubKubeClient.CoreV1().Namespaces().Create(context.Background(), testNs, metav1.CreateOptions{})
+			if err != nil {
+				if apierrors.IsAlreadyExists(err) {
+					return nil
+				}
+				return err
+			}
 			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+	})
+
+	ginkgo.AfterEach(func() {
+		gomega.Eventually(func() error {
+			_, err := hubKubeClient.CoreV1().Namespaces().Get(context.Background(),
+				agentInstallNamespaceConfig, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+
+			if err == nil {
+				errd := hubKubeClient.CoreV1().Namespaces().Delete(context.Background(),
+					agentInstallNamespaceConfig, metav1.DeleteOptions{})
+				if errd != nil {
+					return errd
+				}
+			}
+
+			return err
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
 
@@ -280,6 +317,98 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 		err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Delete(context.Background(), addonName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
+
+	ginkgo.It("addon registraion agent install namespace should work", func() {
+		ginkgo.By("Make sure addon is available")
+		gomega.Eventually(func() error {
+			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addonName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			if !meta.IsStatusConditionTrue(addon.Status.Conditions, "ManifestApplied") {
+				return fmt.Errorf("addon should be applied to spoke, but get condition %v", addon.Status.Conditions)
+			}
+
+			if !meta.IsStatusConditionTrue(addon.Status.Conditions, "Available") {
+				return fmt.Errorf("addon should be available on spoke, but get condition %v", addon.Status.Conditions)
+			}
+
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		ginkgo.By("Make sure addon is functioning")
+		configmap := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("config-%s", rand.String(6)),
+				Namespace: managedClusterName,
+			},
+			Data: map[string]string{
+				"key1": rand.String(6),
+				"key2": rand.String(6),
+			},
+		}
+
+		_, err := hubKubeClient.CoreV1().ConfigMaps(managedClusterName).Create(context.Background(), configmap, metav1.CreateOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		gomega.Eventually(func() error {
+			copyiedConfig, err := hubKubeClient.CoreV1().ConfigMaps("default").Get(context.Background(), configmap.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			if !apiequality.Semantic.DeepEqual(copyiedConfig.Data, configmap.Data) {
+				return fmt.Errorf("expected configmap is not correct, %v", copyiedConfig.Data)
+			}
+
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		ginkgo.By("Prepare a AddOnDeploymentConfig for addon agent install namespace")
+		gomega.Eventually(func() error {
+			return prepareAgentInstallNamespaceAddOnDeploymentConfig(managedClusterName)
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		ginkgo.By("Add the configs to ManagedClusterAddOn")
+		gomega.Eventually(func() error {
+			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(
+				context.Background(), addonName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			newAddon := addon.DeepCopy()
+			newAddon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+				{
+					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+						Group:    "addon.open-cluster-management.io",
+						Resource: "addondeploymentconfigs",
+					},
+					ConfigReferent: addonapiv1alpha1.ConfigReferent{
+						Namespace: managedClusterName,
+						Name:      deployAgentInstallNamespaceConfigName,
+					},
+				},
+			}
+			_, err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Update(
+				context.Background(), newAddon, metav1.UpdateOptions{})
+			if err != nil {
+				return err
+			}
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		ginkgo.By("Make sure addon is configured")
+		gomega.Eventually(func() error {
+			_, err := hubKubeClient.CoreV1().Secrets(agentInstallNamespaceConfig).Get(
+				context.Background(), "helloworld-hub-kubeconfig", metav1.GetOptions{})
+			return err
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		ginkgo.By("Remove addon")
+		err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Delete(context.Background(), addonName, metav1.DeleteOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	})
 })
 
 func prepareAddOnDeploymentConfig(namespace string) error {
@@ -307,11 +436,7 @@ func prepareAddOnDeploymentConfig(namespace string) error {
 		return nil
 	}
 
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func prepareImageOverrideAddOnDeploymentConfig(namespace string) error {
@@ -337,11 +462,7 @@ func prepareImageOverrideAddOnDeploymentConfig(namespace string) error {
 		return nil
 	}
 
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func prepareProxyConfigAddOnDeploymentConfig(namespace string) error {
@@ -366,9 +487,31 @@ func prepareProxyConfigAddOnDeploymentConfig(namespace string) error {
 		return nil
 	}
 
-	if err != nil {
-		return err
+	return err
+}
+
+func prepareAgentInstallNamespaceAddOnDeploymentConfig(namespace string) error {
+	_, err := hubAddOnClient.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Get(
+		context.Background(), deployAgentInstallNamespaceConfigName, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		if _, err := hubAddOnClient.AddonV1alpha1().AddOnDeploymentConfigs(managedClusterName).Create(
+			context.Background(),
+			&addonapiv1alpha1.AddOnDeploymentConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      deployAgentInstallNamespaceConfigName,
+					Namespace: namespace,
+				},
+				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+					AgentInstallNamespace: agentInstallNamespaceConfig,
+				},
+			},
+			metav1.CreateOptions{},
+		); err != nil {
+			return err
+		}
+
+		return nil
 	}
 
-	return nil
+	return err
 }
