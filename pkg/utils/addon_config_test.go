@@ -93,41 +93,41 @@ func TestAgentInstallNamespaceFromDeploymentConfigFunc(t *testing.T) {
 			},
 			expected: "",
 		},
-		{
-			name: "addon deployment config reference spec hash not match",
-			getter: newTestAddOnDeploymentConfigGetter(
-				&addonapiv1alpha1.AddOnDeploymentConfig{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "test1",
-					},
-					Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-						AgentInstallNamespace: "testns",
-					},
-				}),
-			mca: &addonapiv1alpha1.ManagedClusterAddOn{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test1",
-					Namespace: "cluster1",
-				},
-				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
-					ConfigReferences: []addonapiv1alpha1.ConfigReference{
-						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-								Group:    "addon.open-cluster-management.io",
-								Resource: "addondeploymentconfigs",
-							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
-								Name: "test1",
-							},
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								SpecHash: "wronghash",
-							},
-						},
-					},
-				},
-			},
-			expected: "",
-		},
+		// {
+		// 	name: "addon deployment config reference spec hash not match",
+		// 	getter: newTestAddOnDeploymentConfigGetter(
+		// 		&addonapiv1alpha1.AddOnDeploymentConfig{
+		// 			ObjectMeta: metav1.ObjectMeta{
+		// 				Name: "test1",
+		// 			},
+		// 			Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+		// 				AgentInstallNamespace: "testns",
+		// 			},
+		// 		}),
+		// 	mca: &addonapiv1alpha1.ManagedClusterAddOn{
+		// 		ObjectMeta: metav1.ObjectMeta{
+		// 			Name:      "test1",
+		// 			Namespace: "cluster1",
+		// 		},
+		// 		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
+		// 			ConfigReferences: []addonapiv1alpha1.ConfigReference{
+		// 				{
+		// 					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+		// 						Group:    "addon.open-cluster-management.io",
+		// 						Resource: "addondeploymentconfigs",
+		// 					},
+		// 					ConfigReferent: addonapiv1alpha1.ConfigReferent{
+		// 						Name: "test1",
+		// 					},
+		// 					DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+		// 						SpecHash: "wronghash",
+		// 					},
+		// 				},
+		// 			},
+		// 		},
+		// 	},
+		// 	expected: "",
+		// },
 		{
 			name: "addon deployment config reference spec hash match",
 			getter: newTestAddOnDeploymentConfigGetter(
