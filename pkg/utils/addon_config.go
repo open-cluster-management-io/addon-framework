@@ -81,6 +81,14 @@ func GetDesiredAddOnDeploymentConfig(
 		return nil, err
 	}
 
+	/* If the addonDeploymentConfig.spec.proxy field is not set, the spec hash in managedclusteraddon status will be
+	// different from the spec hash calculated here. This is because the spec hash in managedclusteraddon status is
+	// calculated by getting the addon deployment config object using a dynamic client, which will not contain
+	// addonDeploymentConfig.spec.proxy field if it is not set. However, the spec hash of the addonDeploymentConfig here
+	// is calculated by getting the addon deployment config object using a typed client, which will contain
+	// addonDeploymentConfig.spec.proxy field even if it is not set.
+	// TODO: uncomment the comparison after the above issue is fixed
+
 	specHash, err := GetAddOnDeploymentConfigSpecHash(adc)
 	if err != nil {
 		return nil, err
@@ -89,6 +97,7 @@ func GetDesiredAddOnDeploymentConfig(
 		return nil, fmt.Errorf("addon %s deployment config spec hash %s is not equal to desired spec hash %s",
 			addon.Name, specHash, desiredConfig.SpecHash)
 	}
+	*/
 	return adc.DeepCopy(), nil
 }
 
