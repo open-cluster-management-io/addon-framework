@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/index"
 	"open-cluster-management.io/api/addon/v1alpha1"
@@ -21,6 +22,7 @@ import (
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	fakecluster "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
+	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 )
 
@@ -91,7 +93,10 @@ func TestAddonConfigReconcile(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-placement",
 						Namespace: "default",
-						Labels:    map[string]string{clusterv1beta1.PlacementLabel: "test-placement"},
+						Labels: map[string]string{
+							clusterv1beta1.PlacementLabel:          "test-placement",
+							clusterv1beta1.DecisionGroupIndexLabel: "0",
+						},
 					},
 					Status: clusterv1beta1.PlacementDecisionStatus{
 						Decisions: []clusterv1beta1.ClusterDecision{{ClusterName: "cluster2"}},
@@ -108,7 +113,8 @@ func TestAddonConfigReconcile(t *testing.T) {
 					SpecHash:       "hash",
 				},
 			}).WithPlacementStrategy(addonv1alpha1.PlacementStrategy{
-				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
+				PlacementRef:    addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
+				RolloutStrategy: clusterv1alpha1.RolloutStrategy{Type: clusterv1alpha1.All},
 			}).WithInstallProgression(addonv1alpha1.InstallProgression{
 				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
 				ConfigReferences: []addonv1alpha1.InstallConfigReference{
@@ -150,7 +156,7 @@ func TestAddonConfigReconcile(t *testing.T) {
 				newManagedClusterAddon("test", "cluster1", []addonv1alpha1.AddOnConfig{{
 					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
 					ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test2"},
-				}}, nil),
+				}}, nil, nil),
 				addontesting.NewAddon("test", "cluster2"),
 			},
 			placements: []runtime.Object{
@@ -161,7 +167,10 @@ func TestAddonConfigReconcile(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-placement",
 						Namespace: "default",
-						Labels:    map[string]string{clusterv1beta1.PlacementLabel: "test-placement"},
+						Labels: map[string]string{
+							clusterv1beta1.PlacementLabel:          "test-placement",
+							clusterv1beta1.DecisionGroupIndexLabel: "0",
+						},
 					},
 					Status: clusterv1beta1.PlacementDecisionStatus{
 						Decisions: []clusterv1beta1.ClusterDecision{{ClusterName: "cluster1"}, {ClusterName: "cluster2"}},
@@ -178,7 +187,8 @@ func TestAddonConfigReconcile(t *testing.T) {
 					SpecHash:       "hash",
 				},
 			}).WithPlacementStrategy(addonv1alpha1.PlacementStrategy{
-				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
+				PlacementRef:    addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
+				RolloutStrategy: clusterv1alpha1.RolloutStrategy{Type: clusterv1alpha1.All},
 			}).WithInstallProgression(addonv1alpha1.InstallProgression{
 				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
 				ConfigReferences: []addonv1alpha1.InstallConfigReference{
@@ -225,7 +235,7 @@ func TestAddonConfigReconcile(t *testing.T) {
 						SpecHash:       "hash1",
 					},
 					LastObservedGeneration: 1,
-				}}),
+				}}, nil),
 			},
 			placements: []runtime.Object{
 				&clusterv1beta1.Placement{ObjectMeta: metav1.ObjectMeta{Name: "test-placement", Namespace: "default"}},
@@ -235,7 +245,10 @@ func TestAddonConfigReconcile(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-placement",
 						Namespace: "default",
-						Labels:    map[string]string{clusterv1beta1.PlacementLabel: "test-placement"},
+						Labels: map[string]string{
+							clusterv1beta1.PlacementLabel:          "test-placement",
+							clusterv1beta1.DecisionGroupIndexLabel: "0",
+						},
 					},
 					Status: clusterv1beta1.PlacementDecisionStatus{
 						Decisions: []clusterv1beta1.ClusterDecision{{ClusterName: "cluster1"}},
@@ -246,7 +259,8 @@ func TestAddonConfigReconcile(t *testing.T) {
 				ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
 				DefaultConfig:       &addonv1alpha1.ConfigReferent{Name: "test"},
 			}).WithPlacementStrategy(addonv1alpha1.PlacementStrategy{
-				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
+				PlacementRef:    addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
+				RolloutStrategy: clusterv1alpha1.RolloutStrategy{Type: clusterv1alpha1.All},
 			}).WithInstallProgression(addonv1alpha1.InstallProgression{
 				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
 				ConfigReferences: []addonv1alpha1.InstallConfigReference{
@@ -283,7 +297,7 @@ func TestAddonConfigReconcile(t *testing.T) {
 						SpecHash:       "hash1",
 					},
 					LastObservedGeneration: 1,
-				}}),
+				}}, nil),
 			},
 			placements: []runtime.Object{
 				&clusterv1beta1.Placement{ObjectMeta: metav1.ObjectMeta{Name: "test-placement", Namespace: "default"}},
@@ -293,7 +307,10 @@ func TestAddonConfigReconcile(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-placement",
 						Namespace: "default",
-						Labels:    map[string]string{clusterv1beta1.PlacementLabel: "test-placement"},
+						Labels: map[string]string{
+							clusterv1beta1.PlacementLabel:          "test-placement",
+							clusterv1beta1.DecisionGroupIndexLabel: "0",
+						},
 					},
 					Status: clusterv1beta1.PlacementDecisionStatus{
 						Decisions: []clusterv1beta1.ClusterDecision{{ClusterName: "cluster1"}},
@@ -304,7 +321,8 @@ func TestAddonConfigReconcile(t *testing.T) {
 				ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
 				DefaultConfig:       &addonv1alpha1.ConfigReferent{Name: "test"},
 			}).WithPlacementStrategy(addonv1alpha1.PlacementStrategy{
-				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
+				PlacementRef:    addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
+				RolloutStrategy: clusterv1alpha1.RolloutStrategy{Type: clusterv1alpha1.All},
 				Configs: []addonv1alpha1.AddOnConfig{v1alpha1.AddOnConfig{
 					ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
 					ConfigReferent:      v1alpha1.ConfigReferent{Name: "test1"}}},
@@ -344,7 +362,7 @@ func TestAddonConfigReconcile(t *testing.T) {
 						SpecHash:       "hash1",
 					},
 					LastObservedGeneration: 1,
-				}}),
+				}}, nil),
 			},
 			placements: []runtime.Object{
 				&clusterv1beta1.Placement{ObjectMeta: metav1.ObjectMeta{Name: "test-placement", Namespace: "default"}},
@@ -354,7 +372,10 @@ func TestAddonConfigReconcile(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-placement",
 						Namespace: "default",
-						Labels:    map[string]string{clusterv1beta1.PlacementLabel: "test-placement"},
+						Labels: map[string]string{
+							clusterv1beta1.PlacementLabel:          "test-placement",
+							clusterv1beta1.DecisionGroupIndexLabel: "0",
+						},
 					},
 					Status: clusterv1beta1.PlacementDecisionStatus{
 						Decisions: []clusterv1beta1.ClusterDecision{{ClusterName: "cluster1"}},
@@ -369,6 +390,7 @@ func TestAddonConfigReconcile(t *testing.T) {
 				Configs: []addonv1alpha1.AddOnConfig{v1alpha1.AddOnConfig{
 					ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
 					ConfigReferent:      v1alpha1.ConfigReferent{Name: "test1"}}},
+				RolloutStrategy: clusterv1alpha1.RolloutStrategy{Type: clusterv1alpha1.All},
 			}).WithInstallProgression(addonv1alpha1.InstallProgression{
 				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
 				ConfigReferences: []addonv1alpha1.InstallConfigReference{
@@ -384,7 +406,7 @@ func TestAddonConfigReconcile(t *testing.T) {
 			validateAddonActions: addontesting.AssertNoActions,
 		},
 		{
-			name: "placement rolling update with MaxConcurrency 1",
+			name: "placement rollout progressive with MaxConcurrency 1",
 			managedClusteraddon: []runtime.Object{
 				addontesting.NewAddon("test", "cluster1"),
 				addontesting.NewAddon("test", "cluster2"),
@@ -398,7 +420,10 @@ func TestAddonConfigReconcile(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-placement",
 						Namespace: "default",
-						Labels:    map[string]string{clusterv1beta1.PlacementLabel: "test-placement"},
+						Labels: map[string]string{
+							clusterv1beta1.PlacementLabel:          "test-placement",
+							clusterv1beta1.DecisionGroupIndexLabel: "0",
+						},
 					},
 					Status: clusterv1beta1.PlacementDecisionStatus{
 						Decisions: []clusterv1beta1.ClusterDecision{{ClusterName: "cluster2"}, {ClusterName: "cluster3"}},
@@ -407,9 +432,9 @@ func TestAddonConfigReconcile(t *testing.T) {
 			},
 			clusterManagementAddon: addontesting.NewClusterManagementAddon("test", "", "").WithPlacementStrategy(addonv1alpha1.PlacementStrategy{
 				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
-				RolloutStrategy: addonv1alpha1.RolloutStrategy{
-					Type:          addonv1alpha1.AddonRolloutStrategyRollingUpdate,
-					RollingUpdate: &addonv1alpha1.RollingUpdate{MaxConcurrency: intstr.FromInt(1)}},
+				RolloutStrategy: clusterv1alpha1.RolloutStrategy{
+					Type:        clusterv1alpha1.Progressive,
+					Progressive: &clusterv1alpha1.RolloutProgressive{MaxConcurrency: intstr.FromInt(1)}},
 			}).WithInstallProgression(addonv1alpha1.InstallProgression{
 				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
 				ConfigReferences: []addonv1alpha1.InstallConfigReference{
@@ -437,7 +462,7 @@ func TestAddonConfigReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "placement rolling update with MaxConcurrency 0",
+			name: "placement rollout progressive with MaxConcurrency 50%",
 			managedClusteraddon: []runtime.Object{
 				addontesting.NewAddon("test", "cluster1"),
 				addontesting.NewAddon("test", "cluster2"),
@@ -451,49 +476,11 @@ func TestAddonConfigReconcile(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-placement",
 						Namespace: "default",
-						Labels:    map[string]string{clusterv1beta1.PlacementLabel: "test-placement"},
-					},
-					Status: clusterv1beta1.PlacementDecisionStatus{
-						Decisions: []clusterv1beta1.ClusterDecision{{ClusterName: "cluster2"}, {ClusterName: "cluster3"}},
-					},
-				},
-			},
-			clusterManagementAddon: addontesting.NewClusterManagementAddon("test", "", "").WithPlacementStrategy(addonv1alpha1.PlacementStrategy{
-				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
-				RolloutStrategy: addonv1alpha1.RolloutStrategy{
-					Type:          addonv1alpha1.AddonRolloutStrategyRollingUpdate,
-					RollingUpdate: &addonv1alpha1.RollingUpdate{MaxConcurrency: intstr.FromString("0%")}},
-			}).WithInstallProgression(addonv1alpha1.InstallProgression{
-				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
-				ConfigReferences: []addonv1alpha1.InstallConfigReference{
-					{
-						ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
-						DesiredConfig: &v1alpha1.ConfigSpecHash{
-							ConfigReferent: v1alpha1.ConfigReferent{Name: "test1"},
-							SpecHash:       "hash1",
+						Labels: map[string]string{
+							clusterv1beta1.PlacementLabel:          "test-placement",
+							clusterv1beta1.DecisionGroupIndexLabel: "0",
 						},
 					},
-				},
-			}).Build(),
-			validateAddonActions: addontesting.AssertNoActions,
-		},
-		{
-			name: "placement rolling update with default MaxConcurrency",
-			managedClusteraddon: []runtime.Object{
-				addontesting.NewAddon("test", "cluster1"),
-				addontesting.NewAddon("test", "cluster2"),
-				addontesting.NewAddon("test", "cluster3"),
-			},
-			placements: []runtime.Object{
-				&clusterv1beta1.Placement{ObjectMeta: metav1.ObjectMeta{Name: "test-placement", Namespace: "default"}},
-			},
-			placementDecisions: []runtime.Object{
-				&clusterv1beta1.PlacementDecision{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-placement",
-						Namespace: "default",
-						Labels:    map[string]string{clusterv1beta1.PlacementLabel: "test-placement"},
-					},
 					Status: clusterv1beta1.PlacementDecisionStatus{
 						Decisions: []clusterv1beta1.ClusterDecision{{ClusterName: "cluster2"}, {ClusterName: "cluster3"}},
 					},
@@ -501,9 +488,9 @@ func TestAddonConfigReconcile(t *testing.T) {
 			},
 			clusterManagementAddon: addontesting.NewClusterManagementAddon("test", "", "").WithPlacementStrategy(addonv1alpha1.PlacementStrategy{
 				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
-				RolloutStrategy: addonv1alpha1.RolloutStrategy{
-					Type:          addonv1alpha1.AddonRolloutStrategyRollingUpdate,
-					RollingUpdate: &addonv1alpha1.RollingUpdate{MaxConcurrency: defaultMaxConcurrency}},
+				RolloutStrategy: clusterv1alpha1.RolloutStrategy{
+					Type:        clusterv1alpha1.Progressive,
+					Progressive: &clusterv1alpha1.RolloutProgressive{MaxConcurrency: intstr.FromString("50%")}},
 			}).WithInstallProgression(addonv1alpha1.InstallProgression{
 				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
 				ConfigReferences: []addonv1alpha1.InstallConfigReference{
@@ -520,6 +507,321 @@ func TestAddonConfigReconcile(t *testing.T) {
 				addontesting.AssertActions(t, actions, "patch")
 				sort.Sort(byPatchName(actions))
 				expectPatchConfigurationAction(t, actions[0], []addonv1alpha1.ConfigReference{{
+					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+					ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
+					DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
+						SpecHash:       "hash1",
+					},
+					LastObservedGeneration: 0,
+				}})
+			},
+		},
+		{
+			name: "placement rollout progressive with default MaxConcurrency 100%",
+			managedClusteraddon: []runtime.Object{
+				addontesting.NewAddon("test", "cluster1"),
+				addontesting.NewAddon("test", "cluster2"),
+				addontesting.NewAddon("test", "cluster3"),
+			},
+			placements: []runtime.Object{
+				&clusterv1beta1.Placement{ObjectMeta: metav1.ObjectMeta{Name: "test-placement", Namespace: "default"}},
+			},
+			placementDecisions: []runtime.Object{
+				&clusterv1beta1.PlacementDecision{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-placement",
+						Namespace: "default",
+						Labels: map[string]string{
+							clusterv1beta1.PlacementLabel:          "test-placement",
+							clusterv1beta1.DecisionGroupIndexLabel: "0",
+						},
+					},
+					Status: clusterv1beta1.PlacementDecisionStatus{
+						Decisions: []clusterv1beta1.ClusterDecision{{ClusterName: "cluster2"}, {ClusterName: "cluster3"}},
+					},
+				},
+			},
+			clusterManagementAddon: addontesting.NewClusterManagementAddon("test", "", "").WithPlacementStrategy(addonv1alpha1.PlacementStrategy{
+				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
+				RolloutStrategy: clusterv1alpha1.RolloutStrategy{
+					Type:        clusterv1alpha1.Progressive,
+					Progressive: &clusterv1alpha1.RolloutProgressive{}},
+			}).WithInstallProgression(addonv1alpha1.InstallProgression{
+				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
+				ConfigReferences: []addonv1alpha1.InstallConfigReference{
+					{
+						ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						DesiredConfig: &v1alpha1.ConfigSpecHash{
+							ConfigReferent: v1alpha1.ConfigReferent{Name: "test1"},
+							SpecHash:       "hash1",
+						},
+					},
+				},
+			}).Build(),
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch", "patch")
+				sort.Sort(byPatchName(actions))
+				expectPatchConfigurationAction(t, actions[0], []addonv1alpha1.ConfigReference{{
+					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+					ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
+					DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
+						SpecHash:       "hash1",
+					},
+					LastObservedGeneration: 0,
+				}})
+				expectPatchConfigurationAction(t, actions[1], []addonv1alpha1.ConfigReference{{
+					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+					ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
+					DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
+						SpecHash:       "hash1",
+					},
+					LastObservedGeneration: 0,
+				}})
+			},
+		},
+		{
+			name: "placement rollout progressive with mandatory decision groups",
+			managedClusteraddon: []runtime.Object{
+				addontesting.NewAddon("test", "cluster1"),
+				addontesting.NewAddon("test", "cluster2"),
+				addontesting.NewAddon("test", "cluster3"),
+			},
+			placements: []runtime.Object{
+				&clusterv1beta1.Placement{ObjectMeta: metav1.ObjectMeta{Name: "test-placement", Namespace: "default"}},
+			},
+			placementDecisions: []runtime.Object{
+				&clusterv1beta1.PlacementDecision{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-placement-0",
+						Namespace: "default",
+						Labels: map[string]string{
+							clusterv1beta1.PlacementLabel:          "test-placement",
+							clusterv1beta1.DecisionGroupNameLabel:  "group1",
+							clusterv1beta1.DecisionGroupIndexLabel: "0",
+						},
+					},
+					Status: clusterv1beta1.PlacementDecisionStatus{
+						Decisions: []clusterv1beta1.ClusterDecision{{ClusterName: "cluster1"}, {ClusterName: "cluster2"}},
+					},
+				},
+				&clusterv1beta1.PlacementDecision{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-placement-1",
+						Namespace: "default",
+						Labels: map[string]string{
+							clusterv1beta1.PlacementLabel:          "test-placement",
+							clusterv1beta1.DecisionGroupIndexLabel: "1",
+						},
+					},
+					Status: clusterv1beta1.PlacementDecisionStatus{
+						Decisions: []clusterv1beta1.ClusterDecision{{ClusterName: "cluster3"}},
+					},
+				},
+			},
+			clusterManagementAddon: addontesting.NewClusterManagementAddon("test", "", "").WithPlacementStrategy(
+				addonv1alpha1.PlacementStrategy{
+					PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
+					RolloutStrategy: clusterv1alpha1.RolloutStrategy{
+						Type: clusterv1alpha1.Progressive,
+						Progressive: &clusterv1alpha1.RolloutProgressive{
+							MandatoryDecisionGroups: clusterv1alpha1.MandatoryDecisionGroups{
+								MandatoryDecisionGroups: []clusterv1alpha1.MandatoryDecisionGroup{
+									{GroupName: "group1"},
+								},
+							},
+						},
+					}}).WithInstallProgression(addonv1alpha1.InstallProgression{
+				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
+				ConfigReferences: []addonv1alpha1.InstallConfigReference{
+					{
+						ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						DesiredConfig: &v1alpha1.ConfigSpecHash{
+							ConfigReferent: v1alpha1.ConfigReferent{Name: "test1"},
+							SpecHash:       "hash1",
+						},
+					},
+				},
+			}).Build(),
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch", "patch")
+				sort.Sort(byPatchName(actions))
+				expectPatchConfigurationAction(t, actions[0], []addonv1alpha1.ConfigReference{{
+					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+					ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
+					DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
+						SpecHash:       "hash1",
+					},
+					LastObservedGeneration: 0,
+				}})
+				expectPatchConfigurationAction(t, actions[1], []addonv1alpha1.ConfigReference{{
+					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+					ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
+					DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
+						SpecHash:       "hash1",
+					},
+					LastObservedGeneration: 0,
+				}})
+			},
+		},
+		{
+			name: "placement rollout progressive per group",
+			managedClusteraddon: []runtime.Object{
+				addontesting.NewAddon("test", "cluster1"),
+				addontesting.NewAddon("test", "cluster2"),
+				addontesting.NewAddon("test", "cluster3"),
+			},
+			placements: []runtime.Object{
+				&clusterv1beta1.Placement{ObjectMeta: metav1.ObjectMeta{Name: "test-placement", Namespace: "default"}},
+			},
+			placementDecisions: []runtime.Object{
+				&clusterv1beta1.PlacementDecision{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-placement-0",
+						Namespace: "default",
+						Labels: map[string]string{
+							clusterv1beta1.PlacementLabel:          "test-placement",
+							clusterv1beta1.DecisionGroupIndexLabel: "0",
+						},
+					},
+					Status: clusterv1beta1.PlacementDecisionStatus{
+						Decisions: []clusterv1beta1.ClusterDecision{{ClusterName: "cluster1"}, {ClusterName: "cluster2"}},
+					},
+				},
+				&clusterv1beta1.PlacementDecision{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-placement-1",
+						Namespace: "default",
+						Labels: map[string]string{
+							clusterv1beta1.PlacementLabel:          "test-placement",
+							clusterv1beta1.DecisionGroupIndexLabel: "1",
+						},
+					},
+					Status: clusterv1beta1.PlacementDecisionStatus{
+						Decisions: []clusterv1beta1.ClusterDecision{{ClusterName: "cluster3"}},
+					},
+				},
+			},
+			clusterManagementAddon: addontesting.NewClusterManagementAddon("test", "", "").WithPlacementStrategy(
+				addonv1alpha1.PlacementStrategy{
+					PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
+					RolloutStrategy: clusterv1alpha1.RolloutStrategy{
+						Type: clusterv1alpha1.ProgressivePerGroup,
+					}}).WithInstallProgression(addonv1alpha1.InstallProgression{
+				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
+				ConfigReferences: []addonv1alpha1.InstallConfigReference{
+					{
+						ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						DesiredConfig: &v1alpha1.ConfigSpecHash{
+							ConfigReferent: v1alpha1.ConfigReferent{Name: "test1"},
+							SpecHash:       "hash1",
+						},
+					},
+				},
+			}).Build(),
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch", "patch")
+				sort.Sort(byPatchName(actions))
+				expectPatchConfigurationAction(t, actions[0], []addonv1alpha1.ConfigReference{{
+					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+					ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
+					DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
+						SpecHash:       "hash1",
+					},
+					LastObservedGeneration: 0,
+				}})
+				expectPatchConfigurationAction(t, actions[1], []addonv1alpha1.ConfigReference{{
+					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+					ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
+					DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
+						SpecHash:       "hash1",
+					},
+					LastObservedGeneration: 0,
+				}})
+			},
+		},
+		{
+			name: "placement rollout progressive per group with mandatory decision groups",
+			managedClusteraddon: []runtime.Object{
+				addontesting.NewAddon("test", "cluster1"),
+				addontesting.NewAddon("test", "cluster2"),
+				addontesting.NewAddon("test", "cluster3"),
+			},
+			placements: []runtime.Object{
+				&clusterv1beta1.Placement{ObjectMeta: metav1.ObjectMeta{Name: "test-placement", Namespace: "default"}},
+			},
+			placementDecisions: []runtime.Object{
+				&clusterv1beta1.PlacementDecision{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-placement-0",
+						Namespace: "default",
+						Labels: map[string]string{
+							clusterv1beta1.PlacementLabel:          "test-placement",
+							clusterv1beta1.DecisionGroupNameLabel:  "group1",
+							clusterv1beta1.DecisionGroupIndexLabel: "0",
+						},
+					},
+					Status: clusterv1beta1.PlacementDecisionStatus{
+						Decisions: []clusterv1beta1.ClusterDecision{{ClusterName: "cluster1"}, {ClusterName: "cluster2"}},
+					},
+				},
+				&clusterv1beta1.PlacementDecision{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-placement-1",
+						Namespace: "default",
+						Labels: map[string]string{
+							clusterv1beta1.PlacementLabel:          "test-placement",
+							clusterv1beta1.DecisionGroupIndexLabel: "1",
+						},
+					},
+					Status: clusterv1beta1.PlacementDecisionStatus{
+						Decisions: []clusterv1beta1.ClusterDecision{{ClusterName: "cluster3"}},
+					},
+				},
+			},
+			clusterManagementAddon: addontesting.NewClusterManagementAddon("test", "", "").WithPlacementStrategy(
+				addonv1alpha1.PlacementStrategy{
+					PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
+					RolloutStrategy: clusterv1alpha1.RolloutStrategy{
+						Type: clusterv1alpha1.ProgressivePerGroup,
+						ProgressivePerGroup: &clusterv1alpha1.RolloutProgressivePerGroup{
+							MandatoryDecisionGroups: clusterv1alpha1.MandatoryDecisionGroups{
+								MandatoryDecisionGroups: []clusterv1alpha1.MandatoryDecisionGroup{
+									{GroupName: "group1"},
+								},
+							},
+						},
+					}}).WithInstallProgression(addonv1alpha1.InstallProgression{
+				PlacementRef: addonv1alpha1.PlacementRef{Name: "test-placement", Namespace: "default"},
+				ConfigReferences: []addonv1alpha1.InstallConfigReference{
+					{
+						ConfigGroupResource: v1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+						DesiredConfig: &v1alpha1.ConfigSpecHash{
+							ConfigReferent: v1alpha1.ConfigReferent{Name: "test1"},
+							SpecHash:       "hash1",
+						},
+					},
+				},
+			}).Build(),
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch", "patch")
+				sort.Sort(byPatchName(actions))
+				expectPatchConfigurationAction(t, actions[0], []addonv1alpha1.ConfigReference{{
+					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
+					ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
+					DesiredConfig: &addonv1alpha1.ConfigSpecHash{
+						ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"},
+						SpecHash:       "hash1",
+					},
+					LastObservedGeneration: 0,
+				}})
+				expectPatchConfigurationAction(t, actions[1], []addonv1alpha1.ConfigReference{{
 					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Foo"},
 					ConfigReferent:      addonv1alpha1.ConfigReferent{Name: "test1"},
 					DesiredConfig: &addonv1alpha1.ConfigSpecHash{
@@ -569,7 +871,7 @@ func TestAddonConfigReconcile(t *testing.T) {
 
 			controller := &addonConfigurationController{
 				addonClient:                  fakeAddonClient,
-				placementDecisionLister:      clusterInformers.Cluster().V1beta1().PlacementDecisions().Lister(),
+				placementDecisionGetter:      PlacementDecisionGetter{Client: clusterInformers.Cluster().V1beta1().PlacementDecisions().Lister()},
 				placementLister:              clusterInformers.Cluster().V1beta1().Placements().Lister(),
 				clusterManagementAddonLister: addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
 				managedClusterAddonIndexer:   addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetIndexer(),
@@ -582,6 +884,10 @@ func TestAddonConfigReconcile(t *testing.T) {
 			graph, err := controller.buildConfigurationGraph(c.clusterManagementAddon)
 			if err != nil {
 				t.Errorf("expected no error when build graph: %v", err)
+			}
+			err = graph.generateRolloutResult()
+			if err != nil {
+				t.Errorf("expected no error when refresh rollout result: %v", err)
 			}
 
 			_, _, err = reconcile.reconcile(context.TODO(), c.clusterManagementAddon, graph)
@@ -608,10 +914,16 @@ func (a byPatchName) Less(i, j int) bool {
 	return patchi.Namespace < patchj.Namespace
 }
 
-func newManagedClusterAddon(name, namespace string, configs []addonv1alpha1.AddOnConfig, configStatus []addonv1alpha1.ConfigReference) *addonv1alpha1.ManagedClusterAddOn {
+func newManagedClusterAddon(
+	name, namespace string,
+	configs []addonv1alpha1.AddOnConfig,
+	configStatus []addonv1alpha1.ConfigReference,
+	conditions []metav1.Condition,
+) *addonv1alpha1.ManagedClusterAddOn {
 	mca := addontesting.NewAddon(name, namespace)
 	mca.Spec.Configs = configs
 	mca.Status.ConfigReferences = configStatus
+	mca.Status.Conditions = conditions
 	return mca
 }
 
