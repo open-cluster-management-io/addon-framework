@@ -103,11 +103,11 @@ jobs:
       - name: generate changelog
         run: |
           echo "# Addon Framework ${{ needs.env.outputs.RELEASE_VERSION }}" > /home/runner/work/changelog.txt
-          echo "- See the [CHANGELOG](https://github.com/open-cluster-management-io/addon-framework/blob/main/CHANGELOG/CHANGELOG-${{ needs.env.outputs.MAJOR_RELEASE_VERSION }}.md) for more details." >> /home/runner/work/changelog.txt
-          echo "- The released image is quay.io/open-cluster-management/addon-examples:${{ needs.env.outputs.RELEASE_VERSION }}" >> /home/runner/work/changelog.txt
       - name: publish release
-        uses: softprops/action-gh-release@v0.1.5
+        uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           body_path: /home/runner/work/changelog.txt
+          draft: true
+          generate_release_notes: true
