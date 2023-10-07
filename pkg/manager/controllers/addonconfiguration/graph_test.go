@@ -63,8 +63,10 @@ func TestConfigurationGraph(t *testing.T) {
 							},
 						},
 					},
-					mca:    addontesting.NewAddon("test", "cluster1"),
-					status: &clusterv1alpha1.ClusterRolloutStatus{Status: clusterv1alpha1.ToApply},
+					mca: addontesting.NewAddon("test", "cluster1"),
+					status: &clusterv1alpha1.ClusterRolloutStatus{
+						ClusterName: "cluster1",
+						Status:      clusterv1alpha1.ToApply},
 				},
 				{
 					desiredConfigs: map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference{
@@ -77,8 +79,10 @@ func TestConfigurationGraph(t *testing.T) {
 							},
 						},
 					},
-					mca:    addontesting.NewAddon("test", "cluster2"),
-					status: &clusterv1alpha1.ClusterRolloutStatus{Status: clusterv1alpha1.ToApply},
+					mca: addontesting.NewAddon("test", "cluster2"),
+					status: &clusterv1alpha1.ClusterRolloutStatus{
+						ClusterName: "cluster2",
+						Status:      clusterv1alpha1.ToApply},
 				},
 			},
 		},
@@ -146,8 +150,10 @@ func TestConfigurationGraph(t *testing.T) {
 							},
 						},
 					},
-					mca:    addontesting.NewAddon("test", "cluster1"),
-					status: &clusterv1alpha1.ClusterRolloutStatus{Status: clusterv1alpha1.ToApply},
+					mca: addontesting.NewAddon("test", "cluster1"),
+					status: &clusterv1alpha1.ClusterRolloutStatus{
+						ClusterName: "cluster1",
+						Status:      clusterv1alpha1.ToApply},
 				},
 				{
 					desiredConfigs: map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference{
@@ -168,8 +174,11 @@ func TestConfigurationGraph(t *testing.T) {
 							},
 						},
 					},
-					mca:    addontesting.NewAddon("test", "cluster2"),
-					status: &clusterv1alpha1.ClusterRolloutStatus{Status: clusterv1alpha1.ToApply},
+					mca: addontesting.NewAddon("test", "cluster2"),
+					status: &clusterv1alpha1.ClusterRolloutStatus{
+						ClusterName: "cluster2",
+						Status:      clusterv1alpha1.ToApply,
+					},
 				},
 				{
 					desiredConfigs: map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference{
@@ -190,8 +199,11 @@ func TestConfigurationGraph(t *testing.T) {
 							},
 						},
 					},
-					mca:    addontesting.NewAddon("test", "cluster3"),
-					status: &clusterv1alpha1.ClusterRolloutStatus{Status: clusterv1alpha1.ToApply},
+					mca: addontesting.NewAddon("test", "cluster3"),
+					status: &clusterv1alpha1.ClusterRolloutStatus{
+						ClusterName: "cluster3",
+						Status:      clusterv1alpha1.ToApply,
+					},
 				},
 			},
 		},
@@ -306,8 +318,12 @@ func TestConfigurationGraph(t *testing.T) {
 							},
 						},
 					},
-					mca:    addontesting.NewAddon("test", "cluster1"),
-					status: &clusterv1alpha1.ClusterRolloutStatus{Status: clusterv1alpha1.Failed, LastTransitionTime: &fakeTime},
+					mca: addontesting.NewAddon("test", "cluster1"),
+					status: &clusterv1alpha1.ClusterRolloutStatus{
+						ClusterName:        "cluster1",
+						Status:             clusterv1alpha1.Failed,
+						LastTransitionTime: &fakeTime,
+					},
 				},
 				{
 					desiredConfigs: map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference{
@@ -320,8 +336,12 @@ func TestConfigurationGraph(t *testing.T) {
 							},
 						},
 					},
-					mca:    addontesting.NewAddon("test", "cluster2"),
-					status: &clusterv1alpha1.ClusterRolloutStatus{Status: clusterv1alpha1.Progressing, LastTransitionTime: &fakeTime},
+					mca: addontesting.NewAddon("test", "cluster2"),
+					status: &clusterv1alpha1.ClusterRolloutStatus{
+						ClusterName:        "cluster2",
+						Status:             clusterv1alpha1.Progressing,
+						LastTransitionTime: &fakeTime,
+					},
 				},
 				{
 					desiredConfigs: map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference{
@@ -334,8 +354,11 @@ func TestConfigurationGraph(t *testing.T) {
 							},
 						},
 					},
-					mca:    addontesting.NewAddon("test", "cluster4"),
-					status: &clusterv1alpha1.ClusterRolloutStatus{Status: clusterv1alpha1.ToApply},
+					mca: addontesting.NewAddon("test", "cluster4"),
+					status: &clusterv1alpha1.ClusterRolloutStatus{
+						ClusterName: "cluster4",
+						Status:      clusterv1alpha1.ToApply,
+					},
 				},
 			},
 		},
@@ -403,8 +426,10 @@ func TestConfigurationGraph(t *testing.T) {
 							},
 						},
 					},
-					mca:    addontesting.NewAddon("test", "cluster1"),
-					status: &clusterv1alpha1.ClusterRolloutStatus{Status: clusterv1alpha1.ToApply},
+					mca: addontesting.NewAddon("test", "cluster1"),
+					status: &clusterv1alpha1.ClusterRolloutStatus{
+						ClusterName: "cluster1",
+						Status:      clusterv1alpha1.ToApply},
 				},
 				{
 					desiredConfigs: map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference{
@@ -425,8 +450,10 @@ func TestConfigurationGraph(t *testing.T) {
 							},
 						},
 					},
-					mca:    addontesting.NewAddon("test", "cluster2"),
-					status: &clusterv1alpha1.ClusterRolloutStatus{Status: clusterv1alpha1.ToApply},
+					mca: addontesting.NewAddon("test", "cluster2"),
+					status: &clusterv1alpha1.ClusterRolloutStatus{
+						ClusterName: "cluster2",
+						Status:      clusterv1alpha1.ToApply},
 				},
 				{
 					desiredConfigs: map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference{
@@ -447,8 +474,10 @@ func TestConfigurationGraph(t *testing.T) {
 							},
 						},
 					},
-					mca:    addontesting.NewAddon("test", "cluster3"),
-					status: &clusterv1alpha1.ClusterRolloutStatus{Status: clusterv1alpha1.ToApply},
+					mca: addontesting.NewAddon("test", "cluster3"),
+					status: &clusterv1alpha1.ClusterRolloutStatus{
+						ClusterName: "cluster3",
+						Status:      clusterv1alpha1.ToApply},
 				},
 			},
 		},
@@ -523,7 +552,9 @@ func TestConfigurationGraph(t *testing.T) {
 						{ConfigGroupResource: addonv1alpha1.ConfigGroupResource{Group: "core", Resource: "Bar"},
 							ConfigReferent: addonv1alpha1.ConfigReferent{Name: "test1"}},
 					}, nil, nil),
-					status: &clusterv1alpha1.ClusterRolloutStatus{Status: clusterv1alpha1.ToApply},
+					status: &clusterv1alpha1.ClusterRolloutStatus{
+						ClusterName: "cluster1",
+						Status:      clusterv1alpha1.ToApply},
 				},
 				{
 					desiredConfigs: map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference{
@@ -544,8 +575,10 @@ func TestConfigurationGraph(t *testing.T) {
 							},
 						},
 					},
-					mca:    addontesting.NewAddon("test", "cluster2"),
-					status: &clusterv1alpha1.ClusterRolloutStatus{Status: clusterv1alpha1.ToApply},
+					mca: addontesting.NewAddon("test", "cluster2"),
+					status: &clusterv1alpha1.ClusterRolloutStatus{
+						ClusterName: "cluster2",
+						Status:      clusterv1alpha1.ToApply},
 				},
 				{
 					desiredConfigs: map[addonv1alpha1.ConfigGroupResource]addonv1alpha1.ConfigReference{
@@ -566,8 +599,10 @@ func TestConfigurationGraph(t *testing.T) {
 							},
 						},
 					},
-					mca:    addontesting.NewAddon("test", "cluster3"),
-					status: &clusterv1alpha1.ClusterRolloutStatus{Status: clusterv1alpha1.ToApply},
+					mca: addontesting.NewAddon("test", "cluster3"),
+					status: &clusterv1alpha1.ClusterRolloutStatus{
+						ClusterName: "cluster3",
+						Status:      clusterv1alpha1.ToApply},
 				},
 			},
 		},
