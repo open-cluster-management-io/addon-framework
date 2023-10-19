@@ -44,10 +44,12 @@ var mainfestWorkAppliedCondition = metav1.Condition{
 }
 
 type testAgent struct {
-	name         string
-	objects      []runtime.Object
-	err          error
-	healthProber *agent.HealthProber
+	name            string
+	objects         []runtime.Object
+	err             error
+	healthProber    *agent.HealthProber
+	Updaters        []agent.Updater
+	ManifestConfigs []workapiv1.ManifestConfigOption
 }
 
 func (t *testAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
@@ -56,8 +58,10 @@ func (t *testAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapi
 
 func (t *testAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
 	return agent.AgentAddonOptions{
-		AddonName:    t.name,
-		HealthProber: t.healthProber,
+		AddonName:       t.name,
+		HealthProber:    t.healthProber,
+		Updaters:        t.Updaters,
+		ManifestConfigs: t.ManifestConfigs,
 	}
 }
 

@@ -88,7 +88,14 @@ type AgentAddonOptions struct {
 	//	AgentDeployTriggerClusterFilter: func(old, new *clusterv1.ManagedCluster) bool {
 	//	 return !equality.Semantic.DeepEqual(old.Annotations, new.Annotations)
 	//	}
+	// +optional
 	AgentDeployTriggerClusterFilter func(old, new *clusterv1.ManagedCluster) bool
+
+	// ManifestConfigs represents the configurations of manifests defined in workload field.
+	// It will override the update strategy set by the "Updaters" field and merge the feedback rules set by the
+	// "HealthProber" field if they have the same resource identifier.
+	// +optional
+	ManifestConfigs []workapiv1.ManifestConfigOption
 }
 
 type CSRSignerFunc func(csr *certificatesv1.CertificateSigningRequest) []byte

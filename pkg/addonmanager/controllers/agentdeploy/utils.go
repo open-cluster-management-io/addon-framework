@@ -3,6 +3,7 @@ package agentdeploy
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -517,7 +518,43 @@ func getManifestConfigOption(agentAddon agent.AgentAddon,
 		}
 	}
 
+	emc := agentAddon.GetAgentAddonOptions().ManifestConfigs
+	for _, mc := range emc {
+		index := containsResourceIdentifier(manifestConfigs, mc.ResourceIdentifier)
+		if index == -1 {
+			manifestConfigs = append(manifestConfigs, mc)
+			continue
+		}
+
+		for _, rule := range mc.FeedbackRules {
+			if !containsFeedbackRule(manifestConfigs[index].FeedbackRules, rule) {
+				manifestConfigs[index].FeedbackRules = append(manifestConfigs[index].FeedbackRules, rule)
+			}
+		}
+
+		if mc.UpdateStrategy != nil {
+			manifestConfigs[index].UpdateStrategy = mc.UpdateStrategy
+		}
+	}
 	return manifestConfigs
+}
+
+func containsResourceIdentifier(mcs []workapiv1.ManifestConfigOption, ri workapiv1.ResourceIdentifier) int {
+	for index, mc := range mcs {
+		if mc.ResourceIdentifier == ri {
+			return index
+		}
+	}
+	return -1
+}
+
+func containsFeedbackRule(rules []workapiv1.FeedbackRule, rule workapiv1.FeedbackRule) bool {
+	for _, r := range rules {
+		if reflect.DeepEqual(r, rule) {
+			return true
+		}
+	}
+	return false
 }
 
 func getDeletionOrphaningRule(obj runtime.Object) (*workapiv1.OrphaningRule, error) {
