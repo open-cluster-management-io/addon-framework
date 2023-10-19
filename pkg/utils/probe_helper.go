@@ -64,21 +64,30 @@ func DeploymentAvailabilityHealthCheck(identifier workapiv1.ResourceIdentifier, 
 		return fmt.Errorf("unsupported resource group %s", identifier.Group)
 	}
 
-	if len(result.Values) == 0 {
-		return fmt.Errorf("no values are probed for deployment %s/%s", identifier.Namespace, identifier.Name)
-	}
+	var readyReplicas, replicas int64 = -1, -1
 	for _, value := range result.Values {
-		if value.Name != "ReadyReplicas" {
-			continue
+		if value.Name == "Replicas" {
+			replicas = *value.Value.Integer
 		}
-
-		if *value.Value.Integer >= 1 {
-			return nil
+		if value.Name == "ReadyReplicas" {
+			readyReplicas = *value.Value.Integer
 		}
-
-		return fmt.Errorf("readyReplica is %d for deployment %s/%s", *value.Value.Integer, identifier.Namespace, identifier.Name)
 	}
-	return fmt.Errorf("readyReplica is not probed")
+
+	if readyReplicas == -1 || replicas == -1 {
+		return fmt.Errorf("readyReplicas or replicas is not probed for deployment %s/%s",
+			identifier.Namespace, identifier.Name)
+	}
+
+	if replicas == 0 {
+		return nil
+	}
+
+	if readyReplicas >= 1 {
+		return nil
+	}
+
+	return fmt.Errorf("readyReplica is %d for deployment %s/%s", readyReplicas, identifier.Namespace, identifier.Name)
 }
 
 func FilterDeployments(objects []runtime.Object) []*appsv1.Deployment {
