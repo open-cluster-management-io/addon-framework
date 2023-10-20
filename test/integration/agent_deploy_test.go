@@ -64,6 +64,45 @@ const (
 		}
 	}`
 
+	deploymentZeroReplicasJson = `{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "nginx-deployment-no-replica",
+			"namespace": "default"
+		},
+		"spec": {
+			"replicas": 0,
+			"selector": {
+				"matchLabels": {
+					"app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"creationTimestamp": null,
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [
+						{
+							"image": "nginx:1.14.2",
+							"name": "nginx",
+							"ports": [
+								{
+									"containerPort": 80,
+									"protocol": "TCP"
+								}
+							]
+						}
+					]
+				}
+			}
+		}
+	}`
+
 	mchJson = `{
     "apiVersion": "operator.open-cluster-management.io/v1",
     "kind": "MultiClusterHub",
@@ -367,7 +406,10 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 		obj := &unstructured.Unstructured{}
 		err := obj.UnmarshalJSON([]byte(deploymentJson))
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		testAddonImpl.manifests[managedClusterName] = []runtime.Object{obj}
+		objZeroReplicaDeployment := &unstructured.Unstructured{}
+		err = objZeroReplicaDeployment.UnmarshalJSON([]byte(deploymentZeroReplicasJson))
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		testAddonImpl.manifests[managedClusterName] = []runtime.Object{obj, objZeroReplicaDeployment}
 		testAddonImpl.prober = &agent.HealthProber{
 			Type: agent.HealthProberTypeDeploymentAvailability,
 		}
@@ -389,16 +431,19 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 				return err
 			}
 
-			if len(work.Spec.Workload.Manifests) != 1 {
+			if len(work.Spec.Workload.Manifests) != 2 {
 				return fmt.Errorf("Unexpected number of work manifests: %d", len(work.Spec.Workload.Manifests))
 			}
 
-			if len(work.Spec.ManifestConfigs) != 1 {
+			if len(work.Spec.ManifestConfigs) != 2 {
 				return fmt.Errorf("Unexpected number of work manifests configuration: %d", len(work.Spec.ManifestConfigs))
 			}
 
 			if apiequality.Semantic.DeepEqual(work.Spec.Workload.Manifests[0].Raw, []byte(deploymentJson)) {
 				return fmt.Errorf("expected manifest is no correct, get %v", work.Spec.Workload.Manifests[0].Raw)
+			}
+			if apiequality.Semantic.DeepEqual(work.Spec.Workload.Manifests[1].Raw, []byte(deploymentZeroReplicasJson)) {
+				return fmt.Errorf("expected manifest is no correct, get %v", work.Spec.Workload.Manifests[1].Raw)
 			}
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())

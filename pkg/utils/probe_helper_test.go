@@ -19,12 +19,12 @@ func TestDeploymentProbe(t *testing.T) {
 	cases := []struct {
 		name        string
 		result      workapiv1.StatusFeedbackResult
-		expectedErr bool
+		expectedErr string
 	}{
 		{
 			name:        "no result",
 			result:      workapiv1.StatusFeedbackResult{},
-			expectedErr: true,
+			expectedErr: "no values are probed for deployment testns/test",
 		},
 		{
 			name: "no matched value",
@@ -44,10 +44,10 @@ func TestDeploymentProbe(t *testing.T) {
 					},
 				},
 			},
-			expectedErr: true,
+			expectedErr: "readyReplica is not probed",
 		},
 		{
-			name: "check failed with 0 replica",
+			name: "check failed with 0 ready replica",
 			result: workapiv1.StatusFeedbackResult{
 				Values: []workapiv1.FeedbackValue{
 					{
@@ -64,7 +64,7 @@ func TestDeploymentProbe(t *testing.T) {
 					},
 				},
 			},
-			expectedErr: true,
+			expectedErr: "readyReplica is 0 for deployment testns/test",
 		},
 		{
 			name: "check passed",
@@ -84,7 +84,7 @@ func TestDeploymentProbe(t *testing.T) {
 					},
 				},
 			},
-			expectedErr: false,
+			expectedErr: "",
 		},
 	}
 
@@ -95,12 +95,12 @@ func TestDeploymentProbe(t *testing.T) {
 			fields := prober.WorkProber.ProbeFields
 
 			err := prober.WorkProber.HealthCheck(fields[0].ResourceIdentifier, c.result)
-			if err != nil && !c.expectedErr {
-				t.Errorf("expected no error but got %v", err)
+			if err != nil && err.Error() != c.expectedErr {
+				t.Errorf("expected error %s but got %v", c.expectedErr, err)
 			}
 
-			if err == nil && c.expectedErr {
-				t.Error("expected error but got no error")
+			if err == nil && len(c.expectedErr) != 0 {
+				t.Errorf("expected error %s but got no error", c.expectedErr)
 			}
 		})
 	}
