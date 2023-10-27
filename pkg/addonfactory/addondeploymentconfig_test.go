@@ -229,14 +229,16 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 							HTTPProxy:  "http://10.2.3.4:3128",
 							HTTPSProxy: "https://10.2.3.4.3129",
 							NoProxy:    "example.com",
+							CABundle:   []byte("fake-ca-bndle"),
 						},
 					},
 				},
 			},
 			expectedValues: Values{
-				"HTTPProxy":  "http://10.2.3.4:3128",
-				"HTTPSProxy": "https://10.2.3.4.3129",
-				"NoProxy":    "example.com",
+				"HTTPProxy":     "http://10.2.3.4:3128",
+				"HTTPSProxy":    "https://10.2.3.4.3129",
+				"NoProxy":       "example.com",
+				"ProxyCABundle": string([]byte("fake-ca-bndle")),
 			},
 		},
 		{
@@ -269,6 +271,7 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 							HTTPProxy:  "http://10.2.3.4:3128",
 							HTTPSProxy: "https://10.2.3.4:3129",
 							NoProxy:    "example.com",
+							CABundle:   []byte("fake-ca-bndle"),
 						},
 					},
 				},
@@ -276,9 +279,10 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 			expectedValues: Values{
 				"global": map[string]interface{}{
 					"proxyConfig": map[string]interface{}{
-						"HTTP_PROXY":  "http://10.2.3.4:3128",
-						"HTTPS_PROXY": "https://10.2.3.4:3129",
-						"NO_PROXY":    "example.com",
+						"HTTP_PROXY":      "http://10.2.3.4:3128",
+						"HTTPS_PROXY":     "https://10.2.3.4:3129",
+						"NO_PROXY":        "example.com",
+						"PROXY_CA_BUNDLE": string([]byte("fake-ca-bndle")),
 					},
 				},
 			},
