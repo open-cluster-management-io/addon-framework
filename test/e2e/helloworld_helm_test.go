@@ -50,13 +50,29 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 			_, err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), helloWorldHelmAddonName, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
-					_, err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(context.Background(), &helloworldhelmAddon, metav1.CreateOptions{})
-					if err != nil {
-						return err
+					_, cerr := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(context.Background(), &helloworldhelmAddon, metav1.CreateOptions{})
+					if cerr != nil {
+						return cerr
 					}
 				}
 				return err
 			}
+
+			ginkgo.By("Make sure the agent namespace is created")
+			testNs := &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: agentInstallNamespaceConfig,
+				},
+			}
+			_, err = hubKubeClient.CoreV1().Namespaces().Create(context.Background(), testNs, metav1.CreateOptions{})
+			if err != nil {
+				if errors.IsAlreadyExists(err) {
+					ginkgo.By("The agent namespace is already created")
+					return nil
+				}
+				return err
+			}
+			ginkgo.By("The agent namespace is created")
 
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
@@ -106,6 +122,23 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 			return fmt.Errorf("addon agent deployment %s/%s is not deleted", addonInstallNamespace, agentDeploymentName)
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
+		gomega.Eventually(func() error {
+			_, err := hubKubeClient.CoreV1().Namespaces().Get(context.Background(),
+				agentInstallNamespaceConfig, metav1.GetOptions{})
+			if errors.IsNotFound(err) {
+				return nil
+			}
+
+			if err == nil {
+				errd := hubKubeClient.CoreV1().Namespaces().Delete(context.Background(),
+					agentInstallNamespaceConfig, metav1.DeleteOptions{})
+				if errd != nil {
+					return errd
+				}
+			}
+
+			return err
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
 
 	ginkgo.It("addon should be available", func() {
@@ -562,6 +595,54 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 			}
 
 			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+	})
+
+	ginkgo.It("addon registraion agent install namespace should work", func() {
+		ginkgo.By("Prepare a AddOnDeploymentConfig for addon agent install namespace")
+		gomega.Eventually(func() error {
+			return prepareAgentInstallNamespaceAddOnDeploymentConfig(managedClusterName)
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		ginkgo.By("Add the configs to ManagedClusterAddOn")
+		gomega.Eventually(func() error {
+			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(
+				context.Background(), helloWorldHelmAddonName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			newAddon := addon.DeepCopy()
+			newAddon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+				{
+					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+						Group:    "addon.open-cluster-management.io",
+						Resource: "addondeploymentconfigs",
+					},
+					ConfigReferent: addonapiv1alpha1.ConfigReferent{
+						Namespace: managedClusterName,
+						Name:      deployAgentInstallNamespaceConfigName,
+					},
+				},
+			}
+			_, err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Update(
+				context.Background(), newAddon, metav1.UpdateOptions{})
+			if err != nil {
+				return err
+			}
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		ginkgo.By("Make sure addon is configured")
+		gomega.Eventually(func() error {
+			_, err := hubKubeClient.CoreV1().Secrets(agentInstallNamespaceConfig).Get(
+				context.Background(), "helloworldhelm-hub-kubeconfig", metav1.GetOptions{})
+			return err
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		gomega.Eventually(func() error {
+			_, err := hubKubeClient.AppsV1().Deployments(agentInstallNamespaceConfig).Get(
+				context.Background(), "helloworldhelm-agent", metav1.GetOptions{})
+			return err
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
 
