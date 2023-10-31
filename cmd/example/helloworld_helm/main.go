@@ -100,6 +100,8 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 		helloworld_helm.AddonName,
 		utilrand.String(5))
 	// Set agent install namespace from addon deployment config if it exists
+	// Note: If the agentAddonFactory.WithAgentInstallNamespace is set, we recommend
+	// setting this to the same value or omitting this.
 	registrationOption.AgentInstallNamespace = utils.AgentInstallNamespaceFromDeploymentConfigFunc(
 		utils.NewAddOnDeploymentConfigGetter(addonClient),
 	)
