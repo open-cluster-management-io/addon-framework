@@ -91,9 +91,11 @@ type AgentAddonOptions struct {
 	// +optional
 	AgentDeployTriggerClusterFilter func(old, new *clusterv1.ManagedCluster) bool
 
-	// ManifestConfigs represents the configurations of manifests defined in workload field.
-	// It will override the update strategy set by the "Updaters" field and merge the feedback rules set by the
-	// "HealthProber" field if they have the same resource identifier.
+	// ManifestConfigs represents the configurations of manifests defined in workload field. It will:
+	// - override the update strategy set by the "Updaters" field
+	// - merge the feedback rules set by the "HealthProber" field if they have the same resource identifier,
+	//   when merging the feedback rules, if the rule configured here is json path type, will ignore the
+	//   json path which is already in the existing rules, compare by the path name.
 	// +optional
 	ManifestConfigs []workapiv1.ManifestConfigOption
 }

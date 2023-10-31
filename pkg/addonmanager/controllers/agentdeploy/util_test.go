@@ -472,5 +472,173 @@ func TestGetManifestConfigOption(t *testing.T) {
 			assert.Equal(t, c.expectedManifestConfigOption, manifestConfigOptions)
 		})
 	}
+}
 
+func TestMergeFeedbackRule(t *testing.T) {
+	cases := []struct {
+		name                  string
+		existFeedbackRules    []workapiv1.FeedbackRule
+		feedbackRule          workapiv1.FeedbackRule
+		expectedFeedbackRules []workapiv1.FeedbackRule
+	}{
+		{
+			name: "no exist feedback rules",
+			feedbackRule: workapiv1.FeedbackRule{
+				Type: workapiv1.JSONPathsType,
+				JsonPaths: []workapiv1.JsonPath{
+					{
+						Name: "test-name",
+						Path: ".metadata.name",
+					},
+				},
+			},
+			expectedFeedbackRules: []workapiv1.FeedbackRule{
+				{
+					Type: workapiv1.JSONPathsType,
+					JsonPaths: []workapiv1.JsonPath{
+						{
+							Name: "test-name",
+							Path: ".metadata.name",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "no matched well known status type",
+			existFeedbackRules: []workapiv1.FeedbackRule{
+				{
+					Type: workapiv1.JSONPathsType,
+					JsonPaths: []workapiv1.JsonPath{
+						{
+							Name: "test-name",
+							Path: ".metadata.name",
+						},
+					},
+				},
+			},
+			feedbackRule: workapiv1.FeedbackRule{
+				Type: workapiv1.WellKnownStatusType,
+			},
+			expectedFeedbackRules: []workapiv1.FeedbackRule{
+				{
+					Type: workapiv1.JSONPathsType,
+					JsonPaths: []workapiv1.JsonPath{
+						{
+							Name: "test-name",
+							Path: ".metadata.name",
+						},
+					},
+				},
+				{
+					Type: workapiv1.WellKnownStatusType,
+				},
+			},
+		},
+		{
+			name: "no matched feedback rules",
+			existFeedbackRules: []workapiv1.FeedbackRule{
+				{
+					Type: workapiv1.JSONPathsType,
+					JsonPaths: []workapiv1.JsonPath{
+						{
+							Name: "test-name",
+							Path: ".metadata.name",
+						},
+					},
+				},
+			},
+			feedbackRule: workapiv1.FeedbackRule{
+				Type: workapiv1.JSONPathsType,
+				JsonPaths: []workapiv1.JsonPath{
+					{
+						Name: "test-name-1",
+						Path: ".metadata.name",
+					},
+				},
+			},
+			expectedFeedbackRules: []workapiv1.FeedbackRule{
+				{
+					Type: workapiv1.JSONPathsType,
+					JsonPaths: []workapiv1.JsonPath{
+						{
+							Name: "test-name",
+							Path: ".metadata.name",
+						},
+					},
+				},
+				{
+					Type: workapiv1.JSONPathsType,
+					JsonPaths: []workapiv1.JsonPath{
+						{
+							Name: "test-name-1",
+							Path: ".metadata.name",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "ignore existing json paths",
+			existFeedbackRules: []workapiv1.FeedbackRule{
+				{
+					Type: workapiv1.JSONPathsType,
+					JsonPaths: []workapiv1.JsonPath{
+						{
+							Name: "test-name",
+							Path: ".metadata.name",
+						},
+						{
+							Name: "test-namespace",
+							Path: ".metadata.namespace",
+						},
+					},
+				},
+			},
+			feedbackRule: workapiv1.FeedbackRule{
+				Type: workapiv1.JSONPathsType,
+				JsonPaths: []workapiv1.JsonPath{
+					{
+						Name: "test-name-1",
+						Path: ".metadata.name",
+					},
+					{
+						Name: "test-namespace", // this should be ignored
+						Path: ".metadata.name",
+					},
+				},
+			},
+			expectedFeedbackRules: []workapiv1.FeedbackRule{
+				{
+					Type: workapiv1.JSONPathsType,
+					JsonPaths: []workapiv1.JsonPath{
+						{
+							Name: "test-name",
+							Path: ".metadata.name",
+						},
+						{
+							Name: "test-namespace",
+							Path: ".metadata.namespace",
+						},
+					},
+				},
+				{
+					Type: workapiv1.JSONPathsType,
+					JsonPaths: []workapiv1.JsonPath{
+						{
+							Name: "test-name-1",
+							Path: ".metadata.name",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			feedbackRules := mergeFeedbackRule(c.existFeedbackRules, c.feedbackRule)
+			assert.Equal(t, c.expectedFeedbackRules, feedbackRules)
+		})
+	}
 }
