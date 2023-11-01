@@ -226,6 +226,244 @@ func TestGetManifestConfigOption(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "set updater",
+			agentAddon: &testAgent{
+				name: "test",
+				objects: []runtime.Object{
+					NewFakeDeployment("test-deployment", "default"),
+				},
+				Updaters: []agent.Updater{
+					{
+						ResourceIdentifier: workapiv1.ResourceIdentifier{
+							Group:     "apps",
+							Resource:  "deployments",
+							Name:      "test-deployment",
+							Namespace: "default",
+						},
+						UpdateStrategy: workapiv1.UpdateStrategy{
+							Type: workapiv1.UpdateStrategyTypeServerSideApply,
+							ServerSideApply: &workapiv1.ServerSideApplyConfig{
+								FieldManager: "work-agent-test",
+							},
+						},
+					},
+				},
+			},
+			expectedManifestConfigOption: []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Group:     "apps",
+						Resource:  "deployments",
+						Name:      "test-deployment",
+						Namespace: "default",
+					},
+					UpdateStrategy: &workapiv1.UpdateStrategy{
+						Type: workapiv1.UpdateStrategyTypeServerSideApply,
+						ServerSideApply: &workapiv1.ServerSideApplyConfig{
+							FieldManager: "work-agent-test",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "merge feedback rules",
+			agentAddon: &testAgent{
+				name: "test",
+				objects: []runtime.Object{
+					NewFakeDeployment("test-deployment", "default"),
+				},
+				healthProber: &agent.HealthProber{Type: agent.HealthProberTypeDeploymentAvailability},
+				ManifestConfigs: []workapiv1.ManifestConfigOption{
+					{
+						ResourceIdentifier: workapiv1.ResourceIdentifier{
+							Group:     "apps",
+							Resource:  "deployments",
+							Name:      "test-deployment",
+							Namespace: "default",
+						},
+						FeedbackRules: []workapiv1.FeedbackRule{
+							{
+								Type: workapiv1.JSONPathsType,
+								JsonPaths: []workapiv1.JsonPath{
+									{
+										Name: "test-name",
+										Path: ".metadata.name",
+									},
+								},
+							},
+						},
+					},
+					{
+						ResourceIdentifier: workapiv1.ResourceIdentifier{
+							Group:     "apps",
+							Resource:  "deployments",
+							Name:      "test-deployment-1",
+							Namespace: "default",
+						},
+						FeedbackRules: []workapiv1.FeedbackRule{
+							{
+								Type: workapiv1.JSONPathsType,
+								JsonPaths: []workapiv1.JsonPath{
+									{
+										Name: "test-name",
+										Path: ".metadata.name",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedManifestConfigOption: []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Group:     "apps",
+						Resource:  "deployments",
+						Name:      "test-deployment",
+						Namespace: "default",
+					},
+					FeedbackRules: []workapiv1.FeedbackRule{
+						{
+							Type: workapiv1.WellKnownStatusType,
+						},
+						{
+							Type: workapiv1.JSONPathsType,
+							JsonPaths: []workapiv1.JsonPath{
+								{
+									Name: "test-name",
+									Path: ".metadata.name",
+								},
+							},
+						},
+					},
+				},
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Group:     "apps",
+						Resource:  "deployments",
+						Name:      "test-deployment-1",
+						Namespace: "default",
+					},
+					FeedbackRules: []workapiv1.FeedbackRule{
+						{
+							Type: workapiv1.JSONPathsType,
+							JsonPaths: []workapiv1.JsonPath{
+								{
+									Name: "test-name",
+									Path: ".metadata.name",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "merge update strategy",
+			agentAddon: &testAgent{
+				name: "test",
+				objects: []runtime.Object{
+					NewFakeDeployment("test-deployment", "default"),
+				},
+				Updaters: []agent.Updater{
+					{
+						ResourceIdentifier: workapiv1.ResourceIdentifier{
+							Group:     "apps",
+							Resource:  "deployments",
+							Name:      "test-deployment",
+							Namespace: "default",
+						},
+						UpdateStrategy: workapiv1.UpdateStrategy{
+							Type: workapiv1.UpdateStrategyTypeCreateOnly,
+						},
+					},
+					{
+						ResourceIdentifier: workapiv1.ResourceIdentifier{
+							Group:     "apps",
+							Resource:  "deployments",
+							Name:      "test-deployment-2",
+							Namespace: "default",
+						},
+						UpdateStrategy: workapiv1.UpdateStrategy{
+							Type: workapiv1.UpdateStrategyTypeCreateOnly,
+						},
+					},
+				},
+				ManifestConfigs: []workapiv1.ManifestConfigOption{
+					{
+						ResourceIdentifier: workapiv1.ResourceIdentifier{
+							Group:     "apps",
+							Resource:  "deployments",
+							Name:      "test-deployment",
+							Namespace: "default",
+						},
+						UpdateStrategy: &workapiv1.UpdateStrategy{
+							Type: workapiv1.UpdateStrategyTypeServerSideApply,
+							ServerSideApply: &workapiv1.ServerSideApplyConfig{
+								FieldManager: "work-agent-test",
+							},
+						},
+					},
+					{
+						ResourceIdentifier: workapiv1.ResourceIdentifier{
+							Group:     "apps",
+							Resource:  "deployments",
+							Name:      "test-deployment-1",
+							Namespace: "default",
+						},
+						UpdateStrategy: &workapiv1.UpdateStrategy{
+							Type: workapiv1.UpdateStrategyTypeServerSideApply,
+							ServerSideApply: &workapiv1.ServerSideApplyConfig{
+								FieldManager: "work-agent-test",
+							},
+						},
+					},
+				},
+			},
+			expectedManifestConfigOption: []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Group:     "apps",
+						Resource:  "deployments",
+						Name:      "test-deployment",
+						Namespace: "default",
+					},
+					UpdateStrategy: &workapiv1.UpdateStrategy{
+						Type: workapiv1.UpdateStrategyTypeServerSideApply,
+						ServerSideApply: &workapiv1.ServerSideApplyConfig{
+							FieldManager: "work-agent-test",
+						},
+					},
+				},
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Group:     "apps",
+						Resource:  "deployments",
+						Name:      "test-deployment-2",
+						Namespace: "default",
+					},
+					UpdateStrategy: &workapiv1.UpdateStrategy{
+						Type: workapiv1.UpdateStrategyTypeCreateOnly,
+					},
+				},
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Group:     "apps",
+						Resource:  "deployments",
+						Name:      "test-deployment-1",
+						Namespace: "default",
+					},
+					UpdateStrategy: &workapiv1.UpdateStrategy{
+						Type: workapiv1.UpdateStrategyTypeServerSideApply,
+						ServerSideApply: &workapiv1.ServerSideApplyConfig{
+							FieldManager: "work-agent-test",
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -234,5 +472,173 @@ func TestGetManifestConfigOption(t *testing.T) {
 			assert.Equal(t, c.expectedManifestConfigOption, manifestConfigOptions)
 		})
 	}
+}
 
+func TestMergeFeedbackRule(t *testing.T) {
+	cases := []struct {
+		name                  string
+		existFeedbackRules    []workapiv1.FeedbackRule
+		feedbackRule          workapiv1.FeedbackRule
+		expectedFeedbackRules []workapiv1.FeedbackRule
+	}{
+		{
+			name: "no exist feedback rules",
+			feedbackRule: workapiv1.FeedbackRule{
+				Type: workapiv1.JSONPathsType,
+				JsonPaths: []workapiv1.JsonPath{
+					{
+						Name: "test-name",
+						Path: ".metadata.name",
+					},
+				},
+			},
+			expectedFeedbackRules: []workapiv1.FeedbackRule{
+				{
+					Type: workapiv1.JSONPathsType,
+					JsonPaths: []workapiv1.JsonPath{
+						{
+							Name: "test-name",
+							Path: ".metadata.name",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "no matched well known status type",
+			existFeedbackRules: []workapiv1.FeedbackRule{
+				{
+					Type: workapiv1.JSONPathsType,
+					JsonPaths: []workapiv1.JsonPath{
+						{
+							Name: "test-name",
+							Path: ".metadata.name",
+						},
+					},
+				},
+			},
+			feedbackRule: workapiv1.FeedbackRule{
+				Type: workapiv1.WellKnownStatusType,
+			},
+			expectedFeedbackRules: []workapiv1.FeedbackRule{
+				{
+					Type: workapiv1.JSONPathsType,
+					JsonPaths: []workapiv1.JsonPath{
+						{
+							Name: "test-name",
+							Path: ".metadata.name",
+						},
+					},
+				},
+				{
+					Type: workapiv1.WellKnownStatusType,
+				},
+			},
+		},
+		{
+			name: "no matched feedback rules",
+			existFeedbackRules: []workapiv1.FeedbackRule{
+				{
+					Type: workapiv1.JSONPathsType,
+					JsonPaths: []workapiv1.JsonPath{
+						{
+							Name: "test-name",
+							Path: ".metadata.name",
+						},
+					},
+				},
+			},
+			feedbackRule: workapiv1.FeedbackRule{
+				Type: workapiv1.JSONPathsType,
+				JsonPaths: []workapiv1.JsonPath{
+					{
+						Name: "test-name-1",
+						Path: ".metadata.name",
+					},
+				},
+			},
+			expectedFeedbackRules: []workapiv1.FeedbackRule{
+				{
+					Type: workapiv1.JSONPathsType,
+					JsonPaths: []workapiv1.JsonPath{
+						{
+							Name: "test-name",
+							Path: ".metadata.name",
+						},
+					},
+				},
+				{
+					Type: workapiv1.JSONPathsType,
+					JsonPaths: []workapiv1.JsonPath{
+						{
+							Name: "test-name-1",
+							Path: ".metadata.name",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "ignore existing json paths",
+			existFeedbackRules: []workapiv1.FeedbackRule{
+				{
+					Type: workapiv1.JSONPathsType,
+					JsonPaths: []workapiv1.JsonPath{
+						{
+							Name: "test-name",
+							Path: ".metadata.name",
+						},
+						{
+							Name: "test-namespace",
+							Path: ".metadata.namespace",
+						},
+					},
+				},
+			},
+			feedbackRule: workapiv1.FeedbackRule{
+				Type: workapiv1.JSONPathsType,
+				JsonPaths: []workapiv1.JsonPath{
+					{
+						Name: "test-name-1",
+						Path: ".metadata.name",
+					},
+					{
+						Name: "test-namespace", // this should be ignored
+						Path: ".metadata.name",
+					},
+				},
+			},
+			expectedFeedbackRules: []workapiv1.FeedbackRule{
+				{
+					Type: workapiv1.JSONPathsType,
+					JsonPaths: []workapiv1.JsonPath{
+						{
+							Name: "test-name",
+							Path: ".metadata.name",
+						},
+						{
+							Name: "test-namespace",
+							Path: ".metadata.namespace",
+						},
+					},
+				},
+				{
+					Type: workapiv1.JSONPathsType,
+					JsonPaths: []workapiv1.JsonPath{
+						{
+							Name: "test-name-1",
+							Path: ".metadata.name",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			feedbackRules := mergeFeedbackRule(c.existFeedbackRules, c.feedbackRule)
+			assert.Equal(t, c.expectedFeedbackRules, feedbackRules)
+		})
+	}
 }
