@@ -99,6 +99,12 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 		kubeConfig,
 		helloworld_helm.AddonName,
 		utilrand.String(5))
+	// Set agent install namespace from addon deployment config if it exists
+	// Note: If the agentAddonFactory.WithAgentInstallNamespace is set, we recommend
+	// setting this to the same value or omitting this.
+	registrationOption.AgentInstallNamespace = utils.AgentInstallNamespaceFromDeploymentConfigFunc(
+		utils.NewAddOnDeploymentConfigGetter(addonClient),
+	)
 
 	agentAddon, err := addonfactory.NewAgentAddonFactory(helloworld_helm.AddonName, helloworld_helm.FS, "manifests/charts/helloworld").
 		WithConfigGVRs(
@@ -121,6 +127,12 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 			helloworld_helm.GetImageValues(kubeClient),
 			addonfactory.GetValuesFromAddonAnnotation,
 		).WithAgentRegistrationOption(registrationOption).
+		WithAgentInstallNamespace(
+			// Set agent install namespace from addon deployment config if it exists
+			utils.AgentInstallNamespaceFromDeploymentConfigFunc(
+				utils.NewAddOnDeploymentConfigGetter(addonClient),
+			),
+		).
 		BuildHelmAgentAddon()
 	if err != nil {
 		klog.Errorf("failed to build agent %v", err)
