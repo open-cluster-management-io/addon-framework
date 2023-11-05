@@ -34,9 +34,11 @@ type AgentAddonFactory struct {
 	getValuesFuncs    []GetValuesFunc
 	agentAddonOptions agent.AgentAddonOptions
 	// trimCRDDescription flag is used to trim the description of CRDs in manifestWork. disabled by default.
-	trimCRDDescription    bool
-	hostingCluster        *clusterv1.ManagedCluster
-	agentInstallNamespace func(addon *addonapiv1alpha1.ManagedClusterAddOn) string
+	trimCRDDescription          bool
+	hostingCluster              *clusterv1.ManagedCluster
+	agentInstallNamespace       func(addon *addonapiv1alpha1.ManagedClusterAddOn) string
+	createAgentInstallNamespace bool
+	helmEngineStrict            bool
 }
 
 // NewAgentAddonFactory builds an addonAgentFactory instance with addon name and fs.
@@ -57,8 +59,10 @@ func NewAgentAddonFactory(addonName string, fs embed.FS, dir string) *AgentAddon
 			HealthProber:        nil,
 			SupportedConfigGVRs: []schema.GroupVersionResource{},
 		},
-		trimCRDDescription: false,
-		scheme:             s,
+		trimCRDDescription:          false,
+		scheme:                      s,
+		createAgentInstallNamespace: false,
+		helmEngineStrict:            false,
 	}
 }
 
@@ -112,6 +116,18 @@ func (f *AgentAddonFactory) WithAgentHostedModeEnabledOption() *AgentAddonFactor
 // WithTrimCRDDescription is to enable trim the description of CRDs in manifestWork.
 func (f *AgentAddonFactory) WithTrimCRDDescription() *AgentAddonFactory {
 	f.trimCRDDescription = true
+	return f
+}
+
+// WithCreateAgentInstallNamespace is to create the agent install namespace object in manifestWork.
+func (f *AgentAddonFactory) WithCreateAgentInstallNamespace() *AgentAddonFactory {
+	f.createAgentInstallNamespace = true
+	return f
+}
+
+// WithHelmEngineStrict is to enable script go template rendering for Helm charts to generate manifestWork.
+func (f *AgentAddonFactory) WithHelmEngineStrict() *AgentAddonFactory {
+	f.helmEngineStrict = true
 	return f
 }
 
