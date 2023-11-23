@@ -7,9 +7,9 @@ We have several AddOn examples for user to understand how Addon works and how to
 - the [helloworld_helm example](helloworld_helm) is implemented using Helm Chart.
 - the [helloworld_hosted example](helloworld_hosted) is implemented using Go templateds, and support running the agent
   deployment on a hosting cluster cluster.
-- the [helloworld-template example](deplpy/addon/helloworld-template) is implemented using the AddOnTemplate API, it
+- the [helloworld-template example](deploy/addon/helloworld-template) is implemented using the AddOnTemplate API, it
   is managed by the global addon-manager, so there is no dedicated addon-manager pod running on the hub cluster for it.
-- the [kubernetes-dashboard](deplpy/addon/kubernetes-dashboard) is another addon implemented using the AddOnTemplate API
+- the [kubernetes-dashboard](deploy/addon/kubernetes-dashboard) is another addon implemented using the AddOnTemplate API
   to install [a kubernetes dashboard](https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/)
   for a managed cluster.
 
