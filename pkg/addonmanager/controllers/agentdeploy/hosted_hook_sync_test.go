@@ -3,6 +3,7 @@ package agentdeploy
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -27,6 +28,23 @@ import (
 	"open-cluster-management.io/api/utils/work/v1/workbuilder"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
+
+func getHostedDeployWork() *workapiv1.ManifestWork {
+	work := addontesting.NewManifestWork(
+		fmt.Sprintf("%s-%d", constants.DeployHostingWorkNamePrefix("cluster1", "test"), 0),
+		"cluster2",
+		addontesting.NewHostingUnstructured("v1", "ConfigMap", "default", "test"),
+	)
+	work.Labels = map[string]string{
+		addonapiv1alpha1.AddonLabelKey:          "test",
+		addonapiv1alpha1.AddonNamespaceLabelKey: "cluster1",
+	}
+	work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{}
+	work.Status.Conditions = []metav1.Condition{}
+	work.Status.ResourceStatus = workapiv1.ManifestResourceStatus{}
+
+	return work
+}
 
 func TestHostingHookReconcile(t *testing.T) {
 	cases := []struct {
@@ -106,7 +124,7 @@ func TestHostingHookReconcile(t *testing.T) {
 				addontesting.NewHostingUnstructured("v1", "ConfigMap", "default", "test"),
 				addontesting.NewHostedHookJob("test", "default"),
 			}},
-			existingWork: []runtime.Object{},
+			existingWork: []runtime.Object{getHostedDeployWork()},
 			validateWorkActions: func(t *testing.T, actions []clienttesting.Action) {
 				// hosted sync deploy the hook work in the hosting cluster ns
 				addontesting.AssertActions(t, actions, "create")
@@ -114,6 +132,72 @@ func TestHostingHookReconcile(t *testing.T) {
 				deployWork := actual.(*workapiv1.ManifestWork)
 				if deployWork.Namespace != "cluster2" || deployWork.Name != constants.PreDeleteHookHostingWorkName("cluster1", "test") {
 					t.Errorf("the hookWork %v/%v is not the hook job.", deployWork.Namespace, deployWork.Name)
+				}
+			},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchActionImpl).Patch
+				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				err := json.Unmarshal(patch, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !meta.IsStatusConditionFalse(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHookManifestCompleted) {
+					t.Errorf("HookManifestCompleted condition should be false,but got true.")
+				}
+			},
+		},
+		{
+			name: "deploy hook manifest for a deleting addon with finalizer, not completed, updated deployment",
+			key:  "cluster1/test",
+			addon: []runtime.Object{
+				addontesting.SetAddonFinalizers(
+					addontesting.SetAddonDeletionTimestamp(
+						addontesting.NewHostedModeAddon("test", "cluster1", "cluster2",
+							registrationAppliedCondition), time.Now()),
+					addonapiv1alpha1.AddonHostingPreDeleteHookFinalizer, addonapiv1alpha1.AddonHostingManifestFinalizer),
+			},
+			cluster: []runtime.Object{
+				addontesting.NewManagedCluster("cluster1"),
+				addontesting.NewManagedCluster("cluster2"),
+			},
+			testaddon: &testHostedAgent{name: "test", objects: []runtime.Object{
+				addontesting.NewHostingUnstructured("v1", "ConfigMap", "default", "test"),
+				addontesting.NewHostedHookJob("test", "default"),
+			}},
+			existingWork: []runtime.Object{
+				func() *workapiv1.ManifestWork {
+					work := addontesting.NewManifestWork(
+						fmt.Sprintf("%s-%d", constants.DeployHostingWorkNamePrefix("cluster1", "test"), 0),
+						"cluster2",
+						// Setting the wrong name so that the ManifestWork is patched to account for the deployment
+						// work change during predelete hook.
+						addontesting.NewHostingUnstructured("v1", "ConfigMap", "default", "test2"),
+					)
+					work.Labels = map[string]string{
+						addonapiv1alpha1.AddonLabelKey:          "test",
+						addonapiv1alpha1.AddonNamespaceLabelKey: "cluster1",
+					}
+					work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{}
+					work.Status.Conditions = []metav1.Condition{}
+					work.Status.ResourceStatus = workapiv1.ManifestResourceStatus{}
+					return work
+				}(),
+			},
+			validateWorkActions: func(t *testing.T, actions []clienttesting.Action) {
+				// hosted sync deploy the hook work in the hosting cluster ns
+				addontesting.AssertActions(t, actions, "patch", "create")
+				actual := actions[0].(clienttesting.PatchActionImpl)
+				expectedDeployWorkName := fmt.Sprintf("%s-%v", constants.DeployHostingWorkNamePrefix("cluster1", "test"), 0)
+
+				if actual.Namespace != "cluster2" || actual.Name != expectedDeployWorkName {
+					t.Errorf("the deployWork %v/%v is not the deploy job.", actual.Namespace, actual.Name)
+				}
+
+				actual2 := actions[1].(clienttesting.CreateActionImpl).Object
+				hookWork := actual2.(*workapiv1.ManifestWork)
+				if hookWork.Namespace != "cluster2" || hookWork.Name != constants.PreDeleteHookHostingWorkName("cluster1", "test") {
+					t.Errorf("the hookWork %v/%v is not the hook job.", hookWork.Namespace, hookWork.Name)
 				}
 			},
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
@@ -148,6 +232,7 @@ func TestHostingHookReconcile(t *testing.T) {
 				addontesting.NewHostedHookJob("test", "default"),
 			}},
 			existingWork: []runtime.Object{
+				getHostedDeployWork(),
 				func() *workapiv1.ManifestWork {
 					work := addontesting.NewManifestWork(
 						constants.PreDeleteHookHostingWorkName("cluster1", "test"),
@@ -246,6 +331,7 @@ func TestHostingHookReconcile(t *testing.T) {
 				addontesting.NewHostedHookJob("test", "default"),
 			}},
 			existingWork: []runtime.Object{
+				getHostedDeployWork(),
 				func() *workapiv1.ManifestWork {
 					work := addontesting.NewManifestWork(
 						constants.PreDeleteHookHostingWorkName("cluster1", "test"),
