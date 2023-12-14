@@ -10,7 +10,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -70,7 +69,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 			}
 			_, err = hubKubeClient.CoreV1().Namespaces().Create(context.Background(), testNs, metav1.CreateOptions{})
 			if err != nil {
-				if apierrors.IsAlreadyExists(err) {
+				if errors.IsAlreadyExists(err) {
 					return nil
 				}
 				return err
@@ -80,10 +79,11 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 	})
 
 	ginkgo.AfterEach(func() {
+		ginkgo.By("Clean up the customized agent install namespace after each case.")
 		gomega.Eventually(func() error {
 			_, err := hubKubeClient.CoreV1().Namespaces().Get(context.Background(),
 				agentInstallNamespaceConfig, metav1.GetOptions{})
-			if apierrors.IsNotFound(err) {
+			if errors.IsNotFound(err) {
 				return nil
 			}
 
@@ -93,6 +93,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 				if errd != nil {
 					return errd
 				}
+				return fmt.Errorf("ns is deleting, need re-check if namespace is not found")
 			}
 
 			return err
