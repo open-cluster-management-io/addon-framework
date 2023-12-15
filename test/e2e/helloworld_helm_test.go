@@ -79,6 +79,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 	})
 
 	ginkgo.AfterEach(func() {
+		ginkgo.By("Clean up the mca after each case.")
 		gomega.Eventually(func() error {
 			_, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(
 				context.Background(), helloWorldHelmAddonName, metav1.GetOptions{})
@@ -99,6 +100,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 			return fmt.Errorf("addon %s/%s is not deleted", managedClusterName, helloWorldHelmAddonName)
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
+		ginkgo.By("Clean up the orphan agent after each case.")
 		// delete the deployment since it has the deletion-orphan annotation, otherwise it may affect the
 		// test result of each case
 		gomega.Eventually(func() error {
@@ -122,6 +124,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 			return fmt.Errorf("addon agent deployment %s/%s is not deleted", addonInstallNamespace, agentDeploymentName)
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
+		ginkgo.By("Clean up the customized agent install namespace after each case.")
 		gomega.Eventually(func() error {
 			_, err := hubKubeClient.CoreV1().Namespaces().Get(context.Background(),
 				agentInstallNamespaceConfig, metav1.GetOptions{})
@@ -135,6 +138,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 				if errd != nil {
 					return errd
 				}
+				return fmt.Errorf("ns is deleting, need re-check if namespace is not found")
 			}
 
 			return err
