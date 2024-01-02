@@ -90,6 +90,7 @@ func TestHealthCheckReconcile(t *testing.T) {
 		existingWork             []runtime.Object
 		addon                    *addonapiv1alpha1.ManagedClusterAddOn
 		testAddon                *healthCheckTestAgent
+		cluster                  *clusterv1.ManagedCluster
 		expectedErr              error
 		expectedHealthCheckMode  addonapiv1alpha1.HealthCheckMode
 		expectAvailableCondition metav1.Condition
@@ -390,7 +391,81 @@ func TestHealthCheckReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "Health check mode is deployment availability but WorkProber check pass",
+			name: "Health check mode is deployment availability but cluster availability is unknown",
+			cluster: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster1",
+				},
+				Status: clusterv1.ManagedClusterStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   clusterv1.ManagedClusterConditionAvailable,
+							Status: metav1.ConditionUnknown,
+						},
+					},
+				},
+			},
+			testAddon: &healthCheckTestAgent{name: "test",
+				health: &agent.HealthProber{Type: agent.HealthProberTypeDeploymentAvailability},
+			},
+			addon: addontesting.NewAddonWithConditions("test", "cluster1", manifestAppliedCondition),
+			existingWork: []runtime.Object{
+				&v1.ManifestWork{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "addon-test-deploy-01",
+						Namespace: "cluster1",
+						Labels: map[string]string{
+							"open-cluster-management.io/addon-name": "test",
+						},
+					},
+					Spec: v1.ManifestWorkSpec{},
+					Status: v1.ManifestWorkStatus{
+						ResourceStatus: v1.ManifestResourceStatus{
+							Manifests: []v1.ManifestCondition{
+								{
+									ResourceMeta: v1.ManifestResourceMeta{
+										Ordinal:   0,
+										Group:     "apps",
+										Version:   "",
+										Kind:      "",
+										Resource:  "deployments",
+										Name:      "test-deployment",
+										Namespace: "default",
+									},
+									StatusFeedbacks: v1.StatusFeedbackResult{
+										Values: []v1.FeedbackValue{
+											{
+												Name: "Replicas",
+												Value: v1.FieldValue{
+													Integer: boolPtr(1),
+												},
+											},
+											{
+												Name: "ReadyReplicas",
+												Value: v1.FieldValue{
+													Integer: boolPtr(2),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+						Conditions: []metav1.Condition{
+							{
+								Type:   v1.WorkAvailable,
+								Status: metav1.ConditionTrue,
+							},
+						},
+					},
+				},
+			},
+			expectedErr:              nil,
+			expectedHealthCheckMode:  addonapiv1alpha1.HealthCheckModeCustomized,
+			expectAvailableCondition: metav1.Condition{},
+		},
+		{
+			name: "Health check mode is deployment availability and WorkProber check pass",
 			testAddon: &healthCheckTestAgent{name: "test",
 				health: &agent.HealthProber{Type: agent.HealthProberTypeDeploymentAvailability},
 			},
@@ -487,7 +562,7 @@ func TestHealthCheckReconcile(t *testing.T) {
 				agentAddon:     addonDeploymentController.agentAddons[c.testAddon.name],
 			}
 
-			addon, err := healthCheckSyncer.sync(context.TODO(), addontesting.NewFakeSyncContext(t), nil, c.addon)
+			addon, err := healthCheckSyncer.sync(context.TODO(), addontesting.NewFakeSyncContext(t), c.cluster, c.addon)
 			if (err == nil && c.expectedErr != nil) || (err != nil && c.expectedErr == nil) {
 				t.Errorf("name %s, expected err %v, but got %v", c.name, c.expectedErr, err)
 			} else if err != nil && c.expectedErr != nil && err.Error() != c.expectedErr.Error() {
@@ -511,6 +586,11 @@ func TestHealthCheckReconcile(t *testing.T) {
 				if cond.Reason != c.expectAvailableCondition.Reason {
 					t.Errorf("name %s, expected condition reason %v, but got %v",
 						c.name, c.expectAvailableCondition.Reason, cond.Reason)
+				}
+			} else {
+				if meta.FindStatusCondition(addon.Status.Conditions,
+					addonapiv1alpha1.ManagedClusterAddOnConditionAvailable) != nil {
+					t.Errorf("name %s, expected condition not found", c.name)
 				}
 			}
 		})
