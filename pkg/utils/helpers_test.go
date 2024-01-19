@@ -243,3 +243,132 @@ func TestClusterImageRegistriesAnnotationChanged(t *testing.T) {
 		})
 	}
 }
+
+func TestClusterAvailableConditionChanged(t *testing.T) {
+	cases := []struct {
+		name     string
+		old      *clusterv1.ManagedCluster
+		new      *clusterv1.ManagedCluster
+		expected bool
+	}{
+		{
+			name: "condition not changed",
+			old: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+				},
+				Status: clusterv1.ManagedClusterStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:    clusterv1.ManagedClusterConditionAvailable,
+							Status:  metav1.ConditionTrue,
+							Message: "test",
+						},
+					},
+				},
+			},
+			new: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+				},
+				Status: clusterv1.ManagedClusterStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:    clusterv1.ManagedClusterConditionAvailable,
+							Status:  metav1.ConditionTrue,
+							Message: "message changed",
+						},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "old condition not present",
+			old: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+				},
+			},
+			new: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+				},
+				Status: clusterv1.ManagedClusterStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:    clusterv1.ManagedClusterConditionAvailable,
+							Status:  metav1.ConditionTrue,
+							Message: "test",
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "new condition not present",
+			old: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+				},
+				Status: clusterv1.ManagedClusterStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:    clusterv1.ManagedClusterConditionAvailable,
+							Status:  metav1.ConditionUnknown,
+							Message: "test",
+						},
+					},
+				},
+			},
+			new: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "condition changed",
+			old: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+				},
+				Status: clusterv1.ManagedClusterStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:    clusterv1.ManagedClusterConditionAvailable,
+							Status:  metav1.ConditionUnknown,
+							Message: "test",
+						},
+					},
+				},
+			},
+			new: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+				},
+				Status: clusterv1.ManagedClusterStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:    clusterv1.ManagedClusterConditionAvailable,
+							Status:  metav1.ConditionTrue,
+							Message: "test",
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			actual := ClusterAvailableConditionChanged(c.old, c.new)
+			if actual != c.expected {
+				t.Errorf("name %s: expected %v, but got %v", c.name, c.expected, actual)
+			}
+		})
+	}
+}
