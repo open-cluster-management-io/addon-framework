@@ -7,8 +7,13 @@ KUBECTL=${KUBECTL:-kubectl}
 
 rm -rf registration-operator
 
+export IMAGE_NAME=quay.io/open-cluster-management/registration-operator:v0.10.0
+export REGISTRATION_IMAGE=quay.io/open-cluster-management/registration:v0.10.0
+export WORK_IMAGE=quay.io/open-cluster-management/work:v0.10.0
+export PLACEMENT_IMAGE=quay.io/open-cluster-management/placement:v0.10.0
+
 echo "############  Cloning registration-operator"
-git clone https://github.com/open-cluster-management-io/registration-operator.git
+git clone --depth 1 --branch release-0.10 https://github.com/open-cluster-management-io/registration-operator.git
 
 cd registration-operator || {
   printf "cd failed, registration-operator does not exist"

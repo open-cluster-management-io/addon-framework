@@ -66,6 +66,9 @@ chmod +x "${KUBECTL}"
 
 
 echo "###### installing e2e test cluster : ${REPO_DIR}/.kubeconfig"
+
+export KUBECONFIG=${REPO_DIR}/.kubeconfig
+
 ${KIND} delete cluster --name ${MANAGED_CLUSTER_NAME}
 ${KIND} create cluster --image kindest/node:${KUBE_VERSION} --name ${MANAGED_CLUSTER_NAME}
 cluster_ip=$(${KUBECTL} get svc kubernetes -n default -o jsonpath="{.spec.clusterIP}")
@@ -79,10 +82,17 @@ ${KIND} load docker-image ${EXAMPLE_IMAGE_NAME} --name ${MANAGED_CLUSTER_NAME}
 
 echo "###### deploy registration-operator"
 rm -rf "$WORK_DIR/registration-operator"
-git clone https://github.com/open-cluster-management-io/registration-operator.git "$WORK_DIR/registration-operator"
-${KUBECTL} apply -k "$WORK_DIR/registration-operator/deploy/cluster-manager/config/manifests"
-${KUBECTL} apply -k "$WORK_DIR/registration-operator/deploy/cluster-manager/config/samples"
-${KUBECTL} apply -k "$WORK_DIR/registration-operator/deploy/klusterlet/config/manifests"
+
+export IMAGE_NAME=quay.io/open-cluster-management/registration-operator:v0.10.0
+export REGISTRATION_IMAGE=quay.io/open-cluster-management/registration:v0.10.0
+export WORK_IMAGE=quay.io/open-cluster-management/work:v0.10.0
+export PLACEMENT_IMAGE=quay.io/open-cluster-management/placement:v0.10.0
+
+git clone --depth 1 --branch release-0.10 https://github.com/open-cluster-management-io/registration-operator.git "$WORK_DIR/registration-operator"
+cd $WORK_DIR/registration-operator
+make deploy-hub
+make deploy-spoke-operator
+cd ../../
 rm -rf "$WORK_DIR/registration-operator"
 
 ${KUBECTL} get ns open-cluster-management-agent || ${KUBECTL} create ns open-cluster-management-agent
@@ -95,8 +105,8 @@ metadata:
 spec:
   deployOption:
     mode: Default
-  registrationImagePullSpec: quay.io/open-cluster-management/registration
-  workImagePullSpec: quay.io/open-cluster-management/work
+  registrationImagePullSpec: quay.io/open-cluster-management/registration:v0.10.0
+  workImagePullSpec: quay.io/open-cluster-management/work:v0.10.0
   clusterName: ${MANAGED_CLUSTER_NAME}
   namespace: open-cluster-management-agent
   externalServerURLs:
@@ -168,8 +178,8 @@ metadata:
 spec:
   deployOption:
     mode: Hosted
-  registrationImagePullSpec: quay.io/open-cluster-management/registration
-  workImagePullSpec: quay.io/open-cluster-management/work
+  registrationImagePullSpec: quay.io/open-cluster-management/registration:v0.10.0
+  workImagePullSpec: quay.io/open-cluster-management/work:v0.10.0
   clusterName: ${HOSTED_MANAGED_CLUSTER_NAME}
   namespace: open-cluster-management-agent
   externalServerURLs:
