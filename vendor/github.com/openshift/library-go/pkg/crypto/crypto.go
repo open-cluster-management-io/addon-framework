@@ -14,12 +14,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/big"
 	mathrand "math/rand"
 	"net"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strconv"
 	"sync"
@@ -371,7 +371,7 @@ func (c *TLSCertificateConfig) GetPEMBytes() ([]byte, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	keyBytes, err := encodeKey(c.Key)
+	keyBytes, err := EncodeKey(c.Key)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -387,7 +387,7 @@ func GetTLSCertificateConfig(certFile, keyFile string) (*TLSCertificateConfig, e
 		return nil, errors.New("keyFile missing")
 	}
 
-	certPEMBlock, err := ioutil.ReadFile(certFile)
+	certPEMBlock, err := os.ReadFile(certFile)
 	if err != nil {
 		return nil, err
 	}
@@ -396,7 +396,7 @@ func GetTLSCertificateConfig(certFile, keyFile string) (*TLSCertificateConfig, e
 		return nil, fmt.Errorf("Error reading %s: %s", certFile, err)
 	}
 
-	keyPEMBlock, err := ioutil.ReadFile(keyFile)
+	keyPEMBlock, err := os.ReadFile(keyFile)
 	if err != nil {
 		return nil, err
 	}
@@ -509,14 +509,14 @@ func (s *SerialFileGenerator) Next(template *x509.Certificate) (int64, error) {
 	// always add a newline at the end to have a valid file
 	serialText += "\n"
 
-	if err := ioutil.WriteFile(s.SerialFile, []byte(serialText), os.FileMode(0640)); err != nil {
+	if err := os.WriteFile(s.SerialFile, []byte(serialText), os.FileMode(0640)); err != nil {
 		return 0, err
 	}
 	return next, nil
 }
 
 func fileToSerial(serialFile string) (int64, error) {
-	serialData, err := ioutil.ReadFile(serialFile)
+	serialData, err := os.ReadFile(serialFile)
 	if err != nil {
 		return 0, err
 	}
@@ -611,7 +611,7 @@ func MakeSelfSignedCA(certFile, keyFile, serialFile, name string, expireDays int
 	var serialGenerator SerialGenerator
 	if len(serialFile) > 0 {
 		// create / overwrite the serial file with a zero padded hex value (ending in a newline to have a valid file)
-		if err := ioutil.WriteFile(serialFile, []byte("00\n"), 0644); err != nil {
+		if err := os.WriteFile(serialFile, []byte("00\n"), 0644); err != nil {
 			return nil, err
 		}
 		serialGenerator, err = NewSerialFileGenerator(serialFile)
@@ -644,15 +644,20 @@ func MakeSelfSignedCAConfigForSubject(subject pkix.Name, expireDays int) (*TLSCe
 	}
 
 	caLifetime := time.Duration(caLifetimeInDays) * 24 * time.Hour
-	return makeSelfSignedCAConfigForSubjectAndDuration(subject, caLifetime)
+	return makeSelfSignedCAConfigForSubjectAndDuration(subject, time.Now, caLifetime)
 }
 
 func MakeSelfSignedCAConfigForDuration(name string, caLifetime time.Duration) (*TLSCertificateConfig, error) {
 	subject := pkix.Name{CommonName: name}
-	return makeSelfSignedCAConfigForSubjectAndDuration(subject, caLifetime)
+	return makeSelfSignedCAConfigForSubjectAndDuration(subject, time.Now, caLifetime)
 }
 
-func makeSelfSignedCAConfigForSubjectAndDuration(subject pkix.Name, caLifetime time.Duration) (*TLSCertificateConfig, error) {
+func UnsafeMakeSelfSignedCAConfigForDurationAtTime(name string, currentTime func() time.Time, caLifetime time.Duration) (*TLSCertificateConfig, error) {
+	subject := pkix.Name{CommonName: name}
+	return makeSelfSignedCAConfigForSubjectAndDuration(subject, currentTime, caLifetime)
+}
+
+func makeSelfSignedCAConfigForSubjectAndDuration(subject pkix.Name, currentTime func() time.Time, caLifetime time.Duration) (*TLSCertificateConfig, error) {
 	// Create CA cert
 	rootcaPublicKey, rootcaPrivateKey, publicKeyHash, err := newKeyPairWithHash()
 	if err != nil {
@@ -661,7 +666,7 @@ func makeSelfSignedCAConfigForSubjectAndDuration(subject pkix.Name, caLifetime t
 	// AuthorityKeyId and SubjectKeyId should match for a self-signed CA
 	authorityKeyId := publicKeyHash
 	subjectKeyId := publicKeyHash
-	rootcaTemplate := newSigningCertificateTemplateForDuration(subject, caLifetime, time.Now, authorityKeyId, subjectKeyId)
+	rootcaTemplate := newSigningCertificateTemplateForDuration(subject, caLifetime, currentTime, authorityKeyId, subjectKeyId)
 	rootcaCert, err := signCertificate(rootcaTemplate, rootcaPublicKey, rootcaTemplate, rootcaPrivateKey)
 	if err != nil {
 		return nil, err
@@ -682,7 +687,7 @@ func MakeCAConfigForDuration(name string, caLifetime time.Duration, issuer *CA) 
 	authorityKeyId := issuer.Config.Certs[0].SubjectKeyId
 	subjectKeyId := publicKeyHash
 	signerTemplate := newSigningCertificateTemplateForDuration(pkix.Name{CommonName: name}, caLifetime, time.Now, authorityKeyId, subjectKeyId)
-	signerCert, err := issuer.signCertificate(signerTemplate, signerPublicKey)
+	signerCert, err := issuer.SignCertificate(signerTemplate, signerPublicKey)
 	if err != nil {
 		return nil, err
 	}
@@ -691,6 +696,54 @@ func MakeCAConfigForDuration(name string, caLifetime time.Duration, issuer *CA) 
 		Key:   signerPrivateKey,
 	}
 	return signerConfig, nil
+}
+
+// EnsureSubCA returns a subCA signed by the `ca`, whether it was created
+// (as opposed to pre-existing), and any error that might occur during the subCA
+// creation.
+// If serialFile is an empty string, a RandomSerialGenerator will be used.
+func (ca *CA) EnsureSubCA(certFile, keyFile, serialFile, name string, expireDays int) (*CA, bool, error) {
+	if subCA, err := GetCA(certFile, keyFile, serialFile); err == nil {
+		return subCA, false, err
+	}
+	subCA, err := ca.MakeAndWriteSubCA(certFile, keyFile, serialFile, name, expireDays)
+	return subCA, true, err
+}
+
+// MakeAndWriteSubCA returns a new sub-CA configuration. New cert/key pair is generated
+// while using this function.
+// If serialFile is an empty string, a RandomSerialGenerator will be used.
+func (ca *CA) MakeAndWriteSubCA(certFile, keyFile, serialFile, name string, expireDays int) (*CA, error) {
+	klog.V(4).Infof("Generating sub-CA certificate in %s, key in %s, serial in %s", certFile, keyFile, serialFile)
+
+	subCAConfig, err := MakeCAConfigForDuration(name, time.Duration(expireDays)*time.Hour*24, ca)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := subCAConfig.WriteCertConfigFile(certFile, keyFile); err != nil {
+		return nil, err
+	}
+
+	var serialGenerator SerialGenerator
+	if len(serialFile) > 0 {
+		// create / overwrite the serial file with a zero padded hex value (ending in a newline to have a valid file)
+		if err := os.WriteFile(serialFile, []byte("00\n"), 0644); err != nil {
+			return nil, err
+		}
+
+		serialGenerator, err = NewSerialFileGenerator(serialFile)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		serialGenerator = &RandomSerialGenerator{}
+	}
+
+	return &CA{
+		Config:          subCAConfig,
+		SerialGenerator: serialGenerator,
+	}, nil
 }
 
 func (ca *CA) EnsureServerCert(certFile, keyFile string, hostnames sets.String, expireDays int) (*TLSCertificateConfig, bool, error) {
@@ -710,15 +763,17 @@ func GetServerCert(certFile, keyFile string, hostnames sets.String) (*TLSCertifi
 	}
 
 	cert := server.Certs[0]
-	ips, dns := IPAddressesDNSNames(hostnames.List())
-	missingIps := ipsNotInSlice(ips, cert.IPAddresses)
-	missingDns := stringsNotInSlice(dns, cert.DNSNames)
-	if len(missingIps) == 0 && len(missingDns) == 0 {
+	certNames := sets.NewString()
+	for _, ip := range cert.IPAddresses {
+		certNames.Insert(ip.String())
+	}
+	certNames.Insert(cert.DNSNames...)
+	if hostnames.Equal(certNames) {
 		klog.V(4).Infof("Found existing server certificate in %s", certFile)
 		return server, nil
 	}
 
-	return nil, fmt.Errorf("Existing server certificate in %s was missing some hostnames (%v) or IP addresses (%v).", certFile, missingDns, missingIps)
+	return nil, fmt.Errorf("Existing server certificate in %s does not match required hostnames.", certFile)
 }
 
 func (ca *CA) MakeAndWriteServerCert(certFile, keyFile string, hostnames sets.String, expireDays int) (*TLSCertificateConfig, error) {
@@ -748,7 +803,7 @@ func (ca *CA) MakeServerCert(hostnames sets.String, expireDays int, fns ...Certi
 			return nil, err
 		}
 	}
-	serverCrt, err := ca.signCertificate(serverTemplate, serverPublicKey)
+	serverCrt, err := ca.SignCertificate(serverTemplate, serverPublicKey)
 	if err != nil {
 		return nil, err
 	}
@@ -769,7 +824,7 @@ func (ca *CA) MakeServerCertForDuration(hostnames sets.String, lifetime time.Dur
 			return nil, err
 		}
 	}
-	serverCrt, err := ca.signCertificate(serverTemplate, serverPublicKey)
+	serverCrt, err := ca.SignCertificate(serverTemplate, serverPublicKey)
 	if err != nil {
 		return nil, err
 	}
@@ -781,13 +836,35 @@ func (ca *CA) MakeServerCertForDuration(hostnames sets.String, lifetime time.Dur
 }
 
 func (ca *CA) EnsureClientCertificate(certFile, keyFile string, u user.Info, expireDays int) (*TLSCertificateConfig, bool, error) {
-	certConfig, err := GetTLSCertificateConfig(certFile, keyFile)
+	certConfig, err := GetClientCertificate(certFile, keyFile, u)
 	if err != nil {
 		certConfig, err = ca.MakeClientCertificate(certFile, keyFile, u, expireDays)
 		return certConfig, true, err // true indicates we wrote the files.
 	}
-
 	return certConfig, false, nil
+}
+
+func GetClientCertificate(certFile, keyFile string, u user.Info) (*TLSCertificateConfig, error) {
+	certConfig, err := GetTLSCertificateConfig(certFile, keyFile)
+	if err != nil {
+		return nil, err
+	}
+
+	if subject := certConfig.Certs[0].Subject; subjectChanged(subject, UserToSubject(u)) {
+		return nil, fmt.Errorf("existing client certificate in %s was issued for a different Subject (%s)",
+			certFile, subject)
+	}
+
+	return certConfig, nil
+}
+
+func subjectChanged(existing, expected pkix.Name) bool {
+	sort.Strings(existing.Organization)
+	sort.Strings(expected.Organization)
+
+	return existing.CommonName != expected.CommonName ||
+		existing.SerialNumber != expected.SerialNumber ||
+		!reflect.DeepEqual(existing.Organization, expected.Organization)
 }
 
 func (ca *CA) MakeClientCertificate(certFile, keyFile string, u user.Info, expireDays int) (*TLSCertificateConfig, error) {
@@ -801,8 +878,8 @@ func (ca *CA) MakeClientCertificate(certFile, keyFile string, u user.Info, expir
 	}
 
 	clientPublicKey, clientPrivateKey, _ := NewKeyPair()
-	clientTemplate := newClientCertificateTemplate(userToSubject(u), expireDays, time.Now)
-	clientCrt, err := ca.signCertificate(clientTemplate, clientPublicKey)
+	clientTemplate := NewClientCertificateTemplate(UserToSubject(u), expireDays, time.Now)
+	clientCrt, err := ca.SignCertificate(clientTemplate, clientPublicKey)
 	if err != nil {
 		return nil, err
 	}
@@ -811,15 +888,15 @@ func (ca *CA) MakeClientCertificate(certFile, keyFile string, u user.Info, expir
 	if err != nil {
 		return nil, err
 	}
-	keyData, err := encodeKey(clientPrivateKey)
+	keyData, err := EncodeKey(clientPrivateKey)
 	if err != nil {
 		return nil, err
 	}
 
-	if err = ioutil.WriteFile(certFile, certData, os.FileMode(0644)); err != nil {
+	if err = os.WriteFile(certFile, certData, os.FileMode(0644)); err != nil {
 		return nil, err
 	}
-	if err = ioutil.WriteFile(keyFile, keyData, os.FileMode(0600)); err != nil {
+	if err = os.WriteFile(keyFile, keyData, os.FileMode(0600)); err != nil {
 		return nil, err
 	}
 
@@ -828,8 +905,8 @@ func (ca *CA) MakeClientCertificate(certFile, keyFile string, u user.Info, expir
 
 func (ca *CA) MakeClientCertificateForDuration(u user.Info, lifetime time.Duration) (*TLSCertificateConfig, error) {
 	clientPublicKey, clientPrivateKey, _ := NewKeyPair()
-	clientTemplate := newClientCertificateTemplateForDuration(userToSubject(u), lifetime, time.Now)
-	clientCrt, err := ca.signCertificate(clientTemplate, clientPublicKey)
+	clientTemplate := NewClientCertificateTemplateForDuration(UserToSubject(u), lifetime, time.Now)
+	clientCrt, err := ca.SignCertificate(clientTemplate, clientPublicKey)
 	if err != nil {
 		return nil, err
 	}
@@ -838,7 +915,7 @@ func (ca *CA) MakeClientCertificateForDuration(u user.Info, lifetime time.Durati
 	if err != nil {
 		return nil, err
 	}
-	keyData, err := encodeKey(clientPrivateKey)
+	keyData, err := EncodeKey(clientPrivateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -863,7 +940,7 @@ func (s sortedForDER) Less(i, j int) bool {
 	return l1 < l2
 }
 
-func userToSubject(u user.Info) pkix.Name {
+func UserToSubject(u user.Info) pkix.Name {
 	// Ok we are going to order groups in a peculiar way here to workaround a
 	// 2 bugs, 1 in golang (https://github.com/golang/go/issues/24254) which
 	// incorrectly encodes Multivalued RDNs and another in GNUTLS clients
@@ -889,7 +966,7 @@ func userToSubject(u user.Info) pkix.Name {
 	}
 }
 
-func (ca *CA) signCertificate(template *x509.Certificate, requestKey crypto.PublicKey) (*x509.Certificate, error) {
+func (ca *CA) SignCertificate(template *x509.Certificate, requestKey crypto.PublicKey) (*x509.Certificate, error) {
 	// Increment and persist serial
 	serial, err := ca.SerialGenerator.Next(template)
 	if err != nil {
@@ -1036,7 +1113,7 @@ func CertsFromPEM(pemCerts []byte) ([]*x509.Certificate, error) {
 }
 
 // Can be used as a certificate in http.Transport TLSClientConfig
-func newClientCertificateTemplate(subject pkix.Name, expireDays int, currentTime func() time.Time) *x509.Certificate {
+func NewClientCertificateTemplate(subject pkix.Name, expireDays int, currentTime func() time.Time) *x509.Certificate {
 	var lifetimeInDays = DefaultCertificateLifetimeInDays
 	if expireDays > 0 {
 		lifetimeInDays = expireDays
@@ -1048,11 +1125,11 @@ func newClientCertificateTemplate(subject pkix.Name, expireDays int, currentTime
 
 	lifetime := time.Duration(lifetimeInDays) * 24 * time.Hour
 
-	return newClientCertificateTemplateForDuration(subject, lifetime, currentTime)
+	return NewClientCertificateTemplateForDuration(subject, lifetime, currentTime)
 }
 
 // Can be used as a certificate in http.Transport TLSClientConfig
-func newClientCertificateTemplateForDuration(subject pkix.Name, lifetime time.Duration, currentTime func() time.Time) *x509.Certificate {
+func NewClientCertificateTemplateForDuration(subject pkix.Name, lifetime time.Duration, currentTime func() time.Time) *x509.Certificate {
 	return &x509.Certificate{
 		Subject: subject,
 
@@ -1098,7 +1175,7 @@ func EncodeCertificates(certs ...*x509.Certificate) ([]byte, error) {
 	}
 	return b.Bytes(), nil
 }
-func encodeKey(key crypto.PrivateKey) ([]byte, error) {
+func EncodeKey(key crypto.PrivateKey) ([]byte, error) {
 	b := bytes.Buffer{}
 	switch key := key.(type) {
 	case *ecdsa.PrivateKey:
@@ -1132,7 +1209,7 @@ func writeCertificates(f io.Writer, certs ...*x509.Certificate) error {
 	return nil
 }
 func writeKeyFile(f io.Writer, key crypto.PrivateKey) error {
-	bytes, err := encodeKey(key)
+	bytes, err := EncodeKey(key)
 	if err != nil {
 		return err
 	}
@@ -1141,42 +1218,4 @@ func writeKeyFile(f io.Writer, key crypto.PrivateKey) error {
 	}
 
 	return nil
-}
-
-func stringsNotInSlice(needles []string, haystack []string) []string {
-	missing := []string{}
-	for _, needle := range needles {
-		if !stringInSlice(needle, haystack) {
-			missing = append(missing, needle)
-		}
-	}
-	return missing
-}
-
-func stringInSlice(needle string, haystack []string) bool {
-	for _, straw := range haystack {
-		if needle == straw {
-			return true
-		}
-	}
-	return false
-}
-
-func ipsNotInSlice(needles []net.IP, haystack []net.IP) []net.IP {
-	missing := []net.IP{}
-	for _, needle := range needles {
-		if !ipInSlice(needle, haystack) {
-			missing = append(missing, needle)
-		}
-	}
-	return missing
-}
-
-func ipInSlice(needle net.IP, haystack []net.IP) bool {
-	for _, straw := range haystack {
-		if needle.Equal(straw) {
-			return true
-		}
-	}
-	return false
 }

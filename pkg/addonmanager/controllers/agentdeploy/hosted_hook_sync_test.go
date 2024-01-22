@@ -24,9 +24,9 @@ import (
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	fakework "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
-	"open-cluster-management.io/api/utils/work/v1/workapplier"
-	"open-cluster-management.io/api/utils/work/v1/workbuilder"
 	workapiv1 "open-cluster-management.io/api/work/v1"
+	workapplier "open-cluster-management.io/sdk-go/pkg/apis/work/v1/applier"
+	workbuilder "open-cluster-management.io/sdk-go/pkg/apis/work/v1/builder"
 )
 
 func getHostedDeployWork() *workapiv1.ManifestWork {
