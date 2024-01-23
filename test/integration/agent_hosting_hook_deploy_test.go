@@ -156,6 +156,8 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 				Annotations: map[string]string{
 					addonapiv1alpha1.HostingClusterNameAnnotationKey: hostingClusterName,
 				},
+				// this finalizer is to prevent the addon from being deleted for test, it will be deleted at the end.
+				Finalizers: []string{"pending"},
 			},
 			Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
 				InstallNamespace: "default",
@@ -280,7 +282,9 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
-		// update hook manifest feedbackResult, addon will be deleted
+		// update hook manifest feedbackResult, addon status will be updated and finalizer and pre-delete manifestwork
+		// will be deleted.
+
 		work, err = hubWorkClient.WorkV1().ManifestWorks(hostingClusterName).
 			Get(context.Background(), constants.PreDeleteHookHostingWorkName(addon.Namespace, addon.Name), metav1.GetOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -322,6 +326,59 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 		_, err = hubWorkClient.WorkV1().ManifestWorks(hostingClusterName).
 			UpdateStatus(context.Background(), work, metav1.UpdateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		// addon only has pending finalizer, and status is updated
+		gomega.Eventually(func() error {
+			addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).
+				Get(context.Background(), testHostedAddonImpl.name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if len(addon.Finalizers) != 1 {
+				return fmt.Errorf("addon is expected to only 1 finalizer,but got %v", len(addon.Finalizers))
+			}
+			if addon.Finalizers[0] != "pending" {
+				return fmt.Errorf("addon is expected to only pending finalizer,but got %v", len(addon.Finalizers))
+			}
+			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHookManifestCompleted) {
+				return fmt.Errorf("addon HookManifestCompleted condition is expecte to true, but got false")
+			}
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		// update addon to trigger reconcile 3 times, and per-delete manifestwork should be deleted and not be re-created
+		for i := 0; i < 3; i++ {
+			gomega.Eventually(func() error {
+				addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).
+					Get(context.Background(), testHostedAddonImpl.name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				addon.Labels = map[string]string{"test": fmt.Sprintf("%d", i)}
+				_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).
+					Update(context.Background(), addon, metav1.UpdateOptions{})
+				return err
+			}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+			time.Sleep(2 * time.Second)
+			work, err = hubWorkClient.WorkV1().ManifestWorks(hostingClusterName).
+				Get(context.Background(), constants.PreDeleteHookHostingWorkName(addon.Namespace, addon.Name), metav1.GetOptions{})
+			gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
+		}
+
+		// remove pending finalizer to delete addon
+		gomega.Eventually(func() error {
+			addon, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).
+				Get(context.Background(), testHostedAddonImpl.name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			addon.SetFinalizers([]string{})
+			_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).
+				Update(context.Background(), addon, metav1.UpdateOptions{})
+			return err
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
 		gomega.Eventually(func() error {
 			_, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).
 				Get(context.Background(), testHostedAddonImpl.name, metav1.GetOptions{})
@@ -333,6 +390,5 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 			}
 			return fmt.Errorf("addon is expceted to be deleted")
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
-
 	})
 })
