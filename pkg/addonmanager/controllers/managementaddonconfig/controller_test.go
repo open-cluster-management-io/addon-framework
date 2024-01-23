@@ -19,6 +19,7 @@ import (
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
+	"open-cluster-management.io/sdk-go/pkg/patcher"
 )
 
 var fakeGVR = schema.GroupVersionResource{
@@ -260,6 +261,9 @@ func TestSync(t *testing.T) {
 				configListers:                map[schema.GroupResource]dynamiclister.Lister{},
 				addonFilterFunc:              func(obj interface{}) bool { return true },
 				configGVRs:                   map[schema.GroupVersionResource]bool{fakeGVR: true},
+				addonPatcher: patcher.NewPatcher[*addonapiv1alpha1.ClusterManagementAddOn,
+					addonapiv1alpha1.ClusterManagementAddOnSpec,
+					addonapiv1alpha1.ClusterManagementAddOnStatus](fakeAddonClient.AddonV1alpha1().ClusterManagementAddOns()),
 			}
 
 			ctrl.buildConfigInformers(configInformerFactory, map[schema.GroupVersionResource]bool{fakeGVR: true})
