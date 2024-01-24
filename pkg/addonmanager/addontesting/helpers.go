@@ -89,13 +89,15 @@ func NewAddon(name, namespace string, owners ...metav1.OwnerReference) *addonapi
 }
 
 func NewHostedModeAddon(name, namespace string, hostingCluster string,
-	owners ...metav1.OwnerReference) *addonapiv1alpha1.ManagedClusterAddOn {
+	conditions ...metav1.Condition) *addonapiv1alpha1.ManagedClusterAddOn {
 	return &addonapiv1alpha1.ManagedClusterAddOn{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            name,
-			Namespace:       namespace,
-			OwnerReferences: owners,
-			Annotations:     map[string]string{addonapiv1alpha1.HostingClusterNameAnnotationKey: hostingCluster},
+			Name:        name,
+			Namespace:   namespace,
+			Annotations: map[string]string{addonapiv1alpha1.HostingClusterNameAnnotationKey: hostingCluster},
+		},
+		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
+			Conditions: conditions,
 		},
 	}
 }

@@ -126,7 +126,7 @@ func TestHostingHookReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "deploy hook manifest for a deleting addon with 2 finalizer, completed",
+			name: "deploy hook manifest for a deleting addon with 2 finalizer,  without completed condition",
 			key:  "cluster1/test",
 			addon: []runtime.Object{
 				addontesting.SetAddonFinalizers(
@@ -206,29 +206,34 @@ func TestHostingHookReconcile(t *testing.T) {
 				}(),
 			},
 			validateWorkActions: func(t *testing.T, actions []clienttesting.Action) {
-				// hosted hook sync deletes the hook work in the hosting cluster ns
-				addontesting.AssertActions(t, actions, "delete")
-				if actions[0].(clienttesting.DeleteActionImpl).Name != constants.PreDeleteHookHostingWorkName("cluster1", "test") {
-					t.Errorf("should delete the hook work after completed")
-				}
+				addontesting.AssertNoActions(t, actions)
 			},
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				// delete HostingPreDeleteHookFinalizer firstly
-				addontesting.AssertActions(t, actions, "update")
-				actual := actions[0].(clienttesting.UpdateActionImpl).Object
-				addOn := actual.(*addonapiv1alpha1.ManagedClusterAddOn)
-				if addonHasFinalizer(addOn, constants.HostingPreDeleteHookFinalizer) {
-					t.Errorf("expected no HostingManifestFinalizer on addon.")
+				addontesting.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchActionImpl).Patch
+				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				err := json.Unmarshal(patch, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if addonHasFinalizer(addOn, constants.HostingManifestFinalizer) {
+					t.Errorf("expected no HostingPreDeleteHookFinalizer on addon.")
+				}
+				if !meta.IsStatusConditionTrue(addOn.Status.Conditions, constants.AddonHookManifestCompleted) {
+					t.Errorf("HookManifestCompleted condition should be true, but got false.")
 				}
 			},
 		},
 		{
-			name: "deploy hook manifest for a deleting addon with 1 finalizer, completed",
+			name: "deploy hook manifest for a deleting addon with 1 finalizer, completed condition",
 			key:  "cluster1/test",
 			addon: []runtime.Object{
 				addontesting.SetAddonFinalizers(
 					addontesting.SetAddonDeletionTimestamp(
-						addontesting.NewHostedModeAddon("test", "cluster1", "cluster2"), time.Now()),
+						addontesting.NewHostedModeAddon("test", "cluster1", "cluster2",
+							metav1.Condition{
+								Type:   constants.AddonHookManifestCompleted,
+								Status: metav1.ConditionTrue}), time.Now()),
 					constants.HostingPreDeleteHookFinalizer),
 			},
 			cluster: []runtime.Object{
