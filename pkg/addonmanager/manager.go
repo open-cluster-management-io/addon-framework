@@ -244,6 +244,7 @@ func (a *addonManager) StartWithInformers(ctx context.Context,
 		addonClient,
 		clusterInformers.Cluster().V1().ManagedClusters(),
 		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+		addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
 		a.addonAgents,
 	)
 

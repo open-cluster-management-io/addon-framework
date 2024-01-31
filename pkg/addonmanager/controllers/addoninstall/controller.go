@@ -16,6 +16,7 @@ import (
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterlister "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
+	"open-cluster-management.io/sdk-go/pkg/patcher"
 
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
@@ -23,23 +24,32 @@ import (
 
 // managedClusterController reconciles instances of ManagedCluster on the hub.
 type addonInstallController struct {
-	addonClient               addonv1alpha1client.Interface
-	managedClusterLister      clusterlister.ManagedClusterLister
-	managedClusterAddonLister addonlisterv1alpha1.ManagedClusterAddOnLister
-	agentAddons               map[string]agent.AgentAddon
+	addonClient                  addonv1alpha1client.Interface
+	managedClusterLister         clusterlister.ManagedClusterLister
+	managedClusterAddonLister    addonlisterv1alpha1.ManagedClusterAddOnLister
+	clusterManagementAddonLister addonlisterv1alpha1.ClusterManagementAddOnLister
+	agentAddons                  map[string]agent.AgentAddon
+	addonPatcher                 patcher.Patcher[*addonapiv1alpha1.ClusterManagementAddOn,
+		addonapiv1alpha1.ClusterManagementAddOnSpec,
+		addonapiv1alpha1.ClusterManagementAddOnStatus]
 }
 
 func NewAddonInstallController(
 	addonClient addonv1alpha1client.Interface,
 	clusterInformers clusterinformers.ManagedClusterInformer,
 	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
+	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
 	agentAddons map[string]agent.AgentAddon,
 ) factory.Controller {
 	c := &addonInstallController{
-		addonClient:               addonClient,
-		managedClusterLister:      clusterInformers.Lister(),
-		managedClusterAddonLister: addonInformers.Lister(),
-		agentAddons:               agentAddons,
+		addonClient:                  addonClient,
+		managedClusterLister:         clusterInformers.Lister(),
+		managedClusterAddonLister:    addonInformers.Lister(),
+		clusterManagementAddonLister: clusterManagementAddonInformers.Lister(),
+		agentAddons:                  agentAddons,
+		addonPatcher: patcher.NewPatcher[*addonapiv1alpha1.ClusterManagementAddOn,
+			addonapiv1alpha1.ClusterManagementAddOnSpec,
+			addonapiv1alpha1.ClusterManagementAddOnStatus](addonClient.AddonV1alpha1().ClusterManagementAddOns()),
 	}
 
 	return factory.New().WithFilteredEventsInformersQueueKeysFunc(
@@ -96,6 +106,27 @@ func (c *addonInstallController) sync(ctx context.Context, syncCtx factory.SyncC
 	for addonName, addon := range c.agentAddons {
 		if addon.GetAgentAddonOptions().InstallStrategy == nil {
 			continue
+		}
+
+		cma, err := c.clusterManagementAddonLister.Get(addonName)
+		if err != nil {
+			if !errors.IsNotFound(err) {
+				return err
+			}
+		} else {
+			// If the addon defines install strategy via WithInstallStrategy(), force add annotation "addon.open-cluster-management.io/lifecycle: self" to cma.
+			// The annotation with value "self" will be removed when remove WithInstallStrategy() in addon-framework.
+			// The migration plan refer to https://github.com/open-cluster-management-io/ocm/issues/355.
+			cmaCopy := cma.DeepCopy()
+			if cmaCopy.Annotations == nil {
+				cmaCopy.Annotations = map[string]string{}
+			}
+			cmaCopy.Annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey] = addonapiv1alpha1.AddonLifecycleSelfManageAnnotationValue
+
+			_, err = c.addonPatcher.PatchLabelAnnotations(ctx, cmaCopy, cmaCopy.ObjectMeta, cma.ObjectMeta)
+			if err != nil {
+				return err
+			}
 		}
 
 		managedClusterFilter := addon.GetAgentAddonOptions().InstallStrategy.GetManagedClusterFilter()

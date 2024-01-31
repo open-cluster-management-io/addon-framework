@@ -2,6 +2,7 @@ package addoninstall
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	fakecluster "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/sdk-go/pkg/patcher"
 )
 
 type testAgent struct {
@@ -47,9 +49,16 @@ func newManagedClusterWithAnnotation(name, key, value string) *clusterv1.Managed
 	return cluster
 }
 
+func newClusterManagementAddonWithAnnotation(name string, annotations map[string]string) *addonapiv1alpha1.ClusterManagementAddOn {
+	cma := addontesting.NewClusterManagementAddon(name, "", "").Build()
+	cma.Annotations = annotations
+	return cma
+}
+
 func TestReconcile(t *testing.T) {
 	cases := []struct {
 		name                 string
+		cma                  []runtime.Object
 		addon                []runtime.Object
 		testaddons           map[string]agent.AgentAddon
 		cluster              []runtime.Object
@@ -193,12 +202,90 @@ func TestReconcile(t *testing.T) {
 				})},
 			},
 		},
+		{
+			name: "add annotation when uses install strategy",
+			cma: []runtime.Object{newClusterManagementAddonWithAnnotation("test", map[string]string{
+				"test": "test",
+			})},
+			addon:   []runtime.Object{},
+			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch", "create")
+				patch := actions[0].(clienttesting.PatchActionImpl).Patch
+				cma := &addonapiv1alpha1.ClusterManagementAddOn{}
+				err := json.Unmarshal(patch, cma)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if len(cma.Annotations) != 1 || cma.Annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey] != addonapiv1alpha1.AddonLifecycleSelfManageAnnotationValue {
+					t.Errorf("cma annotation is not correct, expected self but got %s", cma.Annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey])
+				}
+			},
+			testaddons: map[string]agent.AgentAddon{
+				"test": &testAgent{name: "test", strategy: agent.InstallAllStrategy("test")},
+			},
+		},
+		{
+			name: "override annotation when uses install strategy",
+			cma: []runtime.Object{newClusterManagementAddonWithAnnotation("test", map[string]string{
+				"test": "test",
+				addonapiv1alpha1.AddonLifecycleAnnotationKey: addonapiv1alpha1.AddonLifecycleAddonManagerAnnotationValue,
+			})},
+			addon:   []runtime.Object{},
+			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch", "create")
+				patch := actions[0].(clienttesting.PatchActionImpl).Patch
+				cma := &addonapiv1alpha1.ClusterManagementAddOn{}
+				err := json.Unmarshal(patch, cma)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if len(cma.Annotations) != 1 || cma.Annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey] != addonapiv1alpha1.AddonLifecycleSelfManageAnnotationValue {
+					t.Errorf("cma annotation is not correct, expected self but got %s", cma.Annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey])
+				}
+			},
+			testaddons: map[string]agent.AgentAddon{
+				"test": &testAgent{name: "test", strategy: agent.InstallAllStrategy("test")},
+			},
+		},
+		{
+			name: "no patch annotation if managed by self",
+			cma: []runtime.Object{newClusterManagementAddonWithAnnotation("test", map[string]string{
+				"test": "test",
+				addonapiv1alpha1.AddonLifecycleAnnotationKey: addonapiv1alpha1.AddonLifecycleSelfManageAnnotationValue,
+			})},
+			addon:   []runtime.Object{},
+			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "create")
+			},
+			testaddons: map[string]agent.AgentAddon{
+				"test": &testAgent{name: "test", strategy: agent.InstallAllStrategy("test")},
+			},
+		},
+		{
+			name: "no patch annotation if no install strategy",
+			cma: []runtime.Object{newClusterManagementAddonWithAnnotation("test", map[string]string{
+				"test": "test",
+				addonapiv1alpha1.AddonLifecycleAnnotationKey: addonapiv1alpha1.AddonLifecycleAddonManagerAnnotationValue,
+			})},
+			addon:                []runtime.Object{},
+			cluster:              []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			validateAddonActions: addontesting.AssertNoActions,
+			testaddons: map[string]agent.AgentAddon{
+				"test": &testAgent{name: "test"},
+			},
+		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			obj := append(c.addon, c.cma...)
 			fakeClusterClient := fakecluster.NewSimpleClientset(c.cluster...)
-			fakeAddonClient := fakeaddon.NewSimpleClientset(c.addon...)
+			fakeAddonClient := fakeaddon.NewSimpleClientset(obj...)
 
 			addonInformers := addoninformers.NewSharedInformerFactory(fakeAddonClient, 10*time.Minute)
 			clusterInformers := clusterv1informers.NewSharedInformerFactory(fakeClusterClient, 10*time.Minute)
@@ -213,12 +300,21 @@ func TestReconcile(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
+			for _, obj := range c.cma {
+				if err := addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Informer().GetStore().Add(obj); err != nil {
+					t.Fatal(err)
+				}
+			}
 
 			controller := addonInstallController{
-				addonClient:               fakeAddonClient,
-				managedClusterLister:      clusterInformers.Cluster().V1().ManagedClusters().Lister(),
-				managedClusterAddonLister: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
-				agentAddons:               c.testaddons,
+				addonClient:                  fakeAddonClient,
+				managedClusterLister:         clusterInformers.Cluster().V1().ManagedClusters().Lister(),
+				managedClusterAddonLister:    addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
+				clusterManagementAddonLister: addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
+				agentAddons:                  c.testaddons,
+				addonPatcher: patcher.NewPatcher[*addonapiv1alpha1.ClusterManagementAddOn,
+					addonapiv1alpha1.ClusterManagementAddOnSpec,
+					addonapiv1alpha1.ClusterManagementAddOnStatus](fakeAddonClient.AddonV1alpha1().ClusterManagementAddOns()),
 			}
 
 			for _, obj := range c.cluster {
