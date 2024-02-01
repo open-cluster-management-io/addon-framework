@@ -25,6 +25,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/addoninstall"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/agentdeploy"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/certificate"
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/managementaddon"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/managementaddonconfig"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/registration"
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -244,8 +245,17 @@ func (a *addonManager) StartWithInformers(ctx context.Context,
 		addonClient,
 		clusterInformers.Cluster().V1().ManagedClusters(),
 		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+		a.addonAgents,
+	)
+
+	// This controller is used during migrating addons to be managed by addon-manager.
+	// This should be removed when the migration is done.
+	// The migration plan refer to https://github.com/open-cluster-management-io/ocm/issues/355.
+	managementAddonController := managementaddon.NewManagementAddonController(
+		addonClient,
 		addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
 		a.addonAgents,
+		utils.FilterByAddonName(a.addonAgents),
 	)
 
 	// This is a duplicate controller in general addon-manager. This should be removed when we
@@ -325,6 +335,7 @@ func (a *addonManager) StartWithInformers(ctx context.Context,
 	go deployController.Run(ctx, 1)
 	go registrationController.Run(ctx, 1)
 	go addonInstallController.Run(ctx, 1)
+	go managementAddonController.Run(ctx, 1)
 
 	go addonOwnerController.Run(ctx, 1)
 	if addonConfigController != nil {
