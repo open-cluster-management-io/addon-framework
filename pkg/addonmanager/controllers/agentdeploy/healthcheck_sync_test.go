@@ -290,7 +290,7 @@ func TestHealthCheckReconcile(t *testing.T) {
 				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
 				Status:  metav1.ConditionTrue,
 				Reason:  addonapiv1alpha1.AddonAvailableReasonProbeAvailable,
-				Message: "Addon is available",
+				Message: "test add-on is available.",
 			},
 		},
 
@@ -527,7 +527,7 @@ func TestHealthCheckReconcile(t *testing.T) {
 				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
 				Status:  metav1.ConditionTrue,
 				Reason:  addonapiv1alpha1.AddonAvailableReasonProbeAvailable,
-				Message: "Addon is available",
+				Message: "test add-on is available.",
 			},
 		},
 	}
