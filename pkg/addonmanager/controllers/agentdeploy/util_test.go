@@ -227,6 +227,45 @@ func TestGetManifestConfigOption(t *testing.T) {
 			},
 		},
 		{
+			name: "workload availability type",
+			agentAddon: &testAgent{
+				name: "test",
+				objects: []runtime.Object{
+					NewFakeDeployment("test-deployment", "default"),
+					NewFakeDaemonSet("test-daemonset", "default"),
+				},
+				healthProber: &agent.HealthProber{Type: agent.HealthProberTypeWorkloadAvailability},
+			},
+			expectedManifestConfigOption: []workapiv1.ManifestConfigOption{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Group:     "apps",
+						Resource:  "deployments",
+						Name:      "test-deployment",
+						Namespace: "default",
+					},
+					FeedbackRules: []workapiv1.FeedbackRule{
+						{
+							Type: workapiv1.WellKnownStatusType,
+						},
+					},
+				},
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Group:     "apps",
+						Resource:  "daemonsets",
+						Name:      "test-daemonset",
+						Namespace: "default",
+					},
+					FeedbackRules: []workapiv1.FeedbackRule{
+						{
+							Type: workapiv1.WellKnownStatusType,
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "set updater",
 			agentAddon: &testAgent{
 				name: "test",

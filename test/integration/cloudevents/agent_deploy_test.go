@@ -107,6 +107,43 @@ const (
 			}
 		}
 	}`
+
+	daemonSetJson = `{
+		"apiVersion": "apps/v1",
+		"kind": "DaemonSet",
+		"metadata": {
+			"name": "nginx-ds",
+			"namespace": "default"
+		},
+		"spec": {
+			"selector": {
+				"matchLabels": {
+					"app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [
+						{
+							"image": "nginx:1.14.2",
+							"name": "nginx",
+							"ports": [
+								{
+									"containerPort": 80,
+									"protocol": "TCP"
+								}
+							]
+						}
+					]
+				}
+			}
+		}
+	}`
 )
 
 var _ = ginkgo.Describe("Agent deploy", func() {
@@ -503,6 +540,165 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 							Reason:             "MinimumReplicasAvailable",
 							Message:            "Deployment has minimum availability.",
 							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+				},
+			},
+		}
+
+		workBytes, err := json.Marshal(work)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		newWorkBytes, err := json.Marshal(newWork)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		patchBytes, err := jsonpatch.CreateMergePatch(workBytes, newWorkBytes)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		_, err = agentWorkClient.Patch(context.Background(), work.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status")
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		// wait for addon to be available
+		gomega.Eventually(func() error {
+			addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testAddonImpl.name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnManifestApplied) {
+				return fmt.Errorf("Unexpected addon applied condition, %v", addon.Status.Conditions)
+			}
+			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionAvailable) {
+				return fmt.Errorf("Unexpected addon available condition, %v", addon.Status.Conditions)
+			}
+			if cond := meta.FindStatusCondition(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionProgressing); cond != nil {
+				return fmt.Errorf("expected no addon progressing condition, %v", addon.Status.Conditions)
+			}
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+	})
+
+	ginkgo.It("Should deploy agent and get available with workload availability prober func", func() {
+		obj := &unstructured.Unstructured{}
+		err := obj.UnmarshalJSON([]byte(deploymentJson))
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		objDaemonSet := &unstructured.Unstructured{}
+		err = objDaemonSet.UnmarshalJSON([]byte(daemonSetJson))
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		testAddonImpl.manifests[managedClusterName] = []runtime.Object{obj, objDaemonSet}
+		testAddonImpl.prober = &agent.HealthProber{
+			Type: agent.HealthProberTypeWorkloadAvailability,
+		}
+
+		addon := &addonapiv1alpha1.ManagedClusterAddOn{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: testAddonImpl.name,
+			},
+			Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
+				InstallNamespace: "default",
+			},
+		}
+		createManagedClusterAddOnwithOwnerRefs(managedClusterName, addon, cma)
+
+		var work *workv1.ManifestWork
+		gomega.Eventually(func() error {
+			works, err := agentWorkLister.List(labels.Everything())
+			if err != nil {
+				return fmt.Errorf("failed to list works: %v", err)
+			}
+
+			if len(works) != 1 {
+				return fmt.Errorf("Unexpected number of work manifests")
+			}
+
+			work = works[0]
+			if len(work.Spec.Workload.Manifests) != 2 {
+				return fmt.Errorf("Unexpected number of work manifests: %d", len(work.Spec.Workload.Manifests))
+			}
+
+			if len(work.Spec.ManifestConfigs) != 2 {
+				return fmt.Errorf("Unexpected number of work manifests configuration: %d",
+					len(work.Spec.ManifestConfigs))
+			}
+
+			if apiequality.Semantic.DeepEqual(work.Spec.Workload.Manifests[0].Raw, []byte(deploymentJson)) {
+				return fmt.Errorf("expected manifest is no correct, get %v", work.Spec.Workload.Manifests[0].Raw)
+			}
+			if apiequality.Semantic.DeepEqual(work.Spec.Workload.Manifests[1].Raw, []byte(daemonSetJson)) {
+				return fmt.Errorf("expected manifest is no correct, get %v", work.Spec.Workload.Manifests[1].Raw)
+			}
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		// Update work status to trigger addon status
+		newWork := work.DeepCopy()
+		meta.SetStatusCondition(&newWork.Status.Conditions, metav1.Condition{Type: workv1.WorkApplied,
+			Status: metav1.ConditionTrue, Reason: "WorkApplied"})
+		meta.SetStatusCondition(&newWork.Status.Conditions, metav1.Condition{Type: workv1.WorkAvailable,
+			Status: metav1.ConditionTrue, Reason: "WorkAvailable"})
+
+		replica := int64(1)
+		newWork.Status.ResourceStatus = workv1.ManifestResourceStatus{
+			Manifests: []workv1.ManifestCondition{
+				{
+					ResourceMeta: workv1.ManifestResourceMeta{
+						Ordinal:   0,
+						Group:     "apps",
+						Resource:  "deployments",
+						Name:      "nginx-deployment",
+						Namespace: "default",
+					},
+					StatusFeedbacks: workv1.StatusFeedbackResult{
+						Values: []workv1.FeedbackValue{
+							{
+								Name: "Replicas",
+								Value: workv1.FieldValue{
+									Type:    workv1.Integer,
+									Integer: &replica,
+								},
+							},
+							{
+								Name: "ReadyReplicas",
+								Value: workv1.FieldValue{
+									Type:    workv1.Integer,
+									Integer: &replica,
+								},
+							},
+						},
+					},
+					Conditions: []metav1.Condition{
+						{
+							Type:               "Available",
+							Status:             metav1.ConditionTrue,
+							Reason:             "MinimumReplicasAvailable",
+							Message:            "Deployment has minimum availability.",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+				},
+				{
+					ResourceMeta: workv1.ManifestResourceMeta{
+						Ordinal:   0,
+						Group:     "apps",
+						Resource:  "daemonsets",
+						Name:      "nginx-ds",
+						Namespace: "default",
+					},
+					StatusFeedbacks: workv1.StatusFeedbackResult{
+						Values: []workv1.FeedbackValue{
+							{
+								Name: "NumberReady",
+								Value: workv1.FieldValue{
+									Type:    workv1.Integer,
+									Integer: &replica,
+								},
+							},
+							{
+								Name: "DesiredNumberScheduled",
+								Value: workv1.FieldValue{
+									Type:    workv1.Integer,
+									Integer: &replica,
+								},
+							},
 						},
 					},
 				},

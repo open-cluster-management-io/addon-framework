@@ -39,9 +39,13 @@ type healthCheckTestAgent struct {
 	health *agent.HealthProber
 }
 
-func (t *healthCheckTestAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
+func (t *healthCheckTestAgent) Manifests(cluster *clusterv1.ManagedCluster,
+	addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
 
-	return []runtime.Object{NewFakeDeployment("test-deployment", "default")}, nil
+	return []runtime.Object{
+		NewFakeDeployment("test-deployment", "default"),
+		NewFakeDaemonSet("test-daemonset", "default"),
+	}, nil
 }
 
 func (t *healthCheckTestAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
@@ -60,6 +64,37 @@ func NewFakeDeployment(namespace, name string) *appsv1.Deployment {
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &one,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": "test",
+				},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"addon": "test",
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "test",
+							Image: "test",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func NewFakeDaemonSet(namespace, name string) *appsv1.DaemonSet {
+	return &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      namespace,
+			Namespace: name,
+		},
+		Spec: appsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": "test",
@@ -530,6 +565,270 @@ func TestHealthCheckReconcile(t *testing.T) {
 				Message: "test add-on is available.",
 			},
 		},
+
+		{
+			name: "Health check mode is workload availability but manifestApplied condition is not true",
+			testAddon: &healthCheckTestAgent{name: "test",
+				health: &agent.HealthProber{Type: agent.HealthProberTypeWorkloadAvailability},
+			},
+			addon:                    addontesting.NewAddon("test", "cluster1"),
+			expectedErr:              nil,
+			expectedHealthCheckMode:  addonapiv1alpha1.HealthCheckModeCustomized,
+			expectAvailableCondition: metav1.Condition{},
+		},
+		{
+			name: "Health check mode is workload availability but no work",
+			testAddon: &healthCheckTestAgent{name: "test",
+				health: &agent.HealthProber{Type: agent.HealthProberTypeWorkloadAvailability},
+			},
+			addon:                   addontesting.NewAddonWithConditions("test", "cluster1", manifestAppliedCondition),
+			expectedErr:             nil,
+			expectedHealthCheckMode: addonapiv1alpha1.HealthCheckModeCustomized,
+			expectAvailableCondition: metav1.Condition{
+				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+				Status:  metav1.ConditionUnknown,
+				Reason:  addonapiv1alpha1.AddonAvailableReasonWorkNotFound,
+				Message: "Work for addon is not found",
+			},
+		},
+		{
+			name: "Health check mode is workload availability but work is unavailable",
+			testAddon: &healthCheckTestAgent{name: "test",
+				health: &agent.HealthProber{Type: agent.HealthProberTypeWorkloadAvailability},
+			},
+			addon: addontesting.NewAddonWithConditions("test", "cluster1", manifestAppliedCondition),
+			existingWork: []runtime.Object{
+				&v1.ManifestWork{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "addon-test-deploy-01",
+						Namespace: "cluster1",
+						Labels: map[string]string{
+							"open-cluster-management.io/addon-name": "test",
+						},
+					},
+					Spec: v1.ManifestWorkSpec{},
+					Status: v1.ManifestWorkStatus{
+						Conditions: []metav1.Condition{
+							{
+								Type:    v1.WorkAvailable,
+								Status:  metav1.ConditionFalse,
+								Message: "failed to apply",
+							},
+						},
+					},
+				},
+			},
+			expectedErr:             nil,
+			expectedHealthCheckMode: addonapiv1alpha1.HealthCheckModeCustomized,
+			expectAvailableCondition: metav1.Condition{
+				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+				Status:  metav1.ConditionFalse,
+				Reason:  addonapiv1alpha1.AddonAvailableReasonWorkNotApply,
+				Message: "failed to apply",
+			},
+		},
+		{
+			name: "Health check mode is workload availability but no result",
+			testAddon: &healthCheckTestAgent{name: "test",
+				health: &agent.HealthProber{Type: agent.HealthProberTypeWorkloadAvailability},
+			},
+			addon: addontesting.NewAddonWithConditions("test", "cluster1", manifestAppliedCondition),
+			existingWork: []runtime.Object{
+				&v1.ManifestWork{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "addon-test-deploy-01",
+						Namespace: "cluster1",
+						Labels: map[string]string{
+							"open-cluster-management.io/addon-name": "test",
+						},
+					},
+					Spec: v1.ManifestWorkSpec{},
+					Status: v1.ManifestWorkStatus{
+						Conditions: []metav1.Condition{
+							{
+								Type:   v1.WorkAvailable,
+								Status: metav1.ConditionTrue,
+							},
+						},
+					},
+				},
+			},
+			expectedErr:             nil,
+			expectedHealthCheckMode: addonapiv1alpha1.HealthCheckModeCustomized,
+			expectAvailableCondition: metav1.Condition{
+				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+				Status:  metav1.ConditionUnknown,
+				Reason:  addonapiv1alpha1.AddonAvailableReasonNoProbeResult,
+				Message: "Probe results are not returned",
+			},
+		},
+		{
+			name: "Health check mode is workload availability but cluster availability is unknown",
+			cluster: &clusterv1.ManagedCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster1",
+				},
+				Status: clusterv1.ManagedClusterStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   clusterv1.ManagedClusterConditionAvailable,
+							Status: metav1.ConditionUnknown,
+						},
+					},
+				},
+			},
+			testAddon: &healthCheckTestAgent{name: "test",
+				health: &agent.HealthProber{Type: agent.HealthProberTypeWorkloadAvailability},
+			},
+			addon: addontesting.NewAddonWithConditions("test", "cluster1", manifestAppliedCondition),
+			existingWork: []runtime.Object{
+				&v1.ManifestWork{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "addon-test-deploy-01",
+						Namespace: "cluster1",
+						Labels: map[string]string{
+							"open-cluster-management.io/addon-name": "test",
+						},
+					},
+					Spec: v1.ManifestWorkSpec{},
+					Status: v1.ManifestWorkStatus{
+						ResourceStatus: v1.ManifestResourceStatus{
+							Manifests: []v1.ManifestCondition{
+								{
+									ResourceMeta: v1.ManifestResourceMeta{
+										Ordinal:   0,
+										Group:     "apps",
+										Version:   "",
+										Kind:      "",
+										Resource:  "daemonsets",
+										Name:      "test-daemonset",
+										Namespace: "default",
+									},
+									StatusFeedbacks: v1.StatusFeedbackResult{
+										Values: []v1.FeedbackValue{
+											{
+												Name: "DesiredNumberScheduled",
+												Value: v1.FieldValue{
+													Integer: boolPtr(1),
+												},
+											},
+											{
+												Name: "NumberReady",
+												Value: v1.FieldValue{
+													Integer: boolPtr(2),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+						Conditions: []metav1.Condition{
+							{
+								Type:   v1.WorkAvailable,
+								Status: metav1.ConditionTrue,
+							},
+						},
+					},
+				},
+			},
+			expectedErr:              nil,
+			expectedHealthCheckMode:  addonapiv1alpha1.HealthCheckModeCustomized,
+			expectAvailableCondition: metav1.Condition{},
+		},
+		{
+			name: "Health check mode is workload availability and WorkProber check pass",
+			testAddon: &healthCheckTestAgent{name: "test",
+				health: &agent.HealthProber{Type: agent.HealthProberTypeWorkloadAvailability},
+			},
+			addon: addontesting.NewAddonWithConditions("test", "cluster1", manifestAppliedCondition),
+			existingWork: []runtime.Object{
+				&v1.ManifestWork{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "addon-test-deploy-01",
+						Namespace: "cluster1",
+						Labels: map[string]string{
+							"open-cluster-management.io/addon-name": "test",
+						},
+					},
+					Spec: v1.ManifestWorkSpec{},
+					Status: v1.ManifestWorkStatus{
+						ResourceStatus: v1.ManifestResourceStatus{
+							Manifests: []v1.ManifestCondition{
+								{
+									ResourceMeta: v1.ManifestResourceMeta{
+										Ordinal:   0,
+										Group:     "apps",
+										Version:   "",
+										Kind:      "",
+										Resource:  "deployments",
+										Name:      "test-deployment",
+										Namespace: "default",
+									},
+									StatusFeedbacks: v1.StatusFeedbackResult{
+										Values: []v1.FeedbackValue{
+											{
+												Name: "Replicas",
+												Value: v1.FieldValue{
+													Integer: boolPtr(2),
+												},
+											},
+											{
+												Name: "ReadyReplicas",
+												Value: v1.FieldValue{
+													Integer: boolPtr(2),
+												},
+											},
+										},
+									},
+								},
+								{
+									ResourceMeta: v1.ManifestResourceMeta{
+										Ordinal:   0,
+										Group:     "apps",
+										Version:   "",
+										Kind:      "",
+										Resource:  "daemonsets",
+										Name:      "test-daemonset",
+										Namespace: "default",
+									},
+									StatusFeedbacks: v1.StatusFeedbackResult{
+										Values: []v1.FeedbackValue{
+											{
+												Name: "DesiredNumberScheduled",
+												Value: v1.FieldValue{
+													Integer: boolPtr(2),
+												},
+											},
+											{
+												Name: "NumberReady",
+												Value: v1.FieldValue{
+													Integer: boolPtr(2),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+						Conditions: []metav1.Condition{
+							{
+								Type:   v1.WorkAvailable,
+								Status: metav1.ConditionTrue,
+							},
+						},
+					},
+				},
+			},
+			expectedErr:             nil,
+			expectedHealthCheckMode: addonapiv1alpha1.HealthCheckModeCustomized,
+			expectAvailableCondition: metav1.Condition{
+				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+				Status:  metav1.ConditionTrue,
+				Reason:  addonapiv1alpha1.AddonAvailableReasonProbeAvailable,
+				Message: "test add-on is available.",
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -571,7 +870,7 @@ func TestHealthCheckReconcile(t *testing.T) {
 
 			if !equality.Semantic.DeepEqual(addon.Status.HealthCheck.Mode, c.expectedHealthCheckMode) {
 				t.Errorf("name %s, expected err %v, but got %v",
-					c.name, addon.Status.HealthCheck.Mode, c.expectedHealthCheckMode)
+					c.name, c.expectedHealthCheckMode, addon.Status.HealthCheck.Mode)
 			}
 
 			if c.expectAvailableCondition.Type != "" {
