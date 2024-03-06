@@ -350,14 +350,15 @@ func IsOwnedByCMA(addon *addonapiv1alpha1.ManagedClusterAddOn) bool {
 	return false
 }
 
-// GetSpecHash returns the sha256 hash of the spec field of the given object
+// GetSpecHash returns the sha256 hash of the spec field or data field of the given object
 func GetSpecHash(obj *unstructured.Unstructured) (string, error) {
 	if obj == nil {
 		return "", fmt.Errorf("object is nil")
 	}
 	spec, ok := obj.Object["spec"]
 	if !ok {
-		return "", fmt.Errorf("object has no spec field")
+		// handle cases like secret and configmaps
+		spec = obj.Object["data"]
 	}
 
 	specBytes, err := json.Marshal(spec)

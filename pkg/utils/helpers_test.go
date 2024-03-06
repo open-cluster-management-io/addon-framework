@@ -88,15 +88,28 @@ func TestGetSpecHash(t *testing.T) {
 			expectedErr: fmt.Errorf("object is nil"),
 		},
 		{
-			name:        "no spec",
-			obj:         &unstructured.Unstructured{},
-			expectedErr: fmt.Errorf("object has no spec field"),
+			name:         "no spec and data",
+			obj:          &unstructured.Unstructured{},
+			expectedErr:  nil,
+			expectedHash: "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
 		},
 		{
-			name: "hash",
+			name: "has spec",
 			obj: &unstructured.Unstructured{
 				Object: map[string]interface{}{
 					"spec": map[string]interface{}{
+						"test": 1,
+					},
+				},
+			},
+			expectedErr:  nil,
+			expectedHash: "1da06016289bd76a5ada4f52fc805ae0c394612f17ec6d0f0c29b636473c8a9d",
+		},
+		{
+			name: "has data",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"data": map[string]interface{}{
 						"test": 1,
 					},
 				},
