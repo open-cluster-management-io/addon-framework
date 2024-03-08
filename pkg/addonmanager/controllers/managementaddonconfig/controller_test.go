@@ -116,8 +116,8 @@ func TestSync(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				if cma.Status.DefaultConfigReferences[0].DesiredConfig.SpecHash != "3e80b3778b3b03766e7be993131c0af2ad05630c5d96fb7fa132d05b77336e04" {
-					t.Errorf("Expect addon config spec hash is 3e80b3778b3b03766e7be993131c0af2ad05630c5d96fb7fa132d05b77336e04, but got %v", cma.Status.DefaultConfigReferences[0].DesiredConfig.SpecHash)
+				if cma.Status.DefaultConfigReferences[0].DesiredConfig.SpecHash != "5f0f8e6cc1574ce8832b6bcefac131d90ae93653fc7204c085bd6e91b6df0892" {
+					t.Errorf("Expect addon config spec hash is 5f0f8e6cc1574ce8832b6bcefac131d90ae93653fc7204c085bd6e91b6df0892, but got %v", cma.Status.DefaultConfigReferences[0].DesiredConfig.SpecHash)
 				}
 			},
 		},
@@ -158,8 +158,8 @@ func TestSync(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				if cma.Status.InstallProgressions[0].ConfigReferences[0].DesiredConfig.SpecHash != "3e80b3778b3b03766e7be993131c0af2ad05630c5d96fb7fa132d05b77336e04" {
-					t.Errorf("Expect addon config spec hash is 3e80b3778b3b03766e7be993131c0af2ad05630c5d96fb7fa132d05b77336e04, but got %v", cma.Status.InstallProgressions[0].ConfigReferences[0].DesiredConfig.SpecHash)
+				if cma.Status.InstallProgressions[0].ConfigReferences[0].DesiredConfig.SpecHash != "5f0f8e6cc1574ce8832b6bcefac131d90ae93653fc7204c085bd6e91b6df0892" {
+					t.Errorf("Expect addon config spec hash is 5f0f8e6cc1574ce8832b6bcefac131d90ae93653fc7204c085bd6e91b6df0892, but got %v", cma.Status.InstallProgressions[0].ConfigReferences[0].DesiredConfig.SpecHash)
 				}
 			},
 		},
