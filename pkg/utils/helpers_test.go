@@ -88,21 +88,58 @@ func TestGetSpecHash(t *testing.T) {
 			expectedErr: fmt.Errorf("object is nil"),
 		},
 		{
-			name:        "no spec",
-			obj:         &unstructured.Unstructured{},
-			expectedErr: fmt.Errorf("object has no spec field"),
-		},
-		{
-			name: "hash",
+			name: "no config field",
 			obj: &unstructured.Unstructured{
 				Object: map[string]interface{}{
+					"apiVersion": "config.test/v1",
+					"kind":       "Config",
+					"metadata": map[string]interface{}{
+						"name":      "name",
+						"namespace": "namespace",
+					},
+					"status": map[string]interface{}{
+						"condition": "test",
+					},
+				},
+			},
+			expectedErr:  nil,
+			expectedHash: "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+		},
+		{
+			name: "has spec",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "config.test/v1",
+					"kind":       "Config",
+					"metadata": map[string]interface{}{
+						"name":      "name",
+						"namespace": "namespace",
+					},
 					"spec": map[string]interface{}{
 						"test": 1,
 					},
 				},
 			},
 			expectedErr:  nil,
-			expectedHash: "1da06016289bd76a5ada4f52fc805ae0c394612f17ec6d0f0c29b636473c8a9d",
+			expectedHash: "af144391b79b4b07bd7c579980ae9ed42dc8e34f7babebbf3fd08cacb578fba4",
+		},
+		{
+			name: "has non spec fields",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "config.test/v1",
+					"kind":       "Config",
+					"metadata": map[string]interface{}{
+						"name":      "name",
+						"namespace": "namespace",
+					},
+					"data": map[string]interface{}{
+						"test": 1,
+					},
+				},
+			},
+			expectedErr:  nil,
+			expectedHash: "766dd25b5177d7bd3673d1bc2d015b74f9fefec024319e5b6a49eef9236bbfa1",
 		},
 	}
 
