@@ -219,6 +219,10 @@ func (a *HelmAgentAddon) getBuiltinValues(
 	return helmBuiltinValues, nil
 }
 
+func (a *HelmAgentAddon) SetHostingCluster(hostingCluster *clusterv1.ManagedCluster) {
+	a.hostingCluster = hostingCluster
+}
+
 func (a *HelmAgentAddon) getDefaultValues(
 	cluster *clusterv1.ManagedCluster,
 	addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
