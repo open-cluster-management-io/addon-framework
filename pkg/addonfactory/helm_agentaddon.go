@@ -10,6 +10,9 @@ import (
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chartutil"
 	"helm.sh/helm/v3/pkg/engine"
+	"helm.sh/helm/v3/pkg/releaseutil"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -42,28 +45,59 @@ type helmDefaultValues struct {
 }
 
 type HelmAgentAddon struct {
-	decoder               runtime.Decoder
-	chart                 *chart.Chart
-	getValuesFuncs        []GetValuesFunc
-	agentAddonOptions     agent.AgentAddonOptions
-	trimCRDDescription    bool
-	hostingCluster        *clusterv1.ManagedCluster
-	agentInstallNamespace func(addon *addonapiv1alpha1.ManagedClusterAddOn) string
+	decoder                     runtime.Decoder
+	chart                       *chart.Chart
+	getValuesFuncs              []GetValuesFunc
+	agentAddonOptions           agent.AgentAddonOptions
+	trimCRDDescription          bool
+	hostingCluster              *clusterv1.ManagedCluster
+	agentInstallNamespace       func(addon *addonapiv1alpha1.ManagedClusterAddOn) string
+	createAgentInstallNamespace bool
+	helmEngineStrict            bool
 }
 
 func newHelmAgentAddon(factory *AgentAddonFactory, chart *chart.Chart) *HelmAgentAddon {
 	return &HelmAgentAddon{
-		decoder:               serializer.NewCodecFactory(factory.scheme).UniversalDeserializer(),
-		chart:                 chart,
-		getValuesFuncs:        factory.getValuesFuncs,
-		agentAddonOptions:     factory.agentAddonOptions,
-		trimCRDDescription:    factory.trimCRDDescription,
-		hostingCluster:        factory.hostingCluster,
-		agentInstallNamespace: factory.agentInstallNamespace,
+		decoder:                     serializer.NewCodecFactory(factory.scheme).UniversalDeserializer(),
+		chart:                       chart,
+		getValuesFuncs:              factory.getValuesFuncs,
+		agentAddonOptions:           factory.agentAddonOptions,
+		trimCRDDescription:          factory.trimCRDDescription,
+		hostingCluster:              factory.hostingCluster,
+		agentInstallNamespace:       factory.agentInstallNamespace,
+		createAgentInstallNamespace: factory.createAgentInstallNamespace,
+		helmEngineStrict:            factory.helmEngineStrict,
 	}
 }
 
 func (a *HelmAgentAddon) Manifests(
+	cluster *clusterv1.ManagedCluster,
+	addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
+	objects, err := a.renderManifests(cluster, addon)
+	if err != nil {
+		return nil, err
+	}
+
+	manifests := make([]Manifest, 0, len(objects))
+	for _, obj := range objects {
+		a, err := meta.TypeAccessor(obj)
+		if err != nil {
+			return nil, err
+		}
+		manifests = append(manifests, Manifest{
+			Object: obj,
+			Kind:   a.GetKind(),
+		})
+	}
+	sortManifestsByKind(manifests, releaseutil.InstallOrder)
+
+	for i, manifest := range manifests {
+		objects[i] = manifest.Object
+	}
+	return objects, nil
+}
+
+func (a *HelmAgentAddon) renderManifests(
 	cluster *clusterv1.ManagedCluster,
 	addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
 	var objects []runtime.Object
@@ -74,7 +108,7 @@ func (a *HelmAgentAddon) Manifests(
 	}
 
 	helmEngine := engine.Engine{
-		Strict:   true,
+		Strict:   a.helmEngineStrict,
 		LintMode: false,
 	}
 
@@ -93,16 +127,8 @@ func (a *HelmAgentAddon) Manifests(
 		return objects, err
 	}
 
-	// sort the filenames of the templates so the manifests are ordered consistently
-	keys := make([]string, 0, len(templates))
-	for k := range templates {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	for _, k := range keys {
-		data := templates[k]
-
+	agentInstallNamespace := a.getValueAgentInstallNamespace(addon)
+	for k, data := range templates {
 		if len(data) == 0 {
 			continue
 		}
@@ -132,6 +158,13 @@ func (a *HelmAgentAddon) Manifests(
 			}
 		}
 
+		if agentInstallNamespace != "" && a.createAgentInstallNamespace {
+			var ns unstructured.Unstructured
+			ns.SetAPIVersion("v1")
+			ns.SetKind("Namespace")
+			ns.SetName(agentInstallNamespace)
+			objects = append(objects, &ns)
+		}
 	}
 
 	if a.trimCRDDescription {
@@ -259,4 +292,48 @@ func (a *HelmAgentAddon) releaseOptions(
 		Name:      a.agentAddonOptions.AddonName,
 		Namespace: a.getValueAgentInstallNamespace(addon),
 	}
+}
+
+// Manifest represents a manifest file, which has a name and some content.
+type Manifest struct {
+	Object runtime.Object
+	Kind   string
+}
+
+// sort manifests by kind.
+//
+// Results are sorted by 'ordering', keeping order of items with equal kind/priority
+func sortManifestsByKind(manifests []Manifest, ordering releaseutil.KindSortOrder) []Manifest {
+	sort.SliceStable(manifests, func(i, j int) bool {
+		return lessByKind(manifests[i], manifests[j], manifests[i].Kind, manifests[j].Kind, ordering)
+	})
+
+	return manifests
+}
+
+func lessByKind(a interface{}, b interface{}, kindA string, kindB string, o releaseutil.KindSortOrder) bool {
+	ordering := make(map[string]int, len(o))
+	for v, k := range o {
+		ordering[k] = v
+	}
+
+	first, aok := ordering[kindA]
+	second, bok := ordering[kindB]
+
+	if !aok && !bok {
+		// if both are unknown then sort alphabetically by kind, keep original order if same kind
+		if kindA != kindB {
+			return kindA < kindB
+		}
+		return first < second
+	}
+	// unknown kind is last
+	if !aok {
+		return false
+	}
+	if !bok {
+		return true
+	}
+	// sort different kinds, keep original order if same priority
+	return first < second
 }
