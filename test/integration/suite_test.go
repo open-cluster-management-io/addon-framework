@@ -9,7 +9,6 @@ import (
 	"github.com/onsi/gomega"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
@@ -98,11 +97,11 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 		name:          "test-install-all",
 		manifests:     map[string][]runtime.Object{},
 		registrations: map[string][]addonapiv1alpha1.RegistrationConfig{},
-		installStrategy: agent.InstallByLabelStrategy("default", v1.LabelSelector{
-			MatchLabels: map[string]string{
-				"test": "test",
-			},
-		}),
+		//		installStrategy: agent.InstallByLabelStrategy("default", v1.LabelSelector{
+		//			MatchLabels: map[string]string{
+		//				"test": "test",
+		//			},
+		//		}),
 	}
 
 	testMultiWorksAddonImpl = &testAddon{
@@ -140,13 +139,13 @@ var _ = ginkgo.AfterSuite(func() {
 })
 
 type testAddon struct {
-	name                string
-	manifests           map[string][]runtime.Object
-	registrations       map[string][]addonapiv1alpha1.RegistrationConfig
-	approveCSR          bool
-	cert                []byte
-	prober              *agent.HealthProber
-	installStrategy     *agent.InstallStrategy
+	name          string
+	manifests     map[string][]runtime.Object
+	registrations map[string][]addonapiv1alpha1.RegistrationConfig
+	approveCSR    bool
+	cert          []byte
+	prober        *agent.HealthProber
+	// installStrategy     *agent.InstallStrategy
 	hostedModeEnabled   bool
 	supportedConfigGVRs []schema.GroupVersionResource
 }
@@ -157,9 +156,9 @@ func (t *testAddon) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapi
 
 func (t *testAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 	option := agent.AgentAddonOptions{
-		AddonName:           t.name,
-		HealthProber:        t.prober,
-		InstallStrategy:     t.installStrategy,
+		AddonName:    t.name,
+		HealthProber: t.prober,
+		//		InstallStrategy:     t.installStrategy,
 		HostedModeEnabled:   t.hostedModeEnabled,
 		SupportedConfigGVRs: t.supportedConfigGVRs,
 	}
