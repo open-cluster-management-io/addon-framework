@@ -57,7 +57,7 @@ var _ = ginkgo.Describe("ClusterManagementAddon", func() {
 
 	ginkgo.It("Should update config related object successfully", func() {
 		// Create clustermanagement addon
-		clusterManagementAddon := &addonapiv1alpha1.ClusterManagementAddOn{
+		cma := &addonapiv1alpha1.ClusterManagementAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testAddonImpl.name,
 			},
@@ -67,7 +67,7 @@ var _ = ginkgo.Describe("ClusterManagementAddon", func() {
 				},
 			},
 		}
-		_, err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Create(context.Background(), clusterManagementAddon, metav1.CreateOptions{})
+		cma, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Create(context.Background(), cma, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		// Create managed cluster addon
@@ -79,8 +79,7 @@ var _ = ginkgo.Describe("ClusterManagementAddon", func() {
 				InstallNamespace: "test",
 			},
 		}
-		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(context.Background(), addon, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		createManagedClusterAddOnwithOwnerRefs(managedClusterName, addon, cma)
 
 		gomega.Eventually(func() error {
 			actual, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testAddonImpl.name, metav1.GetOptions{})

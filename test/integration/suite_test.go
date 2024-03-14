@@ -97,11 +97,6 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 		name:          "test-install-all",
 		manifests:     map[string][]runtime.Object{},
 		registrations: map[string][]addonapiv1alpha1.RegistrationConfig{},
-		//		installStrategy: agent.InstallByLabelStrategy("default", v1.LabelSelector{
-		//			MatchLabels: map[string]string{
-		//				"test": "test",
-		//			},
-		//		}),
 	}
 
 	testMultiWorksAddonImpl = &testAddon{
@@ -145,7 +140,6 @@ type testAddon struct {
 	approveCSR    bool
 	cert          []byte
 	prober        *agent.HealthProber
-	// installStrategy     *agent.InstallStrategy
 	hostedModeEnabled   bool
 	supportedConfigGVRs []schema.GroupVersionResource
 }
@@ -158,7 +152,6 @@ func (t *testAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 	option := agent.AgentAddonOptions{
 		AddonName:    t.name,
 		HealthProber: t.prober,
-		//		InstallStrategy:     t.installStrategy,
 		HostedModeEnabled:   t.hostedModeEnabled,
 		SupportedConfigGVRs: t.supportedConfigGVRs,
 	}

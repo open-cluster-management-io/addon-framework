@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
 
@@ -100,6 +101,21 @@ func updateClusterManagementAddOn(ctx context.Context, new *addonapiv1alpha1.Clu
 		}
 		return false
 	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+}
+
+func createManagedClusterAddOnwithOwnerRefs(namespace string, addon *addonapiv1alpha1.ManagedClusterAddOn, cma *addonapiv1alpha1.ClusterManagementAddOn) {
+	addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(namespace).Create(context.Background(), addon, metav1.CreateOptions{})
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+	addonCopy := addon.DeepCopy()
+
+	// This is to assume that addon-manager has already added the OwnerReferences.
+	owner := metav1.NewControllerRef(cma, addonapiv1alpha1.GroupVersion.WithKind("ClusterManagementAddOn"))
+	modified := utils.MergeOwnerRefs(&addonCopy.OwnerReferences, *owner, false)
+	if modified {
+		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(addonCopy.Namespace).Update(context.Background(), addonCopy, metav1.UpdateOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	}
 }
 
 func updateManagedClusterAddOnStatus(ctx context.Context, new *addonapiv1alpha1.ManagedClusterAddOn) {
