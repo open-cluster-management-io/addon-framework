@@ -51,6 +51,7 @@ type HelmAgentAddon struct {
 	trimCRDDescription    bool
 	hostingCluster        *clusterv1.ManagedCluster
 	agentInstallNamespace func(addon *addonapiv1alpha1.ManagedClusterAddOn) string
+	helmEngineStrict      bool
 }
 
 func newHelmAgentAddon(factory *AgentAddonFactory, chart *chart.Chart) *HelmAgentAddon {
@@ -62,6 +63,7 @@ func newHelmAgentAddon(factory *AgentAddonFactory, chart *chart.Chart) *HelmAgen
 		trimCRDDescription:    factory.trimCRDDescription,
 		hostingCluster:        factory.hostingCluster,
 		agentInstallNamespace: factory.agentInstallNamespace,
+		helmEngineStrict:      factory.helmEngineStrict,
 	}
 }
 
@@ -103,7 +105,7 @@ func (a *HelmAgentAddon) renderManifests(
 	}
 
 	helmEngine := engine.Engine{
-		Strict:   true,
+		Strict:   a.helmEngineStrict,
 		LintMode: false,
 	}
 

@@ -37,6 +37,7 @@ type AgentAddonFactory struct {
 	trimCRDDescription    bool
 	hostingCluster        *clusterv1.ManagedCluster
 	agentInstallNamespace func(addon *addonapiv1alpha1.ManagedClusterAddOn) string
+	helmEngineStrict      bool
 }
 
 // NewAgentAddonFactory builds an addonAgentFactory instance with addon name and fs.
@@ -59,6 +60,7 @@ func NewAgentAddonFactory(addonName string, fs embed.FS, dir string) *AgentAddon
 		},
 		trimCRDDescription: false,
 		scheme:             s,
+		helmEngineStrict:   false,
 	}
 }
 
@@ -112,6 +114,12 @@ func (f *AgentAddonFactory) WithAgentHostedModeEnabledOption() *AgentAddonFactor
 // WithTrimCRDDescription is to enable trim the description of CRDs in manifestWork.
 func (f *AgentAddonFactory) WithTrimCRDDescription() *AgentAddonFactory {
 	f.trimCRDDescription = true
+	return f
+}
+
+// WithHelmEngineStrict is to enable script go template rendering for Helm charts to generate manifestWork.
+func (f *AgentAddonFactory) WithHelmEngineStrict() *AgentAddonFactory {
+	f.helmEngineStrict = true
 	return f
 }
 
