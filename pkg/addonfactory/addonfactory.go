@@ -140,6 +140,7 @@ func (f *AgentAddonFactory) WithHostingCluster(cluster *clusterv1.ManagedCluster
 	return f
 }
 
+// WithManagedClusterClient defines the cluster client that can get the hosting cluster used in hosted mode.
 func (f *AgentAddonFactory) WithManagedClusterClient(c clusterclientset.Interface) *AgentAddonFactory {
 	f.clusterClient = c
 	return f

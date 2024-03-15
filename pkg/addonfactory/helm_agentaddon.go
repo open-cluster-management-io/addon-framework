@@ -47,11 +47,12 @@ type helmDefaultValues struct {
 }
 
 type HelmAgentAddon struct {
-	decoder               runtime.Decoder
-	chart                 *chart.Chart
-	getValuesFuncs        []GetValuesFunc
-	agentAddonOptions     agent.AgentAddonOptions
-	trimCRDDescription    bool
+	decoder            runtime.Decoder
+	chart              *chart.Chart
+	getValuesFuncs     []GetValuesFunc
+	agentAddonOptions  agent.AgentAddonOptions
+	trimCRDDescription bool
+	// Deprecated: use clusterClient to get the hosting cluster.
 	hostingCluster        *clusterv1.ManagedCluster
 	clusterClient         clusterclientset.Interface
 	agentInstallNamespace func(addon *addonapiv1alpha1.ManagedClusterAddOn) string
@@ -243,6 +244,12 @@ func (a *HelmAgentAddon) getBuiltinValues(
 		return nil, err
 	}
 	return helmBuiltinValues, nil
+}
+
+// Deprecated: use "WithManagedClusterClient" in AgentAddonFactory to set a cluster client that
+// can be used to get the hosting cluster.
+func (a *HelmAgentAddon) SetHostingCluster(hostingCluster *clusterv1.ManagedCluster) {
+	a.hostingCluster = hostingCluster
 }
 
 func (a *HelmAgentAddon) getDefaultValues(
