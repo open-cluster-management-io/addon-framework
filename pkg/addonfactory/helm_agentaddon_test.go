@@ -13,6 +13,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1apha1 "open-cluster-management.io/api/cluster/v1alpha1"
 )
@@ -66,6 +67,7 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 		scheme                          *runtime.Scheme
 		clusterName                     string
 		hostingCluster                  *clusterv1.ManagedCluster
+		getHostingClusterWithClient     bool
 		addonName                       string
 		installNamespace                string
 		annotationValues                string
@@ -146,6 +148,19 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 			expectedObjCnt:           5,
 			expectedNamespace:        true,
 		},
+		{
+			name:                        "template render ok, getting hosting cluster with client",
+			scheme:                      testScheme,
+			clusterName:                 "cluster1",
+			hostingCluster:              NewFakeManagedCluster("hosting-cluster", "1.25.0"),
+			getHostingClusterWithClient: true,
+			addonName:                   "helloworld",
+			installNamespace:            "myNs",
+			expectedInstallNamespace:    "myNs",
+			expectedImage:               "quay.io/testimage:test",
+			expectedObjCnt:              5,
+			expectedNamespace:           true,
+		},
 	}
 
 	for _, c := range cases {
@@ -166,13 +181,20 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 			cluster := NewFakeManagedCluster(c.clusterName, "1.10.1")
 			clusterAddon := NewFakeManagedClusterAddon(c.addonName, c.clusterName, c.installNamespace, c.annotationValues)
 
-			agentAddon, err := NewAgentAddonFactory(c.addonName, chartFS, "testmanifests/chart").
+			factory := NewAgentAddonFactory(c.addonName, chartFS, "testmanifests/chart").
 				WithGetValuesFuncs(getValuesFuncs...).
 				WithScheme(c.scheme).
 				WithTrimCRDDescription().
-				WithAgentRegistrationOption(&agent.RegistrationOption{}).
-				WithHostingCluster(c.hostingCluster).
-				BuildHelmAgentAddon()
+				WithAgentRegistrationOption(&agent.RegistrationOption{})
+			if c.getHostingClusterWithClient && c.hostingCluster != nil {
+				clusterClient := clusterclientset.NewSimpleClientset(c.hostingCluster)
+				factory = factory.WithManagedClusterClient(clusterClient)
+				clusterAddon.Annotations[addonapiv1alpha1.HostingClusterNameAnnotationKey] = c.hostingCluster.Name
+			}
+			if !c.getHostingClusterWithClient && c.hostingCluster != nil {
+				factory = factory.WithHostingCluster(c.hostingCluster)
+			}
+			agentAddon, err := factory.BuildHelmAgentAddon()
 			if err != nil {
 				t.Errorf("expected no error, got err %v", err)
 			}
