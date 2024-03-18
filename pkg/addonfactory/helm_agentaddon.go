@@ -12,6 +12,7 @@ import (
 	"helm.sh/helm/v3/pkg/chartutil"
 	"helm.sh/helm/v3/pkg/engine"
 	"helm.sh/helm/v3/pkg/releaseutil"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -271,11 +272,15 @@ func (a *HelmAgentAddon) getDefaultValues(
 		if len(hostingClusterName) > 0 {
 			hostingCluster, err := a.clusterClient.ClusterV1().ManagedClusters().
 				Get(context.TODO(), hostingClusterName, metav1.GetOptions{})
-			if err != nil {
+			if err == nil {
+				defaultValues.HostingClusterCapabilities = *a.capabilities(hostingCluster, addon)
+			} else if errors.IsNotFound(err) {
+				klog.Infof("hostingCluster %s not found, skip providing default value hostingClusterCapabilities",
+					hostingClusterName)
+			} else {
 				klog.Errorf("failed to get hostingCluster %s. err:%v", hostingClusterName, err)
 				return nil, err
 			}
-			defaultValues.HostingClusterCapabilities = *a.capabilities(hostingCluster, addon)
 		}
 	}
 
