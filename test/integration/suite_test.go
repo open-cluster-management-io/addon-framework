@@ -134,12 +134,12 @@ var _ = ginkgo.AfterSuite(func() {
 })
 
 type testAddon struct {
-	name          string
-	manifests     map[string][]runtime.Object
-	registrations map[string][]addonapiv1alpha1.RegistrationConfig
-	approveCSR    bool
-	cert          []byte
-	prober        *agent.HealthProber
+	name                string
+	manifests           map[string][]runtime.Object
+	registrations       map[string][]addonapiv1alpha1.RegistrationConfig
+	approveCSR          bool
+	cert                []byte
+	prober              *agent.HealthProber
 	hostedModeEnabled   bool
 	supportedConfigGVRs []schema.GroupVersionResource
 }
@@ -150,8 +150,8 @@ func (t *testAddon) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapi
 
 func (t *testAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 	option := agent.AgentAddonOptions{
-		AddonName:    t.name,
-		HealthProber: t.prober,
+		AddonName:           t.name,
+		HealthProber:        t.prober,
 		HostedModeEnabled:   t.hostedModeEnabled,
 		SupportedConfigGVRs: t.supportedConfigGVRs,
 	}

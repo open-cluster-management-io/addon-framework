@@ -103,6 +103,8 @@ func updateClusterManagementAddOn(ctx context.Context, new *addonapiv1alpha1.Clu
 	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 }
 
+// The addon owner controller exist in general addon manager.
+// This is for integration testing to assume that addon manager has already added the OwnerReferences.
 func createManagedClusterAddOnwithOwnerRefs(namespace string, addon *addonapiv1alpha1.ManagedClusterAddOn, cma *addonapiv1alpha1.ClusterManagementAddOn) {
 	addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(namespace).Create(context.Background(), addon, metav1.CreateOptions{})
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
