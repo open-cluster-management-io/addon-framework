@@ -4,9 +4,11 @@ resources:
 - resources/cluster_role.yaml
 - resources/cluster_role_binding.yaml
 - resources/service_account.yaml
+- resources/managed_clusterset_binding.yaml
+- resources/placement.yaml
+- resources/addon_deployment_config.yaml
 - resources/helloworld_clustermanagementaddon.yaml
 - resources/helloworld_controller.yaml
-
 
 images:
 - name: quay.io/open-cluster-management/addon-examples

@@ -108,7 +108,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 				return err
 			}
 
-			if cma.Annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey] != addonapiv1alpha1.AddonLifecycleSelfManageAnnotationValue {
+			if cma.Annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey] != addonapiv1alpha1.AddonLifecycleAddonManagerAnnotationValue {
 				return fmt.Errorf("addon should have annotation, but get %v", cma.Annotations)
 			}
 
@@ -149,7 +149,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
-			copyiedConfig, err := hubKubeClient.CoreV1().ConfigMaps("default").Get(context.Background(), configmap.Name, metav1.GetOptions{})
+			copyiedConfig, err := hubKubeClient.CoreV1().ConfigMaps(addonInstallNamespace).Get(context.Background(), configmap.Name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -194,7 +194,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 
 		ginkgo.By("Make sure addon is configured")
 		gomega.Eventually(func() error {
-			agentDeploy, err := hubKubeClient.AppsV1().Deployments("default").Get(context.Background(), "helloworld-agent", metav1.GetOptions{})
+			agentDeploy, err := hubKubeClient.AppsV1().Deployments(addonInstallNamespace).Get(context.Background(), "helloworld-agent", metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -250,7 +250,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
-			copyiedConfig, err := hubKubeClient.CoreV1().ConfigMaps("default").Get(context.Background(), configmap.Name, metav1.GetOptions{})
+			copyiedConfig, err := hubKubeClient.CoreV1().ConfigMaps(addonInstallNamespace).Get(context.Background(), configmap.Name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -295,7 +295,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 
 		ginkgo.By("Make sure addon is configured")
 		gomega.Eventually(func() error {
-			agentDeploy, err := hubKubeClient.AppsV1().Deployments("default").Get(context.Background(), "helloworld-agent", metav1.GetOptions{})
+			agentDeploy, err := hubKubeClient.AppsV1().Deployments(addonInstallNamespace).Get(context.Background(), "helloworld-agent", metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -368,7 +368,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
-			copyiedConfig, err := hubKubeClient.CoreV1().ConfigMaps("default").Get(context.Background(), configmap.Name, metav1.GetOptions{})
+			copyiedConfig, err := hubKubeClient.CoreV1().ConfigMaps(addonInstallNamespace).Get(context.Background(), configmap.Name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -441,6 +441,7 @@ func prepareAddOnDeploymentConfig(namespace string) error {
 						NodeSelector: nodeSelector,
 						Tolerations:  tolerations,
 					},
+					AgentInstallNamespace: addonInstallNamespace,
 				},
 			},
 			metav1.CreateOptions{},
@@ -466,7 +467,8 @@ func prepareImageOverrideAddOnDeploymentConfig(namespace string) error {
 					Namespace: namespace,
 				},
 				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					Registries: registries,
+					Registries:            registries,
+					AgentInstallNamespace: addonInstallNamespace,
 				},
 			},
 			metav1.CreateOptions{},
@@ -491,7 +493,8 @@ func prepareProxyConfigAddOnDeploymentConfig(namespace string) error {
 					Namespace: namespace,
 				},
 				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					ProxyConfig: proxyConfig,
+					ProxyConfig:           proxyConfig,
+					AgentInstallNamespace: addonInstallNamespace,
 				},
 			},
 			metav1.CreateOptions{},
