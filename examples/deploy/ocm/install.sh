@@ -5,73 +5,29 @@ set -o pipefail
 
 KUBECTL=${KUBECTL:-kubectl}
 
-rm -rf _repo_ocm
 
-echo "############  Cloning ocm repo"
-git clone --depth 1 --branch main https://github.com/open-cluster-management-io/ocm.git _repo_ocm
+BUILD_DIR="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
+DEPLOY_DIR="$(dirname "$BUILD_DIR")"
+EXAMPLE_DIR="$(dirname "$DEPLOY_DIR")"
+REPO_DIR="$(dirname "$EXAMPLE_DIR")"
+WORK_DIR="${REPO_DIR}/_output"
+CLUSTERADM="${WORK_DIR}/bin/clusteradm"
 
-cd _repo_ocm || {
-  printf "cd failed, _repo_ocm does not exist"
-  return 1
-}
+export PATH=$PATH:${WORK_DIR}/bin
 
-echo "############  Deploying operators"
-make deploy-hub cluster-ip deploy-spoke-operator apply-spoke-cr
-if [ $? -ne 0 ]; then
- echo "############  Failed to deploy"
- exit 1
-fi
+echo "############  Download clusteradm"
+mkdir -p "${WORK_DIR}/bin"
+wget -qO- https://github.com/open-cluster-management-io/clusteradm/releases/latest/download/clusteradm_${GOHOSTOS}_${GOHOSTARCH}.tar.gz | sudo tar -xvz -C ${WORK_DIR}/bin/
+chmod +x "${CLUSTERADM}"
 
-for i in {1..7}; do
-  echo "############$i  Checking cluster-manager-registration-controller"
-  RUNNING_POD=$($KUBECTL -n open-cluster-management-hub get pods | grep cluster-manager-registration-controller | grep -c "Running")
-  if [ "${RUNNING_POD}" -ge 1 ]; then
-    break
-  fi
+echo "############ Init hub"
+${CLUSTERADM} init --wait --bundle-version=latest
+joincmd=$(${CLUSTERADM} get token | grep clusteradm)
 
-  if [ $i -eq 7 ]; then
-    echo "!!!!!!!!!!  the cluster-manager-registration-controller is not ready within 3 minutes"
-    $KUBECTL -n open-cluster-management-hub get pods
+echo "############ Init agent as cluster1"
+$(echo ${joincmd} --force-internal-endpoint-lookup --wait --bundle-version=latest | sed "s/<cluster_name>/${MANAGED_CLUSTER_NAME}/g")
 
-    exit 1
-  fi
-  sleep 30
-done
-
-for i in {1..7}; do
-  echo "############$i  Checking cluster-manager-registration-webhook"
-  RUNNING_POD=$($KUBECTL -n open-cluster-management-hub get pods | grep cluster-manager-registration-webhook | grep -c "Running")
-  if [ "${RUNNING_POD}" -ge 1 ]; then
-    break
-  fi
-
-  if [ $i -eq 7 ]; then
-    echo "!!!!!!!!!!  the cluster-manager-registration-webhook is not ready within 3 minutes"
-    $KUBECTL -n open-cluster-management-hub get pods
-    exit 1
-  fi
-  sleep 30s
-done
-
-for i in {1..7}; do
-  echo "############$i  Checking klusterlet-agent"
-  RUNNING_POD=$($KUBECTL -n open-cluster-management-agent get pods | grep klusterlet-agent | grep -c "Running")
-  if [ ${RUNNING_POD} -ge 1 ]; then
-    break
-  fi
-
-  if [ $i -eq 7 ]; then
-    echo "!!!!!!!!!!  the klusterlet-agent is not ready within 3 minutes"
-    $KUBECTL -n open-cluster-management-agent get pods
-    exit 1
-  fi
-  sleep 30
-done
+echo "############ Accept join of cluster1"
+${CLUSTERADM} accept --clusters ${MANAGED_CLUSTER_NAME} --wait
 
 echo "############  All-in-one env is installed successfully!!"
-
-echo "############  Cleanup"
-cd ../ || exist
-rm -rf _repo_ocm
-
-echo "############  Finished installation!!!"

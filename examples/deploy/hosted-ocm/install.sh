@@ -20,16 +20,6 @@ function wait_deployment() {
   set -e
 }
 
-function hub_approve_cluster(){
-  local cluster_name=$1
-  echo "approve ${cluster_name}"
-  ${KUBECTL} get csr -l open-cluster-management.io/cluster-name=${cluster_name} | \
-    grep -v NAME | awk '{print $1}' | xargs ${KUBECTL} certificate approve
-  ${KUBECTL} patch managedcluster "${cluster_name}" -p='{"spec":{"hubAcceptsClient":true}}' --type=merge
-  ${KUBECTL} get managedcluster "${cluster_name}"
-}
-
-
 BUILD_DIR="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 DEPLOY_DIR="$(dirname "$BUILD_DIR")"
 EXAMPLE_DIR="$(dirname "$DEPLOY_DIR")"
@@ -64,6 +54,15 @@ curl -s -f \
   -o "${KUBECTL}"
 chmod +x "${KUBECTL}"
 
+CLUSTERADM="${WORK_DIR}/bin/clusteradm"
+
+export PATH=$PATH:${WORK_DIR}/bin
+
+echo "############  Download clusteradm"
+mkdir -p "${WORK_DIR}/bin"
+wget -qO- https://github.com/open-cluster-management-io/clusteradm/releases/latest/download/clusteradm_${GOHOSTOS}_${GOHOSTARCH}.tar.gz | sudo tar -xvz -C ${WORK_DIR}/bin/
+chmod +x "${CLUSTERADM}"
+
 
 echo "###### installing e2e test cluster : ${REPO_DIR}/.kubeconfig"
 ${KIND} delete cluster --name ${MANAGED_CLUSTER_NAME}
@@ -78,35 +77,10 @@ echo "###### loading image: ${EXAMPLE_IMAGE_NAME}"
 ${KIND} load docker-image ${EXAMPLE_IMAGE_NAME} --name ${MANAGED_CLUSTER_NAME}
 
 echo "###### deploy operators"
-rm -rf "$WORK_DIR/_repo_ocm"
-git clone --depth 1 --branch main https://github.com/open-cluster-management-io/ocm.git "$WORK_DIR/_repo_ocm"
+${CLUSTERADM} init --wait --bundle-version=latest
+joincmd=$(${CLUSTERADM} get token | grep clusteradm)
 
-${KUBECTL} apply -k "$WORK_DIR/_repo_ocm/deploy/cluster-manager/config/manifests"
-${KUBECTL} apply -k "$WORK_DIR/_repo_ocm/deploy/cluster-manager/config/samples"
-${KUBECTL} apply -k "$WORK_DIR/_repo_ocm/deploy/klusterlet/config/manifests"
-rm -rf "$WORK_DIR/_repo_ocm"
-
-${KUBECTL} get ns open-cluster-management-agent || ${KUBECTL} create ns open-cluster-management-agent
-
-cat << EOF | ${KUBECTL} apply -f -
-apiVersion: operator.open-cluster-management.io/v1
-kind: Klusterlet
-metadata:
-  name: klusterlet
-spec:
-  deployOption:
-    mode: Default
-  registrationImagePullSpec: quay.io/open-cluster-management/registration
-  workImagePullSpec: quay.io/open-cluster-management/work
-  clusterName: ${MANAGED_CLUSTER_NAME}
-  namespace: open-cluster-management-agent
-  externalServerURLs:
-  - url: https://localhost
-  registrationConfiguration:
-    featureGates:
-    - feature: AddonManagement
-      mode: Enable
-EOF
+$(echo ${joincmd} --force-internal-endpoint-lookup --wait --bundle-version=latest | sed "s/<cluster_name>/${MANAGED_CLUSTER_NAME}/g")
 
 wait_deployment open-cluster-management cluster-manager
 ${KUBECTL} -n open-cluster-management rollout status deploy cluster-manager --timeout=120s
@@ -127,19 +101,12 @@ ${KUBECTL} -n open-cluster-management-hub scale --replicas=0 deployment/cluster-
 # scale replicas to save resources
 ${KUBECTL} -n open-cluster-management scale --replicas=1 deployment/klusterlet
 
-wait_deployment open-cluster-management-agent klusterlet-registration-agent
+${CLUSTERADM} accept --clusters ${MANAGED_CLUSTER_NAME} --wait
+
 echo "###### prepare bootstrap hub secret"
 cp "${KUBECONFIG}" "${WORK_DIR}"/e2e-kubeconfig
 ${KUBECTL} config set "clusters.${cluster_context}.server" "https://${cluster_ip}" \
   --kubeconfig "${WORK_DIR}"/e2e-kubeconfig
-${KUBECTL} delete secret bootstrap-hub-kubeconfig -n open-cluster-management-agent --ignore-not-found
-${KUBECTL} create secret generic bootstrap-hub-kubeconfig \
-  --from-file=kubeconfig="${WORK_DIR}"/e2e-kubeconfig \
-  -n open-cluster-management-agent
-${KUBECTL} -n open-cluster-management-agent rollout status deploy klusterlet-registration-agent --timeout=120s
-${KUBECTL} -n open-cluster-management-agent rollout status deploy klusterlet-work-agent --timeout=120s
-
-hub_approve_cluster ${MANAGED_CLUSTER_NAME}
 
 # prepare another managed cluster for hosted mode testing
 echo "###### installing e2e test managed cluster"
@@ -192,22 +159,13 @@ ${KUBECTL} create secret generic external-managed-kubeconfig \
   --from-file=kubeconfig="${WORK_DIR}"/e2e-managed-kubeconfig \
   -n ${HOSTED_MANAGED_KLUSTERLET_NAME}
 
-
 ${KUBECTL} delete secret ${HOSTED_MANAGED_KUBECONFIG_SECRET_NAME} \
   -n ${HOSTED_MANAGED_KLUSTERLET_NAME} --ignore-not-found
 ${KUBECTL} create secret generic ${HOSTED_MANAGED_KUBECONFIG_SECRET_NAME} \
   --from-file=kubeconfig="${WORK_DIR}"/e2e-managed-kubeconfig-public \
   -n ${HOSTED_MANAGED_KLUSTERLET_NAME}
 
-wait_deployment ${HOSTED_MANAGED_KLUSTERLET_NAME} ${HOSTED_MANAGED_KLUSTERLET_NAME}-registration-agent
-wait_deployment ${HOSTED_MANAGED_KLUSTERLET_NAME} ${HOSTED_MANAGED_KLUSTERLET_NAME}-work-agent
-
-${KUBECTL} -n ${HOSTED_MANAGED_KLUSTERLET_NAME} rollout status deploy \
-  ${HOSTED_MANAGED_KLUSTERLET_NAME}-registration-agent --timeout=120s
-${KUBECTL} -n ${HOSTED_MANAGED_KLUSTERLET_NAME} rollout status deploy \
-  ${HOSTED_MANAGED_KLUSTERLET_NAME}-work-agent --timeout=120s
-
-hub_approve_cluster ${HOSTED_MANAGED_CLUSTER_NAME}
+${CLUSTERADM} accept --clusters ${HOSTED_MANAGED_CLUSTER_NAME} --wait --skip-approve-check
 
 ${KUBECTL} wait --for=condition=ManagedClusterConditionAvailable=true \
   managedcluster/${MANAGED_CLUSTER_NAME} --timeout=120s
