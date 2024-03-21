@@ -23,6 +23,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
 	cmdfactory "open-cluster-management.io/addon-framework/pkg/cmd/factory"
 	"open-cluster-management.io/addon-framework/pkg/version"
+	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 )
 
 func main() {
@@ -85,11 +86,16 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 		helloworld_hosted.AddonName,
 		utilrand.String(5))
 
+	clusterClient, err := clusterclientset.NewForConfig(kubeConfig)
+	if err != nil {
+		return err
+	}
 	agentAddon, err := addonfactory.NewAgentAddonFactory(
 		helloworld_hosted.AddonName, helloworld_hosted.FS, "manifests/templates").
 		WithGetValuesFuncs(helloworld.GetDefaultValues, addonfactory.GetValuesFromAddonAnnotation).
 		WithAgentRegistrationOption(registrationOption).
 		WithAgentHostedModeEnabledOption().
+		WithManagedClusterClient(clusterClient).
 		BuildTemplateAgentAddon()
 	if err != nil {
 		klog.Errorf("failed to build agent %v", err)
