@@ -11,6 +11,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -34,8 +35,10 @@ type AgentAddonFactory struct {
 	getValuesFuncs    []GetValuesFunc
 	agentAddonOptions agent.AgentAddonOptions
 	// trimCRDDescription flag is used to trim the description of CRDs in manifestWork. disabled by default.
-	trimCRDDescription    bool
+	trimCRDDescription bool
+	// Deprecated: use clusterClient to get the hosting cluster.
 	hostingCluster        *clusterv1.ManagedCluster
+	clusterClient         clusterclientset.Interface
 	agentInstallNamespace func(addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error)
 }
 
@@ -123,8 +126,15 @@ func (f *AgentAddonFactory) WithConfigGVRs(gvrs ...schema.GroupVersionResource) 
 
 // WithHostingCluster defines the hosting cluster used in hosted mode. An AgentAddon may use this to provide
 // additional metadata.
+// Deprecated: use WithManagedClusterClient to set a cluster client that can get the hosting cluster.
 func (f *AgentAddonFactory) WithHostingCluster(cluster *clusterv1.ManagedCluster) *AgentAddonFactory {
 	f.hostingCluster = cluster
+	return f
+}
+
+// WithManagedClusterClient defines the cluster client that can get the hosting cluster used in hosted mode.
+func (f *AgentAddonFactory) WithManagedClusterClient(c clusterclientset.Interface) *AgentAddonFactory {
+	f.clusterClient = c
 	return f
 }
 

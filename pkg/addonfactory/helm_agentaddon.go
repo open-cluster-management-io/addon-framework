@@ -2,6 +2,7 @@ package addonfactory
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"sort"
@@ -10,11 +11,14 @@ import (
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chartutil"
 	"helm.sh/helm/v3/pkg/engine"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
@@ -42,12 +46,14 @@ type helmDefaultValues struct {
 }
 
 type HelmAgentAddon struct {
-	decoder               runtime.Decoder
-	chart                 *chart.Chart
-	getValuesFuncs        []GetValuesFunc
-	agentAddonOptions     agent.AgentAddonOptions
-	trimCRDDescription    bool
+	decoder            runtime.Decoder
+	chart              *chart.Chart
+	getValuesFuncs     []GetValuesFunc
+	agentAddonOptions  agent.AgentAddonOptions
+	trimCRDDescription bool
+	// Deprecated: use clusterClient to get the hosting cluster.
 	hostingCluster        *clusterv1.ManagedCluster
+	clusterClient         clusterclientset.Interface
 	agentInstallNamespace func(addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error)
 }
 
@@ -59,6 +65,7 @@ func newHelmAgentAddon(factory *AgentAddonFactory, chart *chart.Chart) *HelmAgen
 		agentAddonOptions:     factory.agentAddonOptions,
 		trimCRDDescription:    factory.trimCRDDescription,
 		hostingCluster:        factory.hostingCluster,
+		clusterClient:         factory.clusterClient,
 		agentInstallNamespace: factory.agentInstallNamespace,
 	}
 }
@@ -234,6 +241,12 @@ func (a *HelmAgentAddon) getBuiltinValues(
 	return helmBuiltinValues, nil
 }
 
+// Deprecated: use "WithManagedClusterClient" in AgentAddonFactory to set a cluster client that
+// can be used to get the hosting cluster.
+func (a *HelmAgentAddon) SetHostingCluster(hostingCluster *clusterv1.ManagedCluster) {
+	a.hostingCluster = hostingCluster
+}
+
 func (a *HelmAgentAddon) getDefaultValues(
 	cluster *clusterv1.ManagedCluster,
 	addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
@@ -248,6 +261,21 @@ func (a *HelmAgentAddon) getDefaultValues(
 
 	if a.hostingCluster != nil {
 		defaultValues.HostingClusterCapabilities = *a.capabilities(a.hostingCluster, addon)
+	} else if a.clusterClient != nil {
+		hostingClusterName := addon.GetAnnotations()[addonapiv1alpha1.HostingClusterNameAnnotationKey]
+		if len(hostingClusterName) > 0 {
+			hostingCluster, err := a.clusterClient.ClusterV1().ManagedClusters().
+				Get(context.TODO(), hostingClusterName, metav1.GetOptions{})
+			if err == nil {
+				defaultValues.HostingClusterCapabilities = *a.capabilities(hostingCluster, addon)
+			} else if errors.IsNotFound(err) {
+				klog.Infof("hostingCluster %s not found, skip providing default value hostingClusterCapabilities",
+					hostingClusterName)
+			} else {
+				klog.Errorf("failed to get hostingCluster %s. err:%v", hostingClusterName, err)
+				return nil, err
+			}
+		}
 	}
 
 	helmDefaultValues, err := JsonStructToValues(defaultValues)
