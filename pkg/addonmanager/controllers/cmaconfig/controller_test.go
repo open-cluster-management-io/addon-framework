@@ -1,4 +1,4 @@
-package managementaddonconfig
+package cmaconfig
 
 import (
 	"context"
@@ -255,7 +255,7 @@ func TestSync(t *testing.T) {
 
 			syncContext := addontesting.NewFakeSyncContext(t)
 
-			ctrl := &clusterManagementAddonConfigController{
+			ctrl := &cmaConfigController{
 				addonClient:                  fakeAddonClient,
 				clusterManagementAddonLister: addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
 				configListers:                map[schema.GroupResource]dynamiclister.Lister{},
@@ -348,7 +348,7 @@ func TestEnqueue(t *testing.T) {
 			addonInformers := addoninformers.NewSharedInformerFactory(fakeAddonClient, 10*time.Minute)
 			addonInformer := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer()
 
-			ctrl := &clusterManagementAddonConfigController{
+			ctrl := &cmaConfigController{
 				clusterManagementAddonIndexer: addonInformer.GetIndexer(),
 				queue:                         addontesting.NewFakeSyncContext(t).Queue(),
 			}

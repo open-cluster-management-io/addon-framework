@@ -24,7 +24,8 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/addonconfig"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/agentdeploy"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/certificate"
-	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/managementaddonconfig"
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/cmaconfig"
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/cmamanagedby"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/registration"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
@@ -237,6 +238,16 @@ func (a *addonManager) StartWithInformers(ctx context.Context,
 		a.addonAgents,
 	)
 
+	// This controller is used during migrating addons to be managed by addon-manager.
+	// This should be removed when the migration is done.
+	// The migration plan refer to https://github.com/open-cluster-management-io/ocm/issues/355.
+	managementAddonController := cmamanagedby.NewCMAManagedByController(
+		addonClient,
+		addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
+		a.addonAgents,
+		utils.FilterByAddonName(a.addonAgents),
+	)
+
 	var addonConfigController, managementAddonConfigController factory.Controller
 	if len(a.addonConfigs) != 0 {
 		addonConfigController = addonconfig.NewAddonConfigController(
@@ -247,7 +258,7 @@ func (a *addonManager) StartWithInformers(ctx context.Context,
 			a.addonConfigs,
 			utils.FilterByAddonName(a.addonAgents),
 		)
-		managementAddonConfigController = managementaddonconfig.NewManagementAddonConfigController(
+		managementAddonConfigController = cmaconfig.NewCMAConfigController(
 			addonClient,
 			addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
 			dynamicInformers,
@@ -293,6 +304,7 @@ func (a *addonManager) StartWithInformers(ctx context.Context,
 
 	go deployController.Run(ctx, 1)
 	go registrationController.Run(ctx, 1)
+	go managementAddonController.Run(ctx, 1)
 
 	if addonConfigController != nil {
 		go addonConfigController.Run(ctx, 1)
