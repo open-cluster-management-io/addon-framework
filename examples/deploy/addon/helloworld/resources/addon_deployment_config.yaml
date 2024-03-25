@@ -1,0 +1,6 @@
+apiVersion: addon.open-cluster-management.io/v1alpha1
+kind: AddOnDeploymentConfig
+metadata:
+  name: global
+spec:
+  agentInstallNamespace: open-cluster-management-agent-addon

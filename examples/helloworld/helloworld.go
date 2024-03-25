@@ -18,7 +18,7 @@ import (
 const (
 	DefaultHelloWorldExampleImage = "quay.io/open-cluster-management/addon-examples:latest"
 	AddonName                     = "helloworld"
-	InstallationNamespace         = "default"
+	InstallationNamespace         = "open-cluster-management-agent-addon"
 )
 
 //go:embed manifests
@@ -30,16 +30,11 @@ func NewRegistrationOption(kubeConfig *rest.Config, addonName, agentName string)
 		CSRConfigurations: agent.KubeClientSignerConfigurations(addonName, agentName),
 		CSRApproveCheck:   utils.DefaultCSRApprover(agentName),
 		PermissionConfig:  rbac.AddonRBAC(kubeConfig),
-		Namespace:         InstallationNamespace,
 	}
 }
 
 func GetDefaultValues(cluster *clusterv1.ManagedCluster,
 	addon *addonapiv1alpha1.ManagedClusterAddOn) (addonfactory.Values, error) {
-	installNamespace := addon.Spec.InstallNamespace
-	if len(installNamespace) == 0 {
-		installNamespace = InstallationNamespace
-	}
 
 	image := os.Getenv("EXAMPLE_IMAGE_NAME")
 	if len(image) == 0 {
@@ -47,15 +42,13 @@ func GetDefaultValues(cluster *clusterv1.ManagedCluster,
 	}
 
 	manifestConfig := struct {
-		KubeConfigSecret      string
-		ClusterName           string
-		AddonInstallNamespace string
-		Image                 string
+		KubeConfigSecret string
+		ClusterName      string
+		Image            string
 	}{
-		KubeConfigSecret:      fmt.Sprintf("%s-hub-kubeconfig", addon.Name),
-		AddonInstallNamespace: installNamespace,
-		ClusterName:           cluster.Name,
-		Image:                 image,
+		KubeConfigSecret: fmt.Sprintf("%s-hub-kubeconfig", addon.Name),
+		ClusterName:      cluster.Name,
+		Image:            image,
 	}
 
 	return addonfactory.StructToValues(manifestConfig), nil

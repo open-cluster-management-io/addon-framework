@@ -2,6 +2,8 @@ apiVersion: addon.open-cluster-management.io/v1alpha1
 kind: ClusterManagementAddOn
 metadata:
   name: helloworld
+  annotations:
+    "addon.open-cluster-management.io/lifecycle": "addon-manager"
 spec:
   addOnMeta:
     displayName: helloworld
@@ -9,3 +11,13 @@ spec:
   supportedConfigs:
   - group: addon.open-cluster-management.io
     resource: addondeploymentconfigs
+  installStrategy:
+    type: Placements
+    placements:
+      - name: global
+        namespace: open-cluster-management
+        configs:
+          - group: addon.open-cluster-management.io
+            resource: addondeploymentconfigs
+            name: global
+            namespace: open-cluster-management

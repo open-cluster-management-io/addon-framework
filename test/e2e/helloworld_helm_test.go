@@ -30,9 +30,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: helloWorldHelmAddonName,
 		},
-		Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
-			InstallNamespace: addonInstallNamespace,
-		},
+		Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{},
 	}
 
 	ginkgo.BeforeEach(func() {
@@ -135,7 +133,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 			if err == nil {
 				errd := hubKubeClient.CoreV1().Namespaces().Delete(context.Background(),
 					agentInstallNamespaceConfig, metav1.DeleteOptions{})
-				if errd != nil {
+				if errd != nil && !errors.IsNotFound(errd) {
 					return errd
 				}
 				return fmt.Errorf("ns is deleting, need re-check if namespace is not found")
