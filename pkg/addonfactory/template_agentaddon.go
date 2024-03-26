@@ -9,7 +9,6 @@ import (
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
-	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/assets"
 )
@@ -133,7 +132,7 @@ func (a *TemplateAgentAddon) getBuiltinValues(
 	}
 	builtinValues.AddonInstallNamespace = installNamespace
 
-	builtinValues.InstallMode, _ = constants.GetHostedModeInfo(addon.GetAnnotations())
+	builtinValues.InstallMode, _ = a.agentAddonOptions.HostedModeInfoFunc(addon, cluster)
 
 	return StructToValues(builtinValues)
 }

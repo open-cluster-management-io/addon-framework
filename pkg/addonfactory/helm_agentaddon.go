@@ -23,7 +23,6 @@ import (
 	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
-	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 )
 
@@ -237,7 +236,7 @@ func (a *HelmAgentAddon) getBuiltinValues(
 
 	builtinValues.AddonInstallNamespace = a.getValueAgentInstallNamespace(addon)
 
-	builtinValues.InstallMode, _ = constants.GetHostedModeInfo(addon.GetAnnotations())
+	builtinValues.InstallMode, _ = a.agentAddonOptions.HostedModeInfoFunc(addon, cluster)
 
 	helmBuiltinValues, err := JsonStructToValues(builtinValues)
 	if err != nil {
@@ -268,7 +267,7 @@ func (a *HelmAgentAddon) getDefaultValues(
 	if a.hostingCluster != nil {
 		defaultValues.HostingClusterCapabilities = *a.capabilities(a.hostingCluster, addon)
 	} else if a.clusterClient != nil {
-		hostingClusterName := addon.GetAnnotations()[addonapiv1alpha1.HostingClusterNameAnnotationKey]
+		_, hostingClusterName := a.agentAddonOptions.HostedModeInfoFunc(addon, cluster)
 		if len(hostingClusterName) > 0 {
 			hostingCluster, err := a.clusterClient.ClusterV1().ManagedClusters().
 				Get(context.TODO(), hostingClusterName, metav1.GetOptions{})
