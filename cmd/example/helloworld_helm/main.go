@@ -69,16 +69,24 @@ func newCommand() *cobra.Command {
 }
 
 func newControllerCommand() *cobra.Command {
+	o := addonmanager.NewManagerOptions()
+	c := &addManagerConfig{managerOptions: o}
 	cmd := cmdfactory.
-		NewControllerCommandConfig("helloworldhelm-addon-controller", version.Get(), runController).
+		NewControllerCommandConfig("helloworldhelm-addon-controller", version.Get(), c.runController).
 		NewCommand()
 	cmd.Use = "controller"
 	cmd.Short = "Start the addon controller"
+	o.AddFlags(cmd)
 
 	return cmd
 }
 
-func runController(ctx context.Context, kubeConfig *rest.Config) error {
+// addManagerConfig holds configuration for addon manager
+type addManagerConfig struct {
+	managerOptions *addonmanager.ManagerOptions
+}
+
+func (c *addManagerConfig) runController(ctx context.Context, kubeConfig *rest.Config) error {
 	kubeClient, err := kubernetes.NewForConfig(kubeConfig)
 	if err != nil {
 		return err
@@ -89,7 +97,7 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 		return err
 	}
 
-	mgr, err := addonmanager.New(kubeConfig)
+	mgr, err := addonmanager.New(kubeConfig, c.managerOptions)
 	if err != nil {
 		klog.Errorf("failed to new addon manager %v", err)
 		return err

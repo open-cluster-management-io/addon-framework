@@ -24,7 +24,7 @@ func main() {
 	if err != nil {
 		os.Exit(1)
 	}
-	addonMgr, err := addonmanager.New(kubeConfig)
+	addonMgr, err := addonmanager.New(kubeConfig, addonmanager.NewManagerOptions())
 	if err != nil {
 		klog.Errorf("unable to setup addon manager: %v", err)
 		os.Exit(1)

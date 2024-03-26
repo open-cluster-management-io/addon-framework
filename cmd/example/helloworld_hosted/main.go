@@ -67,17 +67,25 @@ func newCommand() *cobra.Command {
 }
 
 func newControllerCommand() *cobra.Command {
+	o := addonmanager.NewManagerOptions()
+	c := &addManagerConfig{managerOptions: o}
 	cmd := cmdfactory.
-		NewControllerCommandConfig("helloworld-addon-controller", version.Get(), runController).
+		NewControllerCommandConfig("helloworld-addon-controller", version.Get(), c.runController).
 		NewCommand()
 	cmd.Use = "controller"
 	cmd.Short = "Start the addon controller"
+	o.AddFlags(cmd)
 
 	return cmd
 }
 
-func runController(ctx context.Context, kubeConfig *rest.Config) error {
-	mgr, err := addonmanager.New(kubeConfig)
+// addManagerConfig holds configuration for addon manager
+type addManagerConfig struct {
+	managerOptions *addonmanager.ManagerOptions
+}
+
+func (c *addManagerConfig) runController(ctx context.Context, kubeConfig *rest.Config) error {
+	mgr, err := addonmanager.New(kubeConfig, c.managerOptions)
 	if err != nil {
 		return err
 	}

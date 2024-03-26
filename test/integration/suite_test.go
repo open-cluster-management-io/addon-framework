@@ -110,7 +110,7 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	mgrContext, cancel = context.WithCancel(context.TODO())
 	// start hub controller
 	go func() {
-		addonManager, err = addonmanager.New(cfg)
+		addonManager, err = addonmanager.New(cfg, addonmanager.NewManagerOptions())
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		err = addonManager.AddAgent(testAddonImpl)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
