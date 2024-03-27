@@ -1,4 +1,4 @@
-package managementaddon
+package cmamanagedby
 
 import (
 	"context"
@@ -19,8 +19,7 @@ import (
 )
 
 type testAgent struct {
-	name     string
-	strategy *agent.InstallStrategy
+	name string
 }
 
 func (t *testAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
@@ -29,8 +28,7 @@ func (t *testAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapi
 
 func (t *testAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
 	return agent.AgentAddonOptions{
-		AddonName:       t.name,
-		InstallStrategy: t.strategy,
+		AddonName: t.name,
 	}
 }
 
@@ -48,68 +46,53 @@ func TestReconcile(t *testing.T) {
 		validateAddonActions func(t *testing.T, actions []clienttesting.Action)
 	}{
 		{
-			name: "add annotation when uses install strategy",
-			cma: []runtime.Object{newClusterManagementAddonWithAnnotation("test", map[string]string{
-				"test": "test",
-			})},
-			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "patch")
-				patch := actions[0].(clienttesting.PatchActionImpl).Patch
-				cma := &addonapiv1alpha1.ClusterManagementAddOn{}
-				err := json.Unmarshal(patch, cma)
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				if len(cma.Annotations) != 1 || cma.Annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey] != addonapiv1alpha1.AddonLifecycleSelfManageAnnotationValue {
-					t.Errorf("cma annotation is not correct, expected self but got %s", cma.Annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey])
-				}
-			},
+			name:                 "no patch annotation if nil",
+			cma:                  []runtime.Object{newClusterManagementAddonWithAnnotation("test", nil)},
+			validateAddonActions: addontesting.AssertNoActions,
 			testaddons: map[string]agent.AgentAddon{
-				"test": &testAgent{name: "test", strategy: agent.InstallAllStrategy("test")},
+				"test": &testAgent{name: "test"},
 			},
 		},
 		{
-			name: "override annotation when uses install strategy",
+			name: "no patch annotation if managed by not exist",
 			cma: []runtime.Object{newClusterManagementAddonWithAnnotation("test", map[string]string{
 				"test": "test",
-				addonapiv1alpha1.AddonLifecycleAnnotationKey: addonapiv1alpha1.AddonLifecycleAddonManagerAnnotationValue,
 			})},
-			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "patch")
-				patch := actions[0].(clienttesting.PatchActionImpl).Patch
-				cma := &addonapiv1alpha1.ClusterManagementAddOn{}
-				err := json.Unmarshal(patch, cma)
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				if len(cma.Annotations) != 1 || cma.Annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey] != addonapiv1alpha1.AddonLifecycleSelfManageAnnotationValue {
-					t.Errorf("cma annotation is not correct, expected self but got %s", cma.Annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey])
-				}
-			},
+			validateAddonActions: addontesting.AssertNoActions,
 			testaddons: map[string]agent.AgentAddon{
-				"test": &testAgent{name: "test", strategy: agent.InstallAllStrategy("test")},
+				"test": &testAgent{name: "test"},
 			},
 		},
 		{
-			name: "no patch annotation if managed by self",
+			name: "no patch annotation if managed by is not self",
+			cma: []runtime.Object{newClusterManagementAddonWithAnnotation("test", map[string]string{
+				"test": "test",
+				addonapiv1alpha1.AddonLifecycleAnnotationKey: "xxx",
+			})},
+			validateAddonActions: addontesting.AssertNoActions,
+			testaddons: map[string]agent.AgentAddon{
+				"test": &testAgent{name: "test"},
+			},
+		},
+		{
+			name: "patch annotation if managed by self",
 			cma: []runtime.Object{newClusterManagementAddonWithAnnotation("test", map[string]string{
 				"test": "test",
 				addonapiv1alpha1.AddonLifecycleAnnotationKey: addonapiv1alpha1.AddonLifecycleSelfManageAnnotationValue,
 			})},
-			validateAddonActions: addontesting.AssertNoActions,
-			testaddons: map[string]agent.AgentAddon{
-				"test": &testAgent{name: "test", strategy: agent.InstallAllStrategy("test")},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchActionImpl).Patch
+				cma := &addonapiv1alpha1.ClusterManagementAddOn{}
+				err := json.Unmarshal(patch, cma)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if len(cma.Annotations) != 1 || cma.Annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey] != "" {
+					t.Errorf("cma annotation is not correct, expected self but got %s", cma.Annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey])
+				}
 			},
-		},
-		{
-			name: "no patch annotation if no install strategy",
-			cma: []runtime.Object{newClusterManagementAddonWithAnnotation("test", map[string]string{
-				"test": "test",
-				addonapiv1alpha1.AddonLifecycleAnnotationKey: addonapiv1alpha1.AddonLifecycleAddonManagerAnnotationValue,
-			})},
-			validateAddonActions: addontesting.AssertNoActions,
 			testaddons: map[string]agent.AgentAddon{
 				"test": &testAgent{name: "test"},
 			},
@@ -127,7 +110,7 @@ func TestReconcile(t *testing.T) {
 				}
 			}
 
-			controller := clusterManagementAddonController{
+			controller := cmaManagedByController{
 				addonClient:                  fakeAddonClient,
 				clusterManagementAddonLister: addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
 				agentAddons:                  c.testaddons,

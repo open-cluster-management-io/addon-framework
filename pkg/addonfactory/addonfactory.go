@@ -57,7 +57,6 @@ func NewAgentAddonFactory(addonName string, fs embed.FS, dir string) *AgentAddon
 		agentAddonOptions: agent.AgentAddonOptions{
 			AddonName:           addonName,
 			Registration:        nil,
-			InstallStrategy:     nil,
 			HealthProber:        nil,
 			SupportedConfigGVRs: []schema.GroupVersionResource{},
 		},
@@ -80,19 +79,6 @@ func (f *AgentAddonFactory) WithScheme(s *runtime.Scheme) *AgentAddonFactory {
 // the values got from the big index Func will override the one from small index Func.
 func (f *AgentAddonFactory) WithGetValuesFuncs(getValuesFuncs ...GetValuesFunc) *AgentAddonFactory {
 	f.getValuesFuncs = getValuesFuncs
-	return f
-}
-
-// WithInstallStrategy defines the installation strategy of the manifests prescribed by Manifests(..).
-// Deprecated: add annotation "addon.open-cluster-management.io/lifecycle: addon-manager" to ClusterManagementAddon
-// and define install strategy in ClusterManagementAddon spec.installStrategy instead.
-// The migration plan refer to https://github.com/open-cluster-management-io/ocm/issues/355.
-func (f *AgentAddonFactory) WithInstallStrategy(strategy *agent.InstallStrategy) *AgentAddonFactory {
-	if strategy.InstallNamespace == "" {
-		strategy.InstallNamespace = AddonDefaultInstallNamespace
-	}
-	f.agentAddonOptions.InstallStrategy = strategy
-
 	return f
 }
 

@@ -93,6 +93,7 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 	var managedClusterName string
 	var err error
 	var manifestWorkName0, manifestWorkName1 string
+	var cma *addonapiv1alpha1.ClusterManagementAddOn
 	ginkgo.BeforeEach(func() {
 		suffix := rand.String(5)
 		managedClusterName = fmt.Sprintf("managedcluster-%s", suffix)
@@ -113,8 +114,8 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 		_, err = hubKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-		cma := newClusterManagementAddon(testMultiWorksAddonImpl.name)
-		_, err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Create(context.Background(),
+		cma = newClusterManagementAddon(testMultiWorksAddonImpl.name)
+		cma, err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Create(context.Background(),
 			cma, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
@@ -157,8 +158,7 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 				InstallNamespace: "default",
 			},
 		}
-		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(context.Background(), addon, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		createManagedClusterAddOnwithOwnerRefs(managedClusterName, addon, cma)
 
 		gomega.Eventually(func() error {
 			works, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).List(context.Background(), metav1.ListOptions{
@@ -347,8 +347,7 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 				InstallNamespace: "default",
 			},
 		}
-		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(context.Background(), addon, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		createManagedClusterAddOnwithOwnerRefs(managedClusterName, addon, cma)
 
 		gomega.Eventually(func() error {
 			works, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).List(context.Background(), metav1.ListOptions{

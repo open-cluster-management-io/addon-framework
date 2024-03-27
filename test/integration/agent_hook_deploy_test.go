@@ -72,6 +72,7 @@ var jobCompleteValue = "True"
 
 var _ = ginkgo.Describe("Agent hook deploy", func() {
 	var managedClusterName string
+	var cma *addonapiv1alpha1.ClusterManagementAddOn
 	var err error
 
 	ginkgo.BeforeEach(func() {
@@ -93,8 +94,8 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 		_, err = hubKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-		cma := newClusterManagementAddon(testAddonImpl.name)
-		_, err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Create(context.Background(),
+		cma = newClusterManagementAddon(testAddonImpl.name)
+		cma, err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Create(context.Background(),
 			cma, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
@@ -126,8 +127,8 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 				InstallNamespace: "default",
 			},
 		}
-		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(context.Background(), addon, metav1.CreateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		createManagedClusterAddOnwithOwnerRefs(managedClusterName, addon, cma)
+
 		// deploy manifest is deployed
 		gomega.Eventually(func() error {
 			work, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), fmt.Sprintf("addon-%s-deploy-0", testAddonImpl.name), metav1.GetOptions{})
