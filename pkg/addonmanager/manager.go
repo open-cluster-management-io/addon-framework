@@ -19,8 +19,9 @@ import (
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
-	workv1client "open-cluster-management.io/api/client/work/clientset/versioned"
-	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions"
+	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
+	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
+	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/addonconfig"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/agentdeploy"
@@ -33,6 +34,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/index"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	cloudeventswork "open-cluster-management.io/sdk-go/pkg/cloudevents/work"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/source/codec"
 )
 
 // AddonManager is the interface to initialize a manager on hub to manage the addon
@@ -50,8 +52,9 @@ type AddonManager interface {
 
 	// StartWithInformers starts all registered addon agent with the given informers.
 	StartWithInformers(ctx context.Context,
+		workClient workclientset.Interface,
+		workInformers workv1informers.ManifestWorkInformer,
 		kubeInformers kubeinformers.SharedInformerFactory,
-		workInformers workv1informers.SharedInformerFactory,
 		addonInformers addoninformers.SharedInformerFactory,
 		clusterInformers clusterv1informers.SharedInformerFactory,
 		dynamicInformers dynamicinformer.DynamicSharedInformerFactory) error
@@ -84,12 +87,50 @@ func (a *addonManager) Trigger(clusterName, addonName string) {
 }
 
 func (a *addonManager) Start(ctx context.Context) error {
-	kubeClient, err := kubernetes.NewForConfig(a.config)
+	var addonNames []string
+	for key := range a.addonAgents {
+		addonNames = append(addonNames, key)
+	}
+
+	// To support sending ManifestWorks to different drivers (like the Kubernetes apiserver or MQTT broker), we build
+	// ManifestWork client that implements the ManifestWorkInterface and ManifestWork informer based on different
+	// driver configuration.
+	// Refer to Event Based Manifestwork proposal in enhancements repo to get more details.
+	_, config, err := cloudeventswork.NewConfigLoader(a.options.WorkDriver, a.options.WorkDriverConfig).
+		WithKubeConfig(a.config).
+		LoadConfig()
 	if err != nil {
 		return err
 	}
 
-	workClient, err := workv1client.NewForConfig(a.config)
+	// we need a separated filtered manifestwork informers so we only watch the manifestworks that manifestworkreplicaset cares.
+	// This could reduce a lot of memory consumptions
+	workInformOption := workinformers.WithTweakListOptions(
+		func(listOptions *metav1.ListOptions) {
+			selector := &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      addonv1alpha1.AddonLabelKey,
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   addonNames,
+					},
+				},
+			}
+			listOptions.LabelSelector = metav1.FormatLabelSelector(selector)
+		},
+	)
+
+	clientHolder, err := cloudeventswork.NewClientHolderBuilder(config).
+		WithClientID(a.options.CloudEventsClientID).
+		WithSourceID(a.options.SourceID).
+		WithInformerConfig(10*time.Minute, workInformOption).
+		WithCodecs(codec.NewManifestBundleCodec()).
+		NewSourceClientHolder(ctx)
+	if err != nil {
+		return err
+	}
+
+	kubeClient, err := kubernetes.NewForConfig(a.config)
 	if err != nil {
 		return err
 	}
@@ -113,10 +154,6 @@ func (a *addonManager) Start(ctx context.Context) error {
 	clusterInformers := clusterv1informers.NewSharedInformerFactory(clusterClient, 10*time.Minute)
 	dynamicInformers := dynamicinformer.NewDynamicSharedInformerFactory(dynamicClient, 10*time.Minute)
 
-	var addonNames []string
-	for key := range a.addonAgents {
-		addonNames = append(addonNames, key)
-	}
 	kubeInformers := kubeinformers.NewSharedInformerFactoryWithOptions(kubeClient, 10*time.Minute,
 		kubeinformers.WithTweakListOptions(func(listOptions *metav1.ListOptions) {
 			selector := &metav1.LabelSelector{
@@ -132,23 +169,11 @@ func (a *addonManager) Start(ctx context.Context) error {
 		}),
 	)
 
-	workInformers := workv1informers.NewSharedInformerFactoryWithOptions(workClient, 10*time.Minute,
-		workv1informers.WithTweakListOptions(func(listOptions *metav1.ListOptions) {
-			selector := &metav1.LabelSelector{
-				MatchExpressions: []metav1.LabelSelectorRequirement{
-					{
-						Key:      addonv1alpha1.AddonLabelKey,
-						Operator: metav1.LabelSelectorOpIn,
-						Values:   addonNames,
-					},
-				},
-			}
-			listOptions.LabelSelector = metav1.FormatLabelSelector(selector)
-		}),
-	)
+	workClient := clientHolder.WorkInterface()
+	workInformers := clientHolder.ManifestWorkInformer()
 
 	// addonDeployController
-	err = workInformers.Work().V1().ManifestWorks().Informer().AddIndexers(
+	err = workInformers.Informer().AddIndexers(
 		cache.Indexers{
 			index.ManifestWorkByAddon:           index.IndexManifestWorkByAddon,
 			index.ManifestWorkByHostedAddon:     index.IndexManifestWorkByHostedAddon,
@@ -179,13 +204,13 @@ func (a *addonManager) Start(ctx context.Context) error {
 		return err
 	}
 
-	err = a.StartWithInformers(ctx, kubeInformers, workInformers, addonInformers, clusterInformers, dynamicInformers)
+	err = a.StartWithInformers(ctx, workClient, workInformers, kubeInformers, addonInformers, clusterInformers, dynamicInformers)
 	if err != nil {
 		return err
 	}
 
 	kubeInformers.Start(ctx.Done())
-	workInformers.Start(ctx.Done())
+	go workInformers.Informer().Run(ctx.Done())
 	addonInformers.Start(ctx.Done())
 	clusterInformers.Start(ctx.Done())
 	dynamicInformers.Start(ctx.Done())
@@ -193,8 +218,9 @@ func (a *addonManager) Start(ctx context.Context) error {
 }
 
 func (a *addonManager) StartWithInformers(ctx context.Context,
+	workClient workclientset.Interface,
+	workInformers workv1informers.ManifestWorkInformer,
 	kubeInformers kubeinformers.SharedInformerFactory,
-	workInformers workv1informers.SharedInformerFactory,
 	addonInformers addoninformers.SharedInformerFactory,
 	clusterInformers clusterv1informers.SharedInformerFactory,
 	dynamicInformers dynamicinformer.DynamicSharedInformerFactory) error {
@@ -205,11 +231,6 @@ func (a *addonManager) StartWithInformers(ctx context.Context,
 	}
 
 	addonClient, err := addonv1alpha1client.NewForConfig(a.config)
-	if err != nil {
-		return err
-	}
-
-	workClient, err := workv1client.NewForConfig(a.config)
 	if err != nil {
 		return err
 	}
@@ -230,7 +251,7 @@ func (a *addonManager) StartWithInformers(ctx context.Context,
 		addonClient,
 		clusterInformers.Cluster().V1().ManagedClusters(),
 		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
-		workInformers.Work().V1().ManifestWorks(),
+		workInformers,
 		a.addonAgents,
 	)
 
@@ -326,9 +347,8 @@ func (a *addonManager) StartWithInformers(ctx context.Context,
 
 // ManagerOptions defines the flags for addon manager
 type ManagerOptions struct {
-	WorkDriver       string
-	WorkDriverConfig string
-
+	WorkDriver          string
+	WorkDriverConfig    string
 	CloudEventsClientID string
 	SourceID            string
 }
@@ -341,6 +361,7 @@ func NewManagerOptions() *ManagerOptions {
 	}
 }
 
+// AddFlags adds the addon manager flags to the given command
 func (o *ManagerOptions) AddFlags(cmd *cobra.Command) {
 	flags := cmd.Flags()
 	flags.StringVar(&o.WorkDriver, "work-driver",
@@ -353,7 +374,7 @@ func (o *ManagerOptions) AddFlags(cmd *cobra.Command) {
 		o.SourceID, "The ID of the source when publishing works with cloudevents")
 }
 
-// New returns a new Manager for creating addon agents.
+// New returns a new addon manager for creating addon agents.
 func New(config *rest.Config, opts *ManagerOptions) (AddonManager, error) {
 	return &addonManager{
 		config:       config,

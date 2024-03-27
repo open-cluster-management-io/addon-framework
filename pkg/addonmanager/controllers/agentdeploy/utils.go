@@ -13,6 +13,8 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	workbuilder "open-cluster-management.io/sdk-go/pkg/apis/work/v1/builder"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/common"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/payload"
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -315,6 +317,13 @@ func (b *addonWorksBuilder) BuildDeployWorks(installMode, addonWorkNamespace str
 		return nil, nil, err
 	}
 
+	// add the cloud event data type annotation
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	annotations[common.CloudEventsDataTypeAnnotationKey] = payload.ManifestBundleEventDataType.String()
+	annotations[common.CloudEventsGenerationAnnotationKey] = fmt.Sprintf("%d", addon.Generation)
+
 	return b.workBuilder.Build(deployObjects,
 		newAddonWorkObjectMeta(b.processor.manifestWorkNamePrefix(addon.Namespace, addon.Name), addon.Name, addon.Namespace, addonWorkNamespace, owner),
 		workbuilder.ExistingManifestWorksOption(existingWorks),
@@ -363,6 +372,10 @@ func (b *addonWorksBuilder) BuildHookWork(installMode, addonWorkNamespace string
 	// This owner is only added to the manifestWork deployed in managed cluster ns.
 	if addon.Namespace == addonWorkNamespace {
 		hookWork.OwnerReferences = []metav1.OwnerReference{*owner}
+	}
+	hookWork.Annotations = map[string]string{
+		common.CloudEventsDataTypeAnnotationKey:   payload.ManifestBundleEventDataType.String(),
+		common.CloudEventsGenerationAnnotationKey: fmt.Sprintf("%d", addon.Generation),
 	}
 	hookWork.Spec.ManifestConfigs = hookManifestConfigs
 	if addon.Namespace != addonWorkNamespace {

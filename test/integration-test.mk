@@ -26,7 +26,15 @@ clean-integration-test:
 
 clean: clean-integration-test
 
-test-integration: ensure-kubebuilder-tools
-	go test -c ./test/integration
-	./integration.test -ginkgo.slowSpecThreshold=15 -ginkgo.v -ginkgo.failFast
+test-kube-integration: ensure-kubebuilder-tools
+	go test -c ./test/integration/kube -o ./kube-integration.test
+	./kube-integration.test -ginkgo.slowSpecThreshold=15 -ginkgo.v -ginkgo.failFast
+.PHONY: test-kube-integration
+
+test-mqtt-integration: ensure-kubebuilder-tools
+	go test -c ./test/integration/mqtt -o ./mqtt-integration.test
+	./mqtt-integration.test -ginkgo.slowSpecThreshold=15 -ginkgo.v -ginkgo.failFast
+.PHONY: test-mqtt-integration
+
+test-integration: test-kube-integration test-mqtt-integration
 .PHONY: test-integration
