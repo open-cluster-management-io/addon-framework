@@ -42,8 +42,9 @@ func (t *testHostedAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *ad
 
 func (t *testHostedAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
 	return agent.AgentAddonOptions{
-		AddonName:         t.name,
-		HostedModeEnabled: true,
+		AddonName:          t.name,
+		HostedModeEnabled:  true,
+		HostedModeInfoFunc: constants.GetHostedModeInfo,
 	}
 }
 

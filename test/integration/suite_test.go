@@ -7,6 +7,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -91,6 +92,7 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 		manifests:         map[string][]runtime.Object{},
 		registrations:     map[string][]addonapiv1alpha1.RegistrationConfig{},
 		hostedModeEnabled: true,
+		hostInfoFn:        constants.GetHostedModeInfo,
 	}
 
 	testInstallByLableAddonImpl = &testAddon{
@@ -141,6 +143,7 @@ type testAddon struct {
 	cert                []byte
 	prober              *agent.HealthProber
 	hostedModeEnabled   bool
+	hostInfoFn          func(addon *addonapiv1alpha1.ManagedClusterAddOn, cluster *clusterv1.ManagedCluster) (string, string)
 	supportedConfigGVRs []schema.GroupVersionResource
 }
 
@@ -153,6 +156,7 @@ func (t *testAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 		AddonName:           t.name,
 		HealthProber:        t.prober,
 		HostedModeEnabled:   t.hostedModeEnabled,
+		HostedModeInfoFunc:  t.hostInfoFn,
 		SupportedConfigGVRs: t.supportedConfigGVRs,
 	}
 

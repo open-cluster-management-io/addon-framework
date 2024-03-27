@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -59,6 +60,8 @@ func NewAgentAddonFactory(addonName string, fs embed.FS, dir string) *AgentAddon
 			Registration:        nil,
 			HealthProber:        nil,
 			SupportedConfigGVRs: []schema.GroupVersionResource{},
+			// Set a default hosted mode info func.
+			HostedModeInfoFunc: constants.GetHostedModeInfo,
 		},
 		trimCRDDescription: false,
 		scheme:             s,
@@ -97,6 +100,13 @@ func (f *AgentAddonFactory) WithAgentHealthProber(prober *agent.HealthProber) *A
 // WithAgentHostedModeEnabledOption will enable the agent hosted deploying mode.
 func (f *AgentAddonFactory) WithAgentHostedModeEnabledOption() *AgentAddonFactory {
 	f.agentAddonOptions.HostedModeEnabled = true
+	return f
+}
+
+// WithAgentHostedInfoFn sets the function to get the hosting cluster of an addon in the hosted mode.
+func (f *AgentAddonFactory) WithAgentHostedInfoFn(
+	infoFn func(*addonapiv1alpha1.ManagedClusterAddOn, *clusterv1.ManagedCluster) (string, string)) *AgentAddonFactory {
+	f.agentAddonOptions.HostedModeInfoFunc = infoFn
 	return f
 }
 
