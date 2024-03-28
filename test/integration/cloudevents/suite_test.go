@@ -1,13 +1,25 @@
-package kube
+package cloudevents
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"path"
 	"path/filepath"
 	"testing"
+	"time"
 
+	mochimqtt "github.com/mochi-mqtt/server/v2"
+	"github.com/mochi-mqtt/server/v2/hooks/auth"
+	"github.com/mochi-mqtt/server/v2/listeners"
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+	"gopkg.in/yaml.v2"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/mqtt"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/agent/codec"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -21,7 +33,6 @@ import (
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
-	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
@@ -30,14 +41,18 @@ const (
 	eventuallyInterval = 1  // seconds
 )
 
-var addOnDeploymentConfigGVR = schema.GroupVersionResource{
-	Group:    "addon.open-cluster-management.io",
-	Version:  "v1alpha1",
-	Resource: "addondeploymentconfigs",
-}
+const (
+	sourceID            = "addonmanager-integration-test"
+	cloudEventsClientID = "addonmanager-integration-test"
+	mqttBrokerHost      = "127.0.0.1:1883"
+	workDriverType      = "mqtt"
+)
+
+var mqttBroker *mochimqtt.Server
+var tempDir string
+var workDriverConfigFile string
 
 var testEnv *envtest.Environment
-var hubWorkClient workclientset.Interface
 var hubClusterClient clusterv1client.Interface
 var hubAddonClient addonv1alpha1client.Interface
 var hubKubeClient kubernetes.Interface
@@ -45,8 +60,8 @@ var testAddonImpl *testAddon
 var testHostedAddonImpl *testAddon
 var testInstallByLableAddonImpl *testAddon
 var testMultiWorksAddonImpl *testAddon
-var cancel context.CancelFunc
-var mgrContext context.Context
+var mgrCtx context.Context
+var mgrCtxCancel context.CancelFunc
 var addonManager addonmanager.AddonManager
 
 func TestIntegration(t *testing.T) {
@@ -55,6 +70,40 @@ func TestIntegration(t *testing.T) {
 }
 
 var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
+	ginkgo.By("bootstrapping test mqtt broker")
+
+	mqttBroker = mochimqtt.New(nil)
+	err := mqttBroker.AddHook(new(auth.AllowHook), nil)
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+	err = mqttBroker.AddListener(listeners.NewTCP("test-mqtt-broker", mqttBrokerHost, nil))
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+	// start the mqtt broker
+	go func() {
+		err := mqttBroker.Serve()
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	}()
+
+	tempDir, err = os.MkdirTemp("", "test")
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	gomega.Expect(tempDir).ToNot(gomega.BeEmpty())
+	workDriverConfigFile = path.Join(tempDir, "mqttconfig")
+
+	// write the mqtt broker config to a file
+	workDriverConfig := mqtt.MQTTConfig{
+		BrokerHost: mqttBrokerHost,
+		Topics: &types.Topics{
+			SourceEvents:    fmt.Sprintf("sources/%s/clusters/+/sourceevents", sourceID),
+			AgentEvents:     fmt.Sprintf("sources/%s/clusters/+/agentevents", sourceID),
+			SourceBroadcast: fmt.Sprintf("sources/%s/sourcebroadcast", sourceID),
+		},
+	}
+	workDriverConfigYAML, err := yaml.Marshal(workDriverConfig)
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	err = os.WriteFile(workDriverConfigFile, workDriverConfigYAML, 0600)
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
 	ginkgo.By("bootstrapping test environment")
 
 	// start a kube-apiserver
@@ -71,9 +120,6 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	cfg, err := testEnv.Start()
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	gomega.Expect(cfg).ToNot(gomega.BeNil())
-
-	hubWorkClient, err = workclientset.NewForConfig(cfg)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	hubClusterClient, err = clusterv1client.NewForConfig(cfg)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	hubAddonClient, err = addonv1alpha1client.NewForConfig(cfg)
@@ -107,10 +153,15 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 		registrations: map[string][]addonapiv1alpha1.RegistrationConfig{},
 	}
 
-	mgrContext, cancel = context.WithCancel(context.TODO())
+	mgrCtx, mgrCtxCancel = context.WithCancel(context.TODO())
 	// start hub controller
 	go func() {
-		addonManager, err = addonmanager.New(cfg, addonmanager.NewManagerOptions())
+		managerOptions := addonmanager.NewManagerOptions()
+		managerOptions.WorkDriver = workDriverType
+		managerOptions.WorkDriverConfig = workDriverConfigFile
+		managerOptions.SourceID = sourceID
+		managerOptions.CloudEventsClientID = cloudEventsClientID
+		addonManager, err = addonmanager.New(cfg, managerOptions)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		err = addonManager.AddAgent(testAddonImpl)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -120,7 +171,7 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		err = addonManager.AddAgent(testMultiWorksAddonImpl)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		err = addonManager.Start(mgrContext)
+		err = addonManager.Start(mgrCtx)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	}()
 
@@ -130,9 +181,16 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 var _ = ginkgo.AfterSuite(func() {
 	ginkgo.By("tearing down the test environment")
 
-	cancel()
+	mgrCtxCancel()
 	err := testEnv.Stop()
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+	err = mqttBroker.Close()
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+	if tempDir != "" {
+		os.RemoveAll(tempDir)
+	}
 })
 
 type testAddon struct {
@@ -189,4 +247,31 @@ func newClusterManagementAddon(name string) *addonapiv1alpha1.ClusterManagementA
 			},
 		},
 	}
+}
+
+func startWorkAgent(ctx context.Context, clusterName string) (*work.ClientHolder, error) {
+	config := &mqtt.MQTTOptions{
+		KeepAlive:   60,
+		PubQoS:      1,
+		SubQoS:      1,
+		DialTimeout: 5 * time.Second,
+		BrokerHost:  mqttBrokerHost,
+		Topics: types.Topics{
+			SourceEvents:   fmt.Sprintf("sources/%s/clusters/%s/sourceevents", sourceID, clusterName),
+			AgentEvents:    fmt.Sprintf("sources/%s/clusters/%s/agentevents", sourceID, clusterName),
+			AgentBroadcast: fmt.Sprintf("clusters/%s/agentbroadcast", clusterName),
+		},
+	}
+	clientHolder, err := work.NewClientHolderBuilder(config).
+		WithClientID(clusterName).
+		WithClusterName(clusterName).
+		WithCodecs(codec.NewManifestBundleCodec()).
+		NewAgentClientHolder(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	go clientHolder.ManifestWorkInformer().Informer().Run(ctx.Done())
+
+	return clientHolder, nil
 }

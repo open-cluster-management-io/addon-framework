@@ -31,10 +31,10 @@ test-kube-integration: ensure-kubebuilder-tools
 	./kube-integration.test -ginkgo.slowSpecThreshold=15 -ginkgo.v -ginkgo.failFast
 .PHONY: test-kube-integration
 
-test-mqtt-integration: ensure-kubebuilder-tools
-	go test -c ./test/integration/mqtt -o ./mqtt-integration.test
-	./mqtt-integration.test -ginkgo.slowSpecThreshold=15 -ginkgo.v -ginkgo.failFast
-.PHONY: test-mqtt-integration
+test-cloudevents-integration: ensure-kubebuilder-tools
+	go test -c ./test/integration/cloudevents -o ./cloudevents-integration.test
+	./cloudevents-integration.test -ginkgo.slowSpecThreshold=15 -ginkgo.v -ginkgo.failFast
+.PHONY: test-cloudevents-integration
 
-test-integration: test-kube-integration test-mqtt-integration
+test-integration: test-kube-integration test-cloudevents-integration
 .PHONY: test-integration
