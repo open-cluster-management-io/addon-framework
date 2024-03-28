@@ -40,7 +40,7 @@ type AgentAddonFactory struct {
 	// Deprecated: use clusterClient to get the hosting cluster.
 	hostingCluster        *clusterv1.ManagedCluster
 	clusterClient         clusterclientset.Interface
-	agentInstallNamespace func(addon *addonapiv1alpha1.ManagedClusterAddOn) string
+	agentInstallNamespace func(addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error)
 	helmEngineStrict      bool
 }
 
@@ -164,7 +164,7 @@ func (f *AgentAddonFactory) WithAgentDeployTriggerClusterFilter(
 // override the default built-in namespace value; And if the registrationOption is not nil but the
 // registrationOption.AgentInstallNamespace is nil, this will also set it to this.
 func (f *AgentAddonFactory) WithAgentInstallNamespace(
-	nsFunc func(addon *addonapiv1alpha1.ManagedClusterAddOn) string,
+	nsFunc func(addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error),
 ) *AgentAddonFactory {
 	f.agentInstallNamespace = nsFunc
 	return f

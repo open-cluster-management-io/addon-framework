@@ -163,7 +163,10 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 	}
 
 	if registrationOption.AgentInstallNamespace != nil {
-		ns := registrationOption.AgentInstallNamespace(managedClusterAddonCopy)
+		ns, err := registrationOption.AgentInstallNamespace(managedClusterAddonCopy)
+		if err != nil {
+			return err
+		}
 		if len(ns) > 0 {
 			managedClusterAddonCopy.Status.Namespace = ns
 		} else {
