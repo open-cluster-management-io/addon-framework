@@ -41,7 +41,7 @@ type TemplateAgentAddon struct {
 	getValuesFuncs        []GetValuesFunc
 	agentAddonOptions     agent.AgentAddonOptions
 	trimCRDDescription    bool
-	agentInstallNamespace func(addon *addonapiv1alpha1.ManagedClusterAddOn) string
+	agentInstallNamespace func(addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error)
 }
 
 func newTemplateAgentAddon(factory *AgentAddonFactory) *TemplateAgentAddon {
@@ -108,7 +108,10 @@ func (a *TemplateAgentAddon) getValues(
 			overrideValues = MergeValues(overrideValues, userValues)
 		}
 	}
-	builtinValues := a.getBuiltinValues(cluster, addon)
+	builtinValues, err := a.getBuiltinValues(cluster, addon)
+	if err != nil {
+		return overrideValues, err
+	}
 	overrideValues = MergeValues(overrideValues, builtinValues)
 
 	return overrideValues, nil
@@ -116,7 +119,7 @@ func (a *TemplateAgentAddon) getValues(
 
 func (a *TemplateAgentAddon) getBuiltinValues(
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) Values {
+	addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
 	builtinValues := templateBuiltinValues{}
 	builtinValues.ClusterName = cluster.GetName()
 
@@ -125,7 +128,11 @@ func (a *TemplateAgentAddon) getBuiltinValues(
 		installNamespace = AddonDefaultInstallNamespace
 	}
 	if a.agentInstallNamespace != nil {
-		ns := a.agentInstallNamespace(addon)
+		ns, err := a.agentInstallNamespace(addon)
+		if err != nil {
+			klog.Errorf("failed to get agent install namespace for addon %s: %v", addon.Name, err)
+			return nil, err
+		}
 		if len(ns) > 0 {
 			installNamespace = ns
 		}
@@ -134,7 +141,7 @@ func (a *TemplateAgentAddon) getBuiltinValues(
 
 	builtinValues.InstallMode, _ = a.agentAddonOptions.HostedModeInfoFunc(addon, cluster)
 
-	return StructToValues(builtinValues)
+	return StructToValues(builtinValues), nil
 }
 
 func (a *TemplateAgentAddon) getDefaultValues(

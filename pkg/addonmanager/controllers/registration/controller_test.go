@@ -26,7 +26,7 @@ type testAgent struct {
 	name                  string
 	namespace             string
 	registrations         []addonapiv1alpha1.RegistrationConfig
-	agentInstallNamespace func(addon *addonapiv1alpha1.ManagedClusterAddOn) string
+	agentInstallNamespace func(addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error)
 }
 
 func (t *testAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
@@ -211,8 +211,10 @@ func TestReconcile(t *testing.T) {
 				}
 			},
 			testaddon: &testAgent{name: "test", namespace: "default",
-				registrations:         []addonapiv1alpha1.RegistrationConfig{{SignerName: "test"}},
-				agentInstallNamespace: func(addon *addonapiv1alpha1.ManagedClusterAddOn) string { return "default3" },
+				registrations: []addonapiv1alpha1.RegistrationConfig{{SignerName: "test"}},
+				agentInstallNamespace: func(addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error) {
+					return "default3", nil
+				},
 			},
 		},
 	}
