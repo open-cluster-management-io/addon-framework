@@ -8,12 +8,7 @@ env:
   # Common versions
   GO_VERSION: '1.21'
   GO_REQUIRED_MIN_VERSION: ''
-  GOPATH: '/home/runner/work/addon-framework/addon-framework/go'
   GITHUB_REF: ${{ github.ref }}
-
-defaults:
-  run:
-    working-directory: go/src/open-cluster-management.io/addon-framework
 
 jobs:
   env:
@@ -21,10 +16,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
-          path: go/src/open-cluster-management.io/addon-framework
       - name: get release version
         run: |
           echo "RELEASE_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
@@ -44,10 +38,9 @@ jobs:
         arch: [ amd64, arm64 ]
     steps:
       - name: checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
-          path: go/src/open-cluster-management.io/addon-framework
       - name: install Go
         uses: actions/setup-go@v3
         with:
@@ -71,10 +64,9 @@ jobs:
     needs: [ env, images ]
     steps:
       - name: checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
-          path: go/src/open-cluster-management.io/addon-framework
       - name: create
         run: |
           echo ${{ secrets.DOCKER_PASSWORD }} | docker login quay.io --username ${{ secrets.DOCKER_USER }} --password-stdin
@@ -96,10 +88,9 @@ jobs:
     needs: [ env, image-manifest ]
     steps:
       - name: checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
-          path: go/src/open-cluster-management.io/addon-framework
       - name: generate changelog
         run: |
           echo "# Addon Framework ${{ needs.env.outputs.RELEASE_VERSION }}" > /home/runner/work/changelog.txt

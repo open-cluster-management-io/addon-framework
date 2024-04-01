@@ -11,10 +11,6 @@ env:
   # Common versions
   GO_VERSION: '1.21'
   GO_REQUIRED_MIN_VERSION: ''
-  GOPATH: '/home/runner/work/addon-framework/addon-framework/go'
-defaults:
-  run:
-    working-directory: go/src/open-cluster-management.io/addon-framework
 
 jobs:
   verify:
@@ -22,10 +18,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
-          path: go/src/open-cluster-management.io/addon-framework
       - name: install Go
         uses: actions/setup-go@v3
         with:
@@ -38,10 +33,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
-          path: go/src/open-cluster-management.io/addon-framework
       - name: install Go
         uses: actions/setup-go@v3
         with:
@@ -54,10 +48,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
-          path: go/src/open-cluster-management.io/addon-framework
       - name: install Go
         uses: actions/setup-go@v3
         with:
@@ -70,10 +63,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
-          path: go/src/open-cluster-management.io/addon-framework
       - name: install Go
         uses: actions/setup-go@v3
         with:
@@ -86,10 +78,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
-          path: go/src/open-cluster-management.io/addon-framework
       - name: install Go
         uses: actions/setup-go@v3
         with:
@@ -102,10 +93,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
-          path: go/src/open-cluster-management.io/addon-framework
       - name: install Go
         uses: actions/setup-go@v3
         with:
@@ -134,10 +124,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
-          path: go/src/open-cluster-management.io/addon-framework
       - name: install Go
         uses: actions/setup-go@v3
         with:
