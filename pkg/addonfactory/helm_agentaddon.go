@@ -226,11 +226,14 @@ func (a *HelmAgentAddon) getValueAgentInstallNamespace(addon *addonapiv1alpha1.M
 	if a.agentInstallNamespace != nil {
 		ns, err := a.agentInstallNamespace(addon)
 		if err != nil {
-			klog.Errorf("failed to get agentInstallNamespace from addon %s. err:%v", addon.Name, err)
+			klog.Errorf("failed to get agentInstallNamespace from addon %s. err: %v", addon.Name, err)
 			return "", err
 		}
 		if len(ns) > 0 {
 			installNamespace = ns
+		} else {
+			klog.InfoS("Namespace for addon returned by agent install namespace func is empty",
+				"addonNamespace", addon.Namespace, "addonName", addon)
 		}
 	}
 	return installNamespace, nil

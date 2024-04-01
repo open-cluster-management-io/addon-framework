@@ -46,8 +46,16 @@ func AgentInstallNamespaceFromDeploymentConfigFunc(
 		if err != nil {
 			return "", fmt.Errorf("failed to get deployment config for addon %s: %v", addon.Name, err)
 		}
+
+		// For now, we have no way of knowing if the addon depleoyment config is not configured, or
+		// is configured but not yet been added to the managedclusteraddon status config references,
+		// we expect no error will be returned when the addon deployment config is not configured
+		// so we can use the default namespace.
+		// TODO: Find a way to distinguish between the above two cases
 		if config == nil {
-			return "", fmt.Errorf("failed to get deployment config for addon %s", addon.Name)
+			klog.InfoS("Addon deployment config is nil, return an empty string for agent install namespace",
+				"addonNamespace", addon.Namespace, "addonName", addon.Name)
+			return "", nil
 		}
 
 		return config.Spec.AgentInstallNamespace, nil
