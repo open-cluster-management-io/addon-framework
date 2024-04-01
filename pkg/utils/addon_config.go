@@ -47,7 +47,7 @@ func AgentInstallNamespaceFromDeploymentConfigFunc(
 			return "", fmt.Errorf("failed to get deployment config for addon %s: %v", addon.Name, err)
 		}
 		if config == nil {
-			return "", fmt.Errorf("failed to get deployment config for addon %s: %v", addon.Name, err)
+			return "", fmt.Errorf("failed to get deployment config for addon %s", addon.Name)
 		}
 
 		return config.Spec.AgentInstallNamespace, nil

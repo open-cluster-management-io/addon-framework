@@ -9,4 +9,7 @@ spec:
   supportedConfigs:
   - group: addon.open-cluster-management.io
     resource: addondeploymentconfigs
+    defaultConfig:
+      name: helloworldhelm-config
+      namespace: open-cluster-management
   - resource: configmaps

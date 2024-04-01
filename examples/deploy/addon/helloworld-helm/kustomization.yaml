@@ -1,6 +1,7 @@
 namespace: open-cluster-management
 
 resources:
+- resources/addon_deployment_config.yaml
 - resources/cluster_role.yaml
 - resources/cluster_role_binding.yaml
 - resources/service_account.yaml
