@@ -168,7 +168,7 @@ func TestAgentInstallNamespaceFromDeploymentConfigFunc(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			nsFunc := AgentInstallNamespaceFromDeploymentConfigFunc(c.getter)
-			ns := nsFunc(c.mca)
+			ns, _ := nsFunc(c.mca)
 			assert.Equal(t, c.expected, ns, "should be equal")
 		})
 	}
