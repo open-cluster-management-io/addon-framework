@@ -8,7 +8,7 @@ KUBECTL=${KUBECTL:-kubectl}
 rm -rf _repo_ocm
 
 echo "############  Cloning ocm repo"
-git clone --depth 1 --branch main https://github.com/open-cluster-management-io/ocm.git _repo_ocm
+git clone --depth 1 --branch release-0.13 https://github.com/open-cluster-management-io/ocm.git _repo_ocm
 
 cd _repo_ocm || {
   printf "cd failed, _repo_ocm does not exist"
@@ -16,6 +16,7 @@ cd _repo_ocm || {
 }
 
 echo "############  Deploying operators"
+export IMAGE_TAG=v0.13.0
 make deploy-hub cluster-ip deploy-spoke-operator apply-spoke-cr
 if [ $? -ne 0 ]; then
  echo "############  Failed to deploy"
