@@ -2,18 +2,19 @@ package cmamanagedby
 
 import (
 	"context"
+	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
+	"open-cluster-management.io/addon-framework/pkg/agent"
+	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
 	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
-
-	"open-cluster-management.io/addon-framework/pkg/agent"
-	"open-cluster-management.io/addon-framework/pkg/basecontroller/factory"
 )
 
 const (
@@ -80,6 +81,11 @@ func (c *cmaManagedByController) sync(ctx context.Context, syncCtx factory.SyncC
 		return err
 	}
 
+	err = c.handleFinalizer(ctx, cma, addonName)
+	if err != nil {
+		return err
+	}
+
 	// Remove the annotation value "self" since the WithInstallStrategy() is removed in addon-framework.
 	// The migration plan refer to https://github.com/open-cluster-management-io/ocm/issues/355.
 	cmaCopy := cma.DeepCopy()
@@ -91,4 +97,28 @@ func (c *cmaManagedByController) sync(ctx context.Context, syncCtx factory.SyncC
 
 	_, err = c.addonPatcher.PatchLabelAnnotations(ctx, cmaCopy, cmaCopy.ObjectMeta, cma.ObjectMeta)
 	return err
+}
+
+func (c *cmaManagedByController) handleFinalizer(ctx context.Context, cma *addonapiv1alpha1.ClusterManagementAddOn, addonName string) error {
+	managedClusterAddonList, err := c.addonClient.AddonV1alpha1().ManagedClusterAddOns("").List(ctx, v1.ListOptions{
+		FieldSelector: fmt.Sprintf("metadata.name=%s", addonName),
+	})
+	if err != nil {
+		return err
+	}
+
+	if len(managedClusterAddonList.Items) == 0 {
+		err = c.addonPatcher.RemoveFinalizer(ctx, cma, addonapiv1alpha1.AddonPreDeleteHookFinalizer)
+		if err != nil {
+			return err
+		}
+	} else {
+		// length of managedClusterAddonList.Items > 0
+		_, err = c.addonPatcher.AddFinalizer(ctx, cma, addonapiv1alpha1.AddonPreDeleteHookFinalizer)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

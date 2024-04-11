@@ -1291,7 +1291,7 @@ k8s.io/klog/v2/internal/dbg
 k8s.io/klog/v2/internal/serialize
 k8s.io/klog/v2/internal/severity
 k8s.io/klog/v2/internal/sloghandler
-# k8s.io/kms v0.29.0
+# k8s.io/kms v0.29.2
 ## explicit; go 1.21
 k8s.io/kms/apis/v1beta1
 k8s.io/kms/apis/v2
@@ -1428,6 +1428,7 @@ sigs.k8s.io/apiserver-network-proxy/konnectivity-client/proto/client
 sigs.k8s.io/controller-runtime/pkg/client
 sigs.k8s.io/controller-runtime/pkg/client/apiutil
 sigs.k8s.io/controller-runtime/pkg/client/config
+sigs.k8s.io/controller-runtime/pkg/controller/controllerutil
 sigs.k8s.io/controller-runtime/pkg/conversion
 sigs.k8s.io/controller-runtime/pkg/envtest
 sigs.k8s.io/controller-runtime/pkg/internal/flock

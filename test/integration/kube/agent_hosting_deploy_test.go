@@ -118,22 +118,30 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 	})
 
 	ginkgo.AfterEach(func() {
-		err = hubKubeClient.CoreV1().Namespaces().Delete(
-			context.Background(), managedClusterName, metav1.DeleteOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		err = hubClusterClient.ClusterV1().ManagedClusters().Delete(
-			context.Background(), managedClusterName, metav1.DeleteOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-		err = hubKubeClient.CoreV1().Namespaces().Delete(
-			context.Background(), hostingClusterName, metav1.DeleteOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		err = hubClusterClient.ClusterV1().ManagedClusters().Delete(
-			context.Background(), hostingClusterName, metav1.DeleteOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
 		err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Delete(context.Background(),
 			testHostedAddonImpl.name, metav1.DeleteOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		gomega.Eventually(func() bool {
+			_, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().
+				Get(context.Background(), testHostedAddonImpl.name, metav1.GetOptions{})
+			if errors.IsNotFound(err) {
+				return true
+			}
+
+			return false
+		}, eventuallyTimeout*100, eventuallyInterval).Should(gomega.BeTrue(), "ClusterManagementAddOns should be deleted")
+		err = hubKubeClient.CoreV1().Namespaces().Delete(
+			context.Background(), managedClusterName, metav1.DeleteOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		err = hubClusterClient.ClusterV1().ManagedClusters().Delete(
+			context.Background(), managedClusterName, metav1.DeleteOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		err = hubKubeClient.CoreV1().Namespaces().Delete(
+			context.Background(), hostingClusterName, metav1.DeleteOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		err = hubClusterClient.ClusterV1().ManagedClusters().Delete(
+			context.Background(), hostingClusterName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 
@@ -477,5 +485,4 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 		}
 		testHostedAddonImpl.hostInfoFn = constants.GetHostedModeInfo
 	})
-
 })

@@ -74,7 +74,7 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 	var managedClusterName, hostingClusterName string
 	var err error
 	var hostingManifestWorkName string
-	var hostingJobCompleteValue = "True"
+	hostingJobCompleteValue := "True"
 	var cma *addonapiv1alpha1.ClusterManagementAddOn
 	ginkgo.BeforeEach(func() {
 		suffix := rand.String(5)
@@ -121,6 +121,18 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 	})
 
 	ginkgo.AfterEach(func() {
+		err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Delete(context.Background(),
+			testHostedAddonImpl.name, metav1.DeleteOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		gomega.Eventually(func() bool {
+			_, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().
+				Get(context.Background(), testHostedAddonImpl.name, metav1.GetOptions{})
+			if errors.IsNotFound(err) {
+				return true
+			}
+
+			return false
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue(), "ClusterManagementAddOns should be deleted")
 		err = hubKubeClient.CoreV1().Namespaces().Delete(
 			context.Background(), managedClusterName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -133,9 +145,6 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		err = hubClusterClient.ClusterV1().ManagedClusters().Delete(
 			context.Background(), hostingClusterName, metav1.DeleteOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Delete(context.Background(),
-			testHostedAddonImpl.name, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 

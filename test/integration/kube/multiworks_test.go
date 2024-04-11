@@ -8,6 +8,7 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -121,13 +122,21 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 	})
 
 	ginkgo.AfterEach(func() {
+		err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Delete(context.Background(),
+			testMultiWorksAddonImpl.name, metav1.DeleteOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		gomega.Eventually(func() bool {
+			_, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().
+				Get(context.Background(), testMultiWorksAddonImpl.name, metav1.GetOptions{})
+			if errors.IsNotFound(err) {
+				return true
+			}
+
+			return false
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue(), "ClusterManagementAddOns should be deleted")
 		err = hubKubeClient.CoreV1().Namespaces().Delete(context.Background(), managedClusterName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		err = hubClusterClient.ClusterV1().ManagedClusters().Delete(context.Background(), managedClusterName, metav1.DeleteOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-		err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Delete(context.Background(),
-			testMultiWorksAddonImpl.name, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 

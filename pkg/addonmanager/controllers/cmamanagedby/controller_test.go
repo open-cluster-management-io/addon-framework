@@ -48,7 +48,7 @@ func TestReconcile(t *testing.T) {
 		{
 			name:                 "no patch annotation if nil",
 			cma:                  []runtime.Object{newClusterManagementAddonWithAnnotation("test", nil)},
-			validateAddonActions: addontesting.AssertNoActions,
+			validateAddonActions: validateWithFinalizerAction,
 			testaddons: map[string]agent.AgentAddon{
 				"test": &testAgent{name: "test"},
 			},
@@ -58,7 +58,7 @@ func TestReconcile(t *testing.T) {
 			cma: []runtime.Object{newClusterManagementAddonWithAnnotation("test", map[string]string{
 				"test": "test",
 			})},
-			validateAddonActions: addontesting.AssertNoActions,
+			validateAddonActions: validateWithFinalizerAction,
 			testaddons: map[string]agent.AgentAddon{
 				"test": &testAgent{name: "test"},
 			},
@@ -69,7 +69,7 @@ func TestReconcile(t *testing.T) {
 				"test": "test",
 				addonapiv1alpha1.AddonLifecycleAnnotationKey: "xxx",
 			})},
-			validateAddonActions: addontesting.AssertNoActions,
+			validateAddonActions: validateWithFinalizerAction,
 			testaddons: map[string]agent.AgentAddon{
 				"test": &testAgent{name: "test"},
 			},
@@ -81,8 +81,9 @@ func TestReconcile(t *testing.T) {
 				addonapiv1alpha1.AddonLifecycleAnnotationKey: addonapiv1alpha1.AddonLifecycleSelfManageAnnotationValue,
 			})},
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "patch")
-				patch := actions[0].(clienttesting.PatchActionImpl).Patch
+				addontesting.AssertActions(t, actions, "patch", "patch")
+				// action[0] is setting finalizer. Ignore this action
+				patch := actions[1].(clienttesting.PatchActionImpl).Patch
 				cma := &addonapiv1alpha1.ClusterManagementAddOn{}
 				err := json.Unmarshal(patch, cma)
 				if err != nil {
@@ -131,4 +132,9 @@ func TestReconcile(t *testing.T) {
 			c.validateAddonActions(t, fakeAddonClient.Actions())
 		})
 	}
+}
+
+// Expect that the incoming test case has only one action that is setting finalizer
+func validateWithFinalizerAction(t *testing.T, actions []clienttesting.Action) {
+	addontesting.AssertActions(t, actions, "patch")
 }

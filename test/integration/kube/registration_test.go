@@ -11,6 +11,7 @@ import (
 	certificatesv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -56,13 +57,22 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 	})
 
 	ginkgo.AfterEach(func() {
+		err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Delete(context.Background(), testAddonImpl.name, metav1.DeleteOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		gomega.Eventually(func() bool {
+			_, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().
+				Get(context.Background(), testAddonImpl.name, metav1.GetOptions{})
+			if errors.IsNotFound(err) {
+				return true
+			}
+
+			return false
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue(), "ClusterManagementAddOns should be deleted")
 		err = hubKubeClient.CoreV1().Namespaces().Delete(context.Background(), managedClusterName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		err = hubClusterClient.ClusterV1().ManagedClusters().Delete(context.Background(), managedClusterName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		delete(testAddonImpl.registrations, managedClusterName)
-		err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Delete(context.Background(), testAddonImpl.name, metav1.DeleteOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 
 	ginkgo.It("Should setup registration successfully", func() {
