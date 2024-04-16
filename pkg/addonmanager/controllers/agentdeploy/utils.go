@@ -13,6 +13,8 @@ import (
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 	workbuilder "open-cluster-management.io/sdk-go/pkg/apis/work/v1/builder"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/common"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/payload"
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -89,6 +91,9 @@ func newManifestWork(addonNamespace, addonName, clusterName string, manifests []
 			Namespace: clusterName,
 			Labels: map[string]string{
 				addonapiv1alpha1.AddonLabelKey: addonName,
+			},
+			Annotations: map[string]string{
+				common.CloudEventsDataTypeAnnotationKey: payload.ManifestBundleEventDataType.String(),
 			},
 		},
 		Spec: workapiv1.ManifestWorkSpec{
@@ -313,6 +318,14 @@ func (b *addonWorksBuilder) BuildDeployWorks(installMode, addonWorkNamespace str
 	annotations, err := configsToAnnotations(addon.Status.ConfigReferences)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	if len(annotations) == 0 {
+		annotations = map[string]string{
+			common.CloudEventsDataTypeAnnotationKey: payload.ManifestBundleEventDataType.String(),
+		}
+	} else {
+		annotations[common.CloudEventsDataTypeAnnotationKey] = payload.ManifestBundleEventDataType.String()
 	}
 
 	return b.workBuilder.Build(deployObjects,

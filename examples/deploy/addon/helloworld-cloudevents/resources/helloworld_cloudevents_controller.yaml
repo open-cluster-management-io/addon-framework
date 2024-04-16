@@ -1,0 +1,43 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: helloworldcloudevents-controller
+  labels:
+    app: helloworldcloudevents-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: helloworldcloudevents-controller
+  template:
+    metadata:
+      labels:
+        app: helloworldcloudevents-controller
+    spec:
+      serviceAccountName: helloworldcloudevents-addon-sa
+      containers:
+      - name: helloworldcloudevents-controller
+        image: quay.io/open-cluster-management/addon-examples
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: EXAMPLE_IMAGE_NAME
+          value: $(EXAMPLE_IMAGE_NAME)
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        args:
+          - "/helloworld_cloudevents"
+          - "controller"
+          - "--work-driver=mqtt"
+          - "--work-driver-config=/var/run/secrets/hub/config.yaml"
+          - "--cloudevents-client-id=addon-manager-$(POD_NAME)"
+          - "--source-id=addon-manager"
+        volumeMounts:
+        - mountPath: /var/run/secrets/hub
+          name: workdriverconfig
+          readOnly: true
+      volumes:
+      - name: workdriverconfig
+        secret:
+          secretName: work-driver-config

@@ -56,6 +56,9 @@ verify: verify-gocilint
 deploy-ocm:
 	examples/deploy/ocm/install.sh
 
+deploy-ocm-cloudevents:
+	examples/deploy/ocm-cloudevents/install.sh
+
 deploy-hosted-ocm:
 	examples/deploy/hosted-ocm/install.sh
 
@@ -70,6 +73,12 @@ deploy-helloworld: ensure-kustomize
 	cd examples/deploy/addon/helloworld && ../../../../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/addon-examples=$(EXAMPLE_IMAGE_NAME)
 	$(KUSTOMIZE) build examples/deploy/addon/helloworld | $(KUBECTL) apply -f -
 	mv examples/deploy/addon/helloworld/kustomization.yaml.tmp examples/deploy/addon/helloworld/kustomization.yaml
+
+deploy-helloworld-cloudevents: ensure-kustomize
+	cp examples/deploy/addon/helloworld-cloudevents/kustomization.yaml examples/deploy/addon/helloworld-cloudevents/kustomization.yaml.tmp
+	cd examples/deploy/addon/helloworld-cloudevents && ../../../../$(KUSTOMIZE) edit set image quay.io/open-cluster-management/addon-examples=$(EXAMPLE_IMAGE_NAME)
+	$(KUSTOMIZE) build examples/deploy/addon/helloworld-cloudevents | $(KUBECTL) apply -f -
+	mv examples/deploy/addon/helloworld-cloudevents/kustomization.yaml.tmp examples/deploy/addon/helloworld-cloudevents/kustomization.yaml
 
 deploy-helloworld-helm: ensure-kustomize
 	cp examples/deploy/addon/helloworld-helm/kustomization.yaml examples/deploy/addon/helloworld-helm/kustomization.yaml.tmp
@@ -111,6 +120,9 @@ undeploy-busybox: ensure-kustomize
 undeploy-helloworld: ensure-kustomize
 	$(KUSTOMIZE) build examples/deploy/addon/helloworld | $(KUBECTL) delete --ignore-not-found -f -
 
+undeploy-helloworld-cloudevents: ensure-kustomize
+	$(KUSTOMIZE) build examples/deploy/addon/helloworld-cloudevents | $(KUBECTL) delete --ignore-not-found -f -
+
 undeploy-helloworld-helm: ensure-kustomize
 	$(KUSTOMIZE) build examples/deploy/addon/helloworld-helm | $(KUBECTL) delete --ignore-not-found -f -
 
@@ -128,6 +140,12 @@ build-e2e:
 
 test-e2e: build-e2e deploy-ocm deploy-helloworld deploy-helloworld-helm
 	./e2e.test -test.v -ginkgo.v
+
+build-e2e-cloudevents:
+	go test -c ./test/e2ecloudevents
+
+test-e2e-cloudevents: build-e2e-cloudevents deploy-ocm-cloudevents deploy-helloworld-cloudevents
+	./e2ecloudevents.test -test.v -ginkgo.v
 
 build-hosted-e2e:
 	go test -c ./test/e2ehosted
