@@ -141,12 +141,6 @@ build-e2e:
 test-e2e: build-e2e deploy-ocm deploy-helloworld deploy-helloworld-helm
 	./e2e.test -test.v -ginkgo.v
 
-build-e2e-cloudevents:
-	go test -c ./test/e2ecloudevents
-
-test-e2e-cloudevents: build-e2e-cloudevents deploy-ocm-cloudevents deploy-helloworld-cloudevents
-	./e2ecloudevents.test -test.v -ginkgo.v
-
 build-hosted-e2e:
 	go test -c ./test/e2ehosted
 

@@ -16,8 +16,6 @@ import (
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/common"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/payload"
 
 	"open-cluster-management.io/addon-framework/pkg/basecontroller/events"
 )
@@ -189,9 +187,6 @@ func NewManifestWork(name, namespace string, objects ...*unstructured.Unstructur
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
-			Annotations: map[string]string{
-				common.CloudEventsDataTypeAnnotationKey: payload.ManifestBundleEventDataType.String(),
-			},
 		},
 		Spec: workapiv1.ManifestWorkSpec{
 			Workload: workapiv1.ManifestsTemplate{

@@ -45,14 +45,6 @@ type AddonManager interface {
 
 	// Start starts all registered addon agent.
 	Start(ctx context.Context) error
-
-	// StartWithInformers starts all registered addon agent with the given informers.
-	// StartWithInformers(ctx context.Context,
-	// 	kubeInformers kubeinformers.SharedInformerFactory,
-	// 	workInformers workv1informers.SharedInformerFactory,
-	// 	addonInformers addoninformers.SharedInformerFactory,
-	// 	clusterInformers clusterv1informers.SharedInformerFactory,
-	// 	dynamicInformers dynamicinformer.DynamicSharedInformerFactory) error
 }
 
 type addonManager struct {
