@@ -181,7 +181,7 @@ func (a *cloudeventsAddonManager) Start(ctx context.Context) error {
 		return err
 	}
 
-	err = a.StartWithInformers(ctx, workClient, workInformers, kubeInformers, addonInformers, clusterInformers, dynamicInformers)
+	err = a.startWithInformers(ctx, workClient, workInformers, kubeInformers, addonInformers, clusterInformers, dynamicInformers)
 	if err != nil {
 		return err
 	}
@@ -195,6 +195,17 @@ func (a *cloudeventsAddonManager) Start(ctx context.Context) error {
 }
 
 func (a *cloudeventsAddonManager) StartWithInformers(ctx context.Context,
+	kubeInformers kubeinformers.SharedInformerFactory,
+	workInformers workinformers.SharedInformerFactory,
+	addonInformers addoninformers.SharedInformerFactory,
+	clusterInformers clusterv1informers.SharedInformerFactory,
+	dynamicInformers dynamicinformer.DynamicSharedInformerFactory) error {
+	// TODO: Implement this method to support usage within the addon template.
+	// Requires updating sdk-go to enable clientHolder to manage the shared informer for ManifestWork.
+	return fmt.Errorf("method StartWithInformers is not implemented")
+}
+
+func (a *cloudeventsAddonManager) startWithInformers(ctx context.Context,
 	workClient workclientset.Interface,
 	workInformers workv1informers.ManifestWorkInformer,
 	kubeInformers kubeinformers.SharedInformerFactory,
