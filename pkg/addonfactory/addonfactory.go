@@ -36,7 +36,7 @@ type AgentAddonFactory struct {
 	// trimCRDDescription flag is used to trim the description of CRDs in manifestWork. disabled by default.
 	trimCRDDescription    bool
 	hostingCluster        *clusterv1.ManagedCluster
-	agentInstallNamespace func(addon *addonapiv1alpha1.ManagedClusterAddOn) string
+	agentInstallNamespace func(addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error)
 }
 
 // NewAgentAddonFactory builds an addonAgentFactory instance with addon name and fs.
@@ -150,7 +150,7 @@ func (f *AgentAddonFactory) WithAgentDeployTriggerClusterFilter(
 // override the default built-in namespace value; And if the registrationOption is not nil but the
 // registrationOption.AgentInstallNamespace is nil, this will also set it to this.
 func (f *AgentAddonFactory) WithAgentInstallNamespace(
-	nsFunc func(addon *addonapiv1alpha1.ManagedClusterAddOn) string,
+	nsFunc func(addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error),
 ) *AgentAddonFactory {
 	f.agentInstallNamespace = nsFunc
 	return f
