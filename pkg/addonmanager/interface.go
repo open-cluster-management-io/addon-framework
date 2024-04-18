@@ -8,7 +8,8 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
-	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions"
+	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
+	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
 )
 
 // BaseAddonManager is the interface to initialize a manager on hub to manage the addon
@@ -23,8 +24,9 @@ type BaseAddonManager interface {
 
 	// StartWithInformers starts all registered addon agent with the given informers.
 	StartWithInformers(ctx context.Context,
+		workClient workclientset.Interface,
+		workInformers workv1informers.ManifestWorkInformer,
 		kubeInformers kubeinformers.SharedInformerFactory,
-		workInformers workv1informers.SharedInformerFactory,
 		addonInformers addoninformers.SharedInformerFactory,
 		clusterInformers clusterv1informers.SharedInformerFactory,
 		dynamicInformers dynamicinformer.DynamicSharedInformerFactory) error
@@ -35,6 +37,6 @@ type BaseAddonManager interface {
 type AddonManager interface {
 	BaseAddonManager
 
-	// Start starts all registered addon agents.
+	// Start starts all registered addon agents and controllers.
 	Start(ctx context.Context) error
 }

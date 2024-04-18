@@ -12,8 +12,8 @@ import (
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
-	workv1client "open-cluster-management.io/api/client/work/clientset/versioned"
-	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions"
+	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
+	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/addonconfig"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/agentdeploy"
@@ -53,18 +53,6 @@ func (a *BaseAddonManagerImpl) GetAddonAgents() map[string]agent.AgentAddon {
 	return a.addonAgents
 }
 
-func (a *BaseAddonManagerImpl) GetAddonConfigs() map[schema.GroupVersionResource]bool {
-	return a.addonConfigs
-}
-
-func (a *BaseAddonManagerImpl) GetSyncContexts() []factory.SyncContext {
-	return a.syncContexts
-}
-
-func (a *BaseAddonManagerImpl) SetSyncContexts(syncContexts []factory.SyncContext) {
-	a.syncContexts = syncContexts
-}
-
 func (a *BaseAddonManagerImpl) AddAgent(addon agent.AgentAddon) error {
 	addonOption := addon.GetAgentAddonOptions()
 	if len(addonOption.AddonName) == 0 {
@@ -84,8 +72,9 @@ func (a *BaseAddonManagerImpl) Trigger(clusterName, addonName string) {
 }
 
 func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
+	workClient workclientset.Interface,
+	workInformers workv1informers.ManifestWorkInformer,
 	kubeInformers kubeinformers.SharedInformerFactory,
-	workInformers workv1informers.SharedInformerFactory,
 	addonInformers addoninformers.SharedInformerFactory,
 	clusterInformers clusterv1informers.SharedInformerFactory,
 	dynamicInformers dynamicinformer.DynamicSharedInformerFactory) error {
@@ -96,11 +85,6 @@ func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 	}
 
 	addonClient, err := addonv1alpha1client.NewForConfig(a.config)
-	if err != nil {
-		return err
-	}
-
-	workClient, err := workv1client.NewForConfig(a.config)
 	if err != nil {
 		return err
 	}
@@ -121,7 +105,7 @@ func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 		addonClient,
 		clusterInformers.Cluster().V1().ManagedClusters(),
 		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
-		workInformers.Work().V1().ManifestWorks(),
+		workInformers,
 		a.addonAgents,
 	)
 
