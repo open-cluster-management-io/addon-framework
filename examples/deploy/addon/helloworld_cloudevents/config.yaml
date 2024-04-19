@@ -1,0 +1,5 @@
+brokerHost: mosquitto.mqtt:1883
+topics:
+  sourceEvents: sources/addon-manager/clusters/+/sourceevents
+  agentEvents: sources/addon-manager/clusters/+/agentevents
+  sourceBroadcast: sources/addon-manager/sourcebroadcast

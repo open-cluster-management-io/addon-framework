@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: helloworld-controller
+spec:
+  template:
+    spec:
+      containers:
+      - name: helloworld-controller
+        args:
+        - "/helloworld"
+        - "controller"
+        - "--work-driver=mqtt"
+        - "--work-driver-config=/var/run/secrets/hub/config.yaml"
+        - "--cloudevents-client-id=addon-manager-$(POD_NAME)"
+        - "--source-id=addon-manager"
+        volumeMounts:
+        - mountPath: /var/run/secrets/hub
+          name: workdriverconfig
+          readOnly: true
+      volumes:
+      - name: workdriverconfig
+        secret:
+          secretName: work-driver-config

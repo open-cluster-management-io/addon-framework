@@ -1,0 +1,38 @@
+namespace: open-cluster-management
+
+resources:
+- resources/cluster_role.yaml
+- resources/cluster_role_binding.yaml
+- resources/service_account.yaml
+- resources/managed_clusterset_binding.yaml
+- resources/placement.yaml
+- resources/addon_deployment_config.yaml
+- resources/helloworld_clustermanagementaddon.yaml
+- resources/helloworld_controller.yaml
+
+images:
+- name: quay.io/open-cluster-management/addon-examples
+  newName: quay.io/open-cluster-management/addon-examples
+  newTag: latest
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+vars:
+- fieldref:
+    fieldPath: spec.template.spec.containers.[name=helloworld-controller].image
+  name: EXAMPLE_IMAGE_NAME
+  objref:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: helloworld-controller
+
+secretGenerator:
+- files:
+  - config.yaml
+  name: work-driver-config
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+patches:
+- path: work_driver_config_patch.yaml
