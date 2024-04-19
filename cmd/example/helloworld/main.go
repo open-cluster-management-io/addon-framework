@@ -21,6 +21,7 @@ import (
 	"open-cluster-management.io/addon-framework/examples/helloworld_agent"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/cloudevents"
 	cmdfactory "open-cluster-management.io/addon-framework/pkg/cmd/factory"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	"open-cluster-management.io/addon-framework/pkg/version"
@@ -66,24 +67,40 @@ func newCommand() *cobra.Command {
 }
 
 func newControllerCommand() *cobra.Command {
+	o := cloudevents.NewCloudEventsOptions()
+	c := &addManagerConfig{cloudeventsOptions: o}
 	cmd := cmdfactory.
-		NewControllerCommandConfig("helloworld-addon-controller", version.Get(), runController).
+		NewControllerCommandConfig("helloworld-addon-controller", version.Get(), c.runController).
 		NewCommand()
 	cmd.Use = "controller"
 	cmd.Short = "Start the addon controller"
+	o.AddFlags(cmd)
 
 	return cmd
 }
 
-func runController(ctx context.Context, kubeConfig *rest.Config) error {
+// addManagerConfig holds cloudevents configuration for addon manager
+type addManagerConfig struct {
+	cloudeventsOptions *cloudevents.CloudEventsOptions
+}
+
+func (c *addManagerConfig) runController(ctx context.Context, kubeConfig *rest.Config) error {
 	addonClient, err := addonv1alpha1client.NewForConfig(kubeConfig)
 	if err != nil {
 		return err
 	}
 
-	mgr, err := addonmanager.New(kubeConfig)
-	if err != nil {
-		return err
+	var mgr addonmanager.AddonManager
+	if c.cloudeventsOptions.WorkDriver == "kube" {
+		mgr, err = addonmanager.New(kubeConfig)
+		if err != nil {
+			return err
+		}
+	} else {
+		mgr, err = cloudevents.New(kubeConfig, c.cloudeventsOptions)
+		if err != nil {
+			return err
+		}
 	}
 
 	registrationOption := helloworld.NewRegistrationOption(
