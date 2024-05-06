@@ -252,11 +252,13 @@ func newClusterManagementAddon(name string) *addonapiv1alpha1.ClusterManagementA
 
 func startWorkAgent(ctx context.Context, clusterName string) (*work.ClientHolder, error) {
 	config := &mqtt.MQTTOptions{
-		KeepAlive:   60,
-		PubQoS:      1,
-		SubQoS:      1,
-		DialTimeout: 5 * time.Second,
-		BrokerHost:  mqttBrokerHost,
+		KeepAlive: 60,
+		PubQoS:    1,
+		SubQoS:    1,
+		Dialer: &mqtt.MQTTDialer{
+			BrokerHost: mqttBrokerHost,
+			Timeout:    5 * time.Second,
+		},
 		Topics: types.Topics{
 			SourceEvents:   fmt.Sprintf("sources/%s/clusters/%s/sourceevents", sourceID, clusterName),
 			AgentEvents:    fmt.Sprintf("sources/%s/clusters/%s/agentevents", sourceID, clusterName),
