@@ -2,8 +2,6 @@
 
 This is to define an AddOn framework library.
 
-Still in PoC phase.
-
 ## Community, discussion, contribution, and support
 
 Check the [CONTRIBUTING Doc](CONTRIBUTING.md) for how to contribute to the repo.
@@ -35,6 +33,13 @@ So developers could be able to develop their own addon functions more easily.
 * [cluster-proxy](https://github.com/open-cluster-management-io/cluster-proxy) 
 
 * [managed-serviceaccount](https://github.com/open-cluster-management-io/managed-serviceaccount)
+
+## AddOn Contributions
+
+A [collection of OCM addons](https://github.com/open-cluster-management-io/addon-contrib)
+for staging and testing PoC purposes:
+
+AI integration, IoT layer, cluster proxy, telemetry, resource usage collection and more.
 
 ## AddOn Examples 
 
