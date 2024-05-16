@@ -23,74 +23,6 @@ var AddOnDeploymentConfigGVR = schema.GroupVersionResource{
 	Resource: "addondeploymentconfigs",
 }
 
-// AddOnDeloymentConfigToValuesFunc transform the AddOnDeploymentConfig object into Values object
-// The transformation logic depends on the definition of the addon template
-// Deprecated: use AddOnDeploymentConfigToValuesFunc instead.
-type AddOnDeloymentConfigToValuesFunc func(config addonapiv1alpha1.AddOnDeploymentConfig) (Values, error)
-
-// NewAddOnDeloymentConfigGetter returns a AddOnDeloymentConfigGetter with addon client
-// Deprecated: use NewAddOnDeploymentConfigGetter in pkg/utils package instead.
-func NewAddOnDeloymentConfigGetter(addonClient addonv1alpha1client.Interface) utils.AddOnDeploymentConfigGetter {
-	return utils.NewAddOnDeploymentConfigGetter(addonClient)
-}
-
-// GetAddOnDeloymentConfigValues uses AddOnDeloymentConfigGetter to get the AddOnDeploymentConfig object, then
-// uses AddOnDeloymentConfigToValuesFunc to transform the AddOnDeploymentConfig object to Values object
-// If there are multiple AddOnDeploymentConfig objects in the AddOn ConfigReferences, the big index object will
-// override the one from small index
-// Deprecated: use GetAddOnDeploymentConfigValues instead.
-func GetAddOnDeloymentConfigValues(
-	getter utils.AddOnDeploymentConfigGetter, toValuesFuncs ...AddOnDeloymentConfigToValuesFunc) GetValuesFunc {
-	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
-		var lastValues = Values{}
-		for _, config := range addon.Status.ConfigReferences {
-			if config.ConfigGroupResource.Group != utils.AddOnDeploymentConfigGVR.Group ||
-				config.ConfigGroupResource.Resource != utils.AddOnDeploymentConfigGVR.Resource {
-				continue
-			}
-
-			addOnDeploymentConfig, err := getter.Get(context.Background(), config.Namespace, config.Name)
-			if err != nil {
-				return nil, err
-			}
-
-			for _, toValuesFunc := range toValuesFuncs {
-				values, err := toValuesFunc(*addOnDeploymentConfig)
-				if err != nil {
-					return nil, err
-				}
-				lastValues = MergeValues(lastValues, values)
-			}
-		}
-
-		return lastValues, nil
-	}
-}
-
-// ToAddOnDeloymentConfigValues transform the AddOnDeploymentConfig object into Values object that is a plain value map
-// for example: the spec of one AddOnDeploymentConfig is:
-//
-//	{
-//		customizedVariables: [{name: "Image", value: "img"}, {name: "ImagePullPolicy", value: "Always"}],
-//		nodePlacement: {nodeSelector: {"host": "ssd"}, tolerations: {"key": "test"}},
-//	}
-//
-// after transformed, the key set of Values object will be: {"Image", "ImagePullPolicy", "NodeSelector", "Tolerations"}
-// Deprecated: use ToAddOnDeploymentConfigValues instead.
-func ToAddOnDeloymentConfigValues(config addonapiv1alpha1.AddOnDeploymentConfig) (Values, error) {
-	values, err := ToAddOnCustomizedVariableValues(config)
-	if err != nil {
-		return nil, err
-	}
-
-	if config.Spec.NodePlacement != nil {
-		values["NodeSelector"] = config.Spec.NodePlacement.NodeSelector
-		values["Tolerations"] = config.Spec.NodePlacement.Tolerations
-	}
-
-	return values, nil
-}
-
 // ToAddOnNodePlacementValues only transform the AddOnDeploymentConfig NodePlacement part into Values object that has
 // a specific for helm chart values
 // for example: the spec of one AddOnDeploymentConfig is:
@@ -214,24 +146,17 @@ func GetAddOnDeploymentConfigValues(
 	getter utils.AddOnDeploymentConfigGetter, toValuesFuncs ...AddOnDeploymentConfigToValuesFunc) GetValuesFunc {
 	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
 		var lastValues = Values{}
-		for _, config := range addon.Status.ConfigReferences {
-			if config.ConfigGroupResource.Group != utils.AddOnDeploymentConfigGVR.Group ||
-				config.ConfigGroupResource.Resource != utils.AddOnDeploymentConfigGVR.Resource {
-				continue
-			}
+		addOnDeploymentConfig, err := utils.GetDesiredAddOnDeploymentConfig(addon, getter)
+		if err != nil {
+			return lastValues, err
+		}
 
-			addOnDeploymentConfig, err := getter.Get(context.Background(), config.Namespace, config.Name)
+		for _, toValuesFunc := range toValuesFuncs {
+			values, err := toValuesFunc(*addOnDeploymentConfig)
 			if err != nil {
 				return nil, err
 			}
-
-			for _, toValuesFunc := range toValuesFuncs {
-				values, err := toValuesFunc(*addOnDeploymentConfig)
-				if err != nil {
-					return nil, err
-				}
-				lastValues = MergeValues(lastValues, values)
-			}
+			lastValues = MergeValues(lastValues, values)
 		}
 
 		return lastValues, nil
