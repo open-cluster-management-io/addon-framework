@@ -73,7 +73,13 @@ func GetImageValues(kubeClient kubernetes.Interface) addonfactory.GetValuesFunc 
 				continue
 			}
 
-			configMap, err := kubeClient.CoreV1().ConfigMaps(config.Namespace).Get(context.Background(), config.Name, metav1.GetOptions{})
+			if config.DesiredConfig == nil {
+				continue
+			}
+
+			configMap, err := kubeClient.CoreV1().
+				ConfigMaps(config.DesiredConfig.Namespace).
+				Get(context.Background(), config.DesiredConfig.Name, metav1.GetOptions{})
 			if err != nil {
 				return nil, err
 			}

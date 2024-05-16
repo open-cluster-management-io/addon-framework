@@ -1,7 +1,6 @@
 package addonfactory
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -151,6 +150,10 @@ func GetAddOnDeploymentConfigValues(
 			return lastValues, err
 		}
 
+		if addOnDeploymentConfig == nil {
+			return lastValues, nil
+		}
+
 		for _, toValuesFunc := range toValuesFuncs {
 			values, err := toValuesFunc(*addOnDeploymentConfig)
 			if err != nil {
@@ -274,19 +277,12 @@ func getRegistriesFromClusterAnnotation(
 //   - Image registries configured in the addonDeploymentConfig will take precedence over the managed cluster annotation
 func GetAgentImageValues(getter utils.AddOnDeploymentConfigGetter, imageKey, image string) GetValuesFunc {
 	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
-
+		addOnDeploymentConfig, err := utils.GetDesiredAddOnDeploymentConfig(addon, getter)
+		if err != nil {
+			return nil, err
+		}
 		// Get image from AddOnDeploymentConfig
-		for _, config := range addon.Status.ConfigReferences {
-			if config.ConfigGroupResource.Group != utils.AddOnDeploymentConfigGVR.Group ||
-				config.ConfigGroupResource.Resource != utils.AddOnDeploymentConfigGVR.Resource {
-				continue
-			}
-
-			addOnDeploymentConfig, err := getter.Get(context.Background(), config.Namespace, config.Name)
-			if err != nil {
-				return nil, err
-			}
-
+		if addOnDeploymentConfig != nil {
 			values, overrode, err := overrideImageWithKeyValue(imageKey, image,
 				getRegistriesFromAddonDeploymentConfig(*addOnDeploymentConfig))
 			if err != nil {
