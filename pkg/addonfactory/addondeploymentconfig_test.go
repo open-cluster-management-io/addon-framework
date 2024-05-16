@@ -11,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
+	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -39,9 +40,12 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 								Group:    "config.test",
 								Resource: "testconfigs",
 							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
-								Namespace: "cluster1",
-								Name:      "testConfig",
+							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+									Namespace: "cluster1",
+									Name:      "testConfig",
+								},
+								SpecHash: "dummy",
 							},
 						},
 					}
@@ -49,68 +53,6 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 				}(),
 			},
 			expectedValues: Values{},
-		},
-		{
-			name:          "mutiple addon deployment configs",
-			toValuesFuncs: []AddOnDeploymentConfigToValuesFunc{ToAddOnDeploymentConfigValues},
-			addOnObjs: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
-					addon := addontesting.NewAddon("test", "cluster1")
-					addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
-						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-								Group:    "addon.open-cluster-management.io",
-								Resource: "addondeploymentconfigs",
-							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
-								Namespace: "cluster1",
-								Name:      "config1",
-							},
-						},
-						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-								Group:    "addon.open-cluster-management.io",
-								Resource: "addondeploymentconfigs",
-							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
-								Namespace: "cluster1",
-								Name:      "config2",
-							},
-						},
-					}
-					return addon
-				}(),
-				&addonapiv1alpha1.AddOnDeploymentConfig{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "config1",
-						Namespace: "cluster1",
-					},
-					Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-						CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
-							{Name: "Test", Value: "test1"},
-						},
-					},
-				},
-				&addonapiv1alpha1.AddOnDeploymentConfig{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "config2",
-						Namespace: "cluster1",
-					},
-					Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-						CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
-							{Name: "Test", Value: "test2"},
-						},
-						NodePlacement: &addonapiv1alpha1.NodePlacement{
-							NodeSelector: map[string]string{"test": "test"},
-						},
-					},
-				},
-			},
-			expectedValues: Values{
-				"Test":         "test2",
-				"NodeSelector": map[string]string{"test": "test"},
-				"Tolerations":  []corev1.Toleration{},
-			},
 		},
 		{
 			name:          "to addon node placement",
@@ -124,9 +66,12 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 								Group:    "addon.open-cluster-management.io",
 								Resource: "addondeploymentconfigs",
 							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
-								Namespace: "cluster1",
-								Name:      "config",
+							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+									Namespace: "cluster1",
+									Name:      "config",
+								},
+								SpecHash: "dummy",
 							},
 						},
 					}
@@ -164,9 +109,12 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 								Group:    "addon.open-cluster-management.io",
 								Resource: "addondeploymentconfigs",
 							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
-								Namespace: "cluster1",
-								Name:      "config",
+							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+									Namespace: "cluster1",
+									Name:      "config",
+								},
+								SpecHash: "dummy",
 							},
 						},
 					}
@@ -211,9 +159,12 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 								Group:    "addon.open-cluster-management.io",
 								Resource: "addondeploymentconfigs",
 							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
-								Namespace: "cluster1",
-								Name:      "config",
+							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+									Namespace: "cluster1",
+									Name:      "config",
+								},
+								SpecHash: "dummy",
 							},
 						},
 					}
@@ -253,9 +204,12 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 								Group:    "addon.open-cluster-management.io",
 								Resource: "addondeploymentconfigs",
 							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
-								Namespace: "cluster1",
-								Name:      "config",
+							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+									Namespace: "cluster1",
+									Name:      "config",
+								},
+								SpecHash: "dummy",
 							},
 						},
 					}
@@ -293,7 +247,7 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			fakeAddonClient := fakeaddon.NewSimpleClientset(c.addOnObjs...)
 
-			getter := NewAddOnDeploymentConfigGetter(fakeAddonClient)
+			getter := utils.NewAddOnDeploymentConfigGetter(fakeAddonClient)
 
 			addOn, ok := c.addOnObjs[0].(*addonapiv1alpha1.ManagedClusterAddOn)
 			if !ok {
@@ -606,36 +560,18 @@ func TestGetAgentImageValues(t *testing.T) {
 							Group:    "addon.open-cluster-management.io",
 							Resource: "addondeploymentconfigs",
 						},
-						ConfigReferent: addonapiv1alpha1.ConfigReferent{
-							Namespace: "cluster1",
-							Name:      "config1",
-						},
-					},
-					{
-						ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
-							Group:    "addon.open-cluster-management.io",
-							Resource: "addondeploymentconfigs",
-						},
-						ConfigReferent: addonapiv1alpha1.ConfigReferent{
-							Namespace: "cluster1",
-							Name:      "config2",
+						DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+								Namespace: "cluster1",
+								Name:      "config2",
+							},
+							SpecHash: "dummy",
 						},
 					},
 				}
 				return addon
 			}(),
 			addonDeploymentConfig: []runtime.Object{
-				&addonapiv1alpha1.AddOnDeploymentConfig{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "config1",
-						Namespace: "cluster1",
-					},
-					Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-						CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
-							{Name: "Test", Value: "test1"},
-						},
-					},
-				},
 				&addonapiv1alpha1.AddOnDeploymentConfig{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "config2",
