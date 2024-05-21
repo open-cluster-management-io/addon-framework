@@ -12,7 +12,6 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	workapiv1 "open-cluster-management.io/api/work/v1"
 )
 
 const (
@@ -56,40 +55,6 @@ func GetDefaultValues(cluster *clusterv1.ManagedCluster,
 
 func AgentHealthProber() *agent.HealthProber {
 	return &agent.HealthProber{
-		Type: agent.HealthProberTypeWork,
-		WorkProber: &agent.WorkHealthProber{
-			ProbeFields: []agent.ProbeField{
-				{
-					ResourceIdentifier: workapiv1.ResourceIdentifier{
-						Group:     "apps",
-						Resource:  "deployments",
-						Name:      "helloworld-agent",
-						Namespace: InstallationNamespace,
-					},
-					ProbeRules: []workapiv1.FeedbackRule{
-						{
-							Type: workapiv1.WellKnownStatusType,
-						},
-					},
-				},
-			},
-			HealthCheck: func(identifier workapiv1.ResourceIdentifier, result workapiv1.StatusFeedbackResult) error {
-				if len(result.Values) == 0 {
-					return fmt.Errorf("no values are probed for deployment %s/%s", identifier.Namespace, identifier.Name)
-				}
-				for _, value := range result.Values {
-					if value.Name != "ReadyReplicas" {
-						continue
-					}
-
-					if *value.Value.Integer >= 1 {
-						return nil
-					}
-
-					return fmt.Errorf("readyReplica is %d for deployement %s/%s", *value.Value.Integer, identifier.Namespace, identifier.Name)
-				}
-				return fmt.Errorf("readyReplica is not probed")
-			},
-		},
+		Type: agent.HealthProberTypeDeploymentAvailability,
 	}
 }
