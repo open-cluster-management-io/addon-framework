@@ -229,6 +229,20 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHostingManifestApplied) {
 				return fmt.Errorf("Unexpected addon applied condition, %v", addon.Status.Conditions)
 			}
+
+			manifestAppliyedCondition := meta.FindStatusCondition(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnManifestApplied)
+			if manifestAppliyedCondition == nil {
+				return fmt.Errorf("%s Condition is not found", addonapiv1alpha1.ManagedClusterAddOnManifestApplied)
+			}
+			if manifestAppliyedCondition.Reason != addonapiv1alpha1.AddonManifestAppliedReasonManifestsApplied {
+				return fmt.Errorf("Condition Reason is not correct: %v", manifestAppliyedCondition.Reason)
+			}
+			if manifestAppliyedCondition.Message != "no manifest need to apply" {
+				return fmt.Errorf("Condition Message is not correct: %v", manifestAppliyedCondition.Message)
+			}
+			if manifestAppliyedCondition.Status != metav1.ConditionTrue {
+				return fmt.Errorf("Condition Status is not correct: %v", manifestAppliyedCondition.Status)
+			}
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
