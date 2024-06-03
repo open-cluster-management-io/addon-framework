@@ -386,15 +386,6 @@ func (c *addonDeployController) buildDeployManifestWorks(installMode, workNamesp
 		})
 		return nil, nil, err
 	}
-	if len(objects) == 0 {
-		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-			Type:    appliedType,
-			Status:  metav1.ConditionTrue,
-			Reason:  addonapiv1alpha1.AddonManifestAppliedReasonManifestsApplied,
-			Message: "no manifest need to apply",
-		})
-		return nil, nil, nil
-	}
 
 	manifestOptions := getManifestConfigOption(agentAddon, cluster, addon)
 	existingWorksCopy := []workapiv1.ManifestWork{}
@@ -410,6 +401,14 @@ func (c *addonDeployController) buildDeployManifestWorks(installMode, workNamesp
 			Message: fmt.Sprintf("failed to build manifestwork: %v", err),
 		})
 		return nil, nil, err
+	}
+	if len(appliedWorks) == 0 {
+		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
+			Type:    appliedType,
+			Status:  metav1.ConditionTrue,
+			Reason:  addonapiv1alpha1.AddonManifestAppliedReasonManifestsApplied,
+			Message: "no manifest need to apply",
+		})
 	}
 	return appliedWorks, deleteWorks, nil
 }
