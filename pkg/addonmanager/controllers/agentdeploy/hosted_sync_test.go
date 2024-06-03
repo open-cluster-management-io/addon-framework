@@ -237,6 +237,20 @@ func TestHostingReconcile(t *testing.T) {
 				if meta.IsStatusConditionFalse(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHostingManifestApplied) {
 					t.Errorf("Condition Reason is not correct: %v", addOn.Status.Conditions)
 				}
+
+				manifestAppliyedCondition := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnManifestApplied)
+				if manifestAppliyedCondition == nil {
+					t.Fatal("manifestapplied condition should not be nil")
+				}
+				if manifestAppliyedCondition.Reason != addonapiv1alpha1.AddonManifestAppliedReasonManifestsApplied {
+					t.Errorf("Condition Reason is not correct: %v", manifestAppliyedCondition.Reason)
+				}
+				if manifestAppliyedCondition.Message != "no manifest need to apply" {
+					t.Errorf("Condition Message is not correct: %v", manifestAppliyedCondition.Message)
+				}
+				if manifestAppliyedCondition.Status != metav1.ConditionTrue {
+					t.Errorf("Condition Status is not correct: %v", manifestAppliyedCondition.Status)
+				}
 			},
 		},
 		{
