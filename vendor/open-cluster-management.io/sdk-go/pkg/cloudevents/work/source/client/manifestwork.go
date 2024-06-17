@@ -180,6 +180,7 @@ func (c *ManifestWorkSourceClient) Patch(ctx context.Context, name string, pt ku
 
 	newWork := patchedWork.DeepCopy()
 	newWork.Generation = generation
+	ensureSourceLabel(c.sourceID, newWork)
 	if err := c.cloudEventsClient.Publish(ctx, eventType, newWork); err != nil {
 		return nil, err
 	}
