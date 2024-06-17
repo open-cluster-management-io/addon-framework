@@ -398,7 +398,7 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 						StatusFeedbacks: workapiv1.StatusFeedbackResult{
 							Values: []workapiv1.FeedbackValue{
 								{
-									Name: "Replicas",
+									Name: "ReplicasTest",
 									Value: workapiv1.FieldValue{
 										Type:    workapiv1.Integer,
 										Integer: &replica,
@@ -456,6 +456,13 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 									Integer: &replica,
 								},
 							},
+							{
+								Name: "Replicas",
+								Value: workapiv1.FieldValue{
+									Type:    workapiv1.Integer,
+									Integer: &replica,
+								},
+							},
 						},
 					},
 					Conditions: []metav1.Condition{
@@ -502,6 +509,13 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 						Values: []workapiv1.FeedbackValue{
 							{
 								Name: "ReadyReplicas",
+								Value: workapiv1.FieldValue{
+									Type:    workapiv1.Integer,
+									Integer: &replica,
+								},
+							},
+							{
+								Name: "Replicas",
 								Value: workapiv1.FieldValue{
 									Type:    workapiv1.Integer,
 									Integer: &replica,

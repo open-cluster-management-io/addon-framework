@@ -24,7 +24,7 @@ func TestDeploymentProbe(t *testing.T) {
 		{
 			name:        "no result",
 			result:      workapiv1.StatusFeedbackResult{},
-			expectedErr: "no values are probed for deployment testns/test",
+			expectedErr: "no values are probed for deployments testns/test",
 		},
 		{
 			name: "no matched value",
@@ -64,7 +64,27 @@ func TestDeploymentProbe(t *testing.T) {
 					},
 				},
 			},
-			expectedErr: "readyReplica is 0 for deployment testns/test",
+			expectedErr: "desiredNumberReplicas is 1 but readyReplica is 0 for deployments testns/test",
+		},
+		{
+			name: "check desired replicas is 0 passed",
+			result: workapiv1.StatusFeedbackResult{
+				Values: []workapiv1.FeedbackValue{
+					{
+						Name: "Replicas",
+						Value: workapiv1.FieldValue{
+							Integer: boolPtr(0),
+						},
+					},
+					{
+						Name: "ReadyReplicas",
+						Value: workapiv1.FieldValue{
+							Integer: boolPtr(0),
+						},
+					},
+				},
+			},
+			expectedErr: "",
 		},
 		{
 			name: "check passed",
