@@ -2,7 +2,6 @@ package cloudevents
 
 import (
 	"github.com/spf13/cobra"
-	cloudeventswork "open-cluster-management.io/sdk-go/pkg/cloudevents/work"
 )
 
 // CloudEventsOptions defines the flags for addon manager
@@ -17,7 +16,7 @@ type CloudEventsOptions struct {
 func NewCloudEventsOptions() *CloudEventsOptions {
 	return &CloudEventsOptions{
 		// set default work driver to kube
-		WorkDriver: cloudeventswork.ConfigTypeKube,
+		WorkDriver: "kube",
 	}
 }
 

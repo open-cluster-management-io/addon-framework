@@ -2,6 +2,7 @@ package cloudevents
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -20,8 +21,12 @@ import (
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
 	"open-cluster-management.io/addon-framework/pkg/index"
+	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/constants"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
 	cloudeventswork "open-cluster-management.io/sdk-go/pkg/cloudevents/work"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/source/codec"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/store"
 )
 
 // cloudeventsAddonManager is the implementation of AddonManager with
@@ -44,11 +49,37 @@ func (a *cloudeventsAddonManager) Start(ctx context.Context) error {
 	// ManifestWork client that implements the ManifestWorkInterface and ManifestWork informer based on different
 	// driver configuration.
 	// Refer to Event Based Manifestwork proposal in enhancements repo to get more details.
-	_, clientConfig, err := cloudeventswork.NewConfigLoader(a.options.WorkDriver, a.options.WorkDriverConfig).
-		WithKubeConfig(a.GetConfig()).
-		LoadConfig()
-	if err != nil {
-		return err
+	var workClient workclientset.Interface
+	var watcherStore *store.SourceInformerWatcherStore
+	var err error
+	switch a.options.WorkDriver {
+	case "kube":
+		workClient, err = workclientset.NewForConfig(config)
+		if err != nil {
+			return err
+		}
+	case constants.ConfigTypeGRPC, constants.ConfigTypeMQTT:
+		watcherStore = store.NewSourceInformerWatcherStore(ctx)
+
+		_, clientConfig, err := generic.NewConfigLoader(a.options.WorkDriver, a.options.WorkDriverConfig).
+			LoadConfig()
+		if err != nil {
+			return err
+		}
+
+		clientHolder, err := cloudeventswork.NewClientHolderBuilder(clientConfig).
+			WithClientID(a.options.CloudEventsClientID).
+			WithSourceID(a.options.SourceID).
+			WithCodecs(codec.NewManifestBundleCodec()).
+			WithWorkClientWatcherStore(watcherStore).
+			NewSourceClientHolder(ctx)
+		if err != nil {
+			return err
+		}
+
+		workClient = clientHolder.WorkInterface()
+	default:
+		return fmt.Errorf("unsupported work driver: %s", a.options.WorkDriver)
 	}
 
 	// we need a separated filtered manifestwork informers so we only watch the manifestworks that manifestworkreplicaset cares.
@@ -67,16 +98,6 @@ func (a *cloudeventsAddonManager) Start(ctx context.Context) error {
 			listOptions.LabelSelector = metav1.FormatLabelSelector(selector)
 		},
 	)
-
-	clientHolder, err := cloudeventswork.NewClientHolderBuilder(clientConfig).
-		WithClientID(a.options.CloudEventsClientID).
-		WithSourceID(a.options.SourceID).
-		WithInformerConfig(10*time.Minute, workInformOption).
-		WithCodecs(codec.NewManifestBundleCodec()).
-		NewSourceClientHolder(ctx)
-	if err != nil {
-		return err
-	}
 
 	kubeClient, err := kubernetes.NewForConfig(config)
 	if err != nil {
@@ -117,8 +138,13 @@ func (a *cloudeventsAddonManager) Start(ctx context.Context) error {
 		}),
 	)
 
-	workClient := clientHolder.WorkInterface()
-	workInformers := clientHolder.ManifestWorkInformer()
+	factory := workinformers.NewSharedInformerFactoryWithOptions(workClient, 30*time.Minute, workInformOption)
+	workInformers := factory.Work().V1().ManifestWorks()
+
+	// For cloudevents work client, we use the informer store as the client store
+	if watcherStore != nil {
+		watcherStore.SetStore(workInformers.Informer().GetStore())
+	}
 
 	// addonDeployController
 	err = workInformers.Informer().AddIndexers(
