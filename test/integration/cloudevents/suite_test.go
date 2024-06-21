@@ -34,7 +34,10 @@ import (
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
+	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
+	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/store"
 )
 
 const (
@@ -250,29 +253,44 @@ func newClusterManagementAddon(name string) *addonapiv1alpha1.ClusterManagementA
 	}
 }
 
-func startWorkAgent(ctx context.Context, clusterName string) (*work.ClientHolder, error) {
+func startWorkAgent(ctx context.Context, clusterName string) (*work.ClientHolder, workv1informers.ManifestWorkInformer, error) {
 	config := &mqtt.MQTTOptions{
-		KeepAlive:   60,
-		PubQoS:      1,
-		SubQoS:      1,
-		DialTimeout: 5 * time.Second,
-		BrokerHost:  mqttBrokerHost,
+		KeepAlive: 60,
+		PubQoS:    1,
+		SubQoS:    1,
+		Dialer: &mqtt.MQTTDialer{
+			Timeout:    5 * time.Second,
+			BrokerHost: mqttBrokerHost,
+		},
+
 		Topics: types.Topics{
 			SourceEvents:   fmt.Sprintf("sources/%s/clusters/%s/sourceevents", sourceID, clusterName),
 			AgentEvents:    fmt.Sprintf("sources/%s/clusters/%s/agentevents", sourceID, clusterName),
 			AgentBroadcast: fmt.Sprintf("clusters/%s/agentbroadcast", clusterName),
 		},
 	}
+	watcherStore := store.NewAgentInformerWatcherStore()
+
 	clientHolder, err := work.NewClientHolderBuilder(config).
 		WithClientID(clusterName).
 		WithClusterName(clusterName).
 		WithCodecs(codec.NewManifestBundleCodec()).
+		WithWorkClientWatcherStore(watcherStore).
 		NewAgentClientHolder(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	go clientHolder.ManifestWorkInformer().Informer().Run(ctx.Done())
+	workClient := clientHolder.WorkInterface()
+	factory := workinformers.NewSharedInformerFactoryWithOptions(workClient, 30*time.Minute)
+	workInformers := factory.Work().V1().ManifestWorks()
 
-	return clientHolder, nil
+	// For cloudevents work client, we use the informer store as the client store
+	if watcherStore != nil {
+		watcherStore.SetStore(workInformers.Informer().GetStore())
+	}
+
+	go workInformers.Informer().Run(ctx.Done())
+
+	return clientHolder, workInformers, nil
 }

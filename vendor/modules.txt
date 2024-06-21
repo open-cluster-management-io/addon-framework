@@ -35,10 +35,13 @@ github.com/cenkalti/backoff/v4
 # github.com/cespare/xxhash/v2 v2.2.0
 ## explicit; go 1.11
 github.com/cespare/xxhash/v2
+# github.com/cloudevents/sdk-go/protocol/kafka_confluent/v2 v2.0.0-20240413090539-7fef29478991
+## explicit; go 1.18
+github.com/cloudevents/sdk-go/protocol/kafka_confluent/v2
 # github.com/cloudevents/sdk-go/protocol/mqtt_paho/v2 v2.0.0-20231030012137-0836a524e995
 ## explicit; go 1.18
 github.com/cloudevents/sdk-go/protocol/mqtt_paho/v2
-# github.com/cloudevents/sdk-go/v2 v2.15.2
+# github.com/cloudevents/sdk-go/v2 v2.15.3-0.20240329120647-e6a74efbacbf
 ## explicit; go 1.18
 github.com/cloudevents/sdk-go/v2
 github.com/cloudevents/sdk-go/v2/binding
@@ -54,6 +57,10 @@ github.com/cloudevents/sdk-go/v2/event/datacodec/xml
 github.com/cloudevents/sdk-go/v2/protocol
 github.com/cloudevents/sdk-go/v2/protocol/http
 github.com/cloudevents/sdk-go/v2/types
+# github.com/confluentinc/confluent-kafka-go/v2 v2.3.0
+## explicit; go 1.17
+github.com/confluentinc/confluent-kafka-go/v2/kafka
+github.com/confluentinc/confluent-kafka-go/v2/kafka/librdkafka_vendor
 # github.com/coreos/go-semver v0.3.1
 ## explicit; go 1.8
 github.com/coreos/go-semver/semver
@@ -220,6 +227,10 @@ github.com/mitchellh/copystructure
 # github.com/mitchellh/reflectwalk v1.0.2
 ## explicit
 github.com/mitchellh/reflectwalk
+# github.com/moby/patternmatcher v0.6.0
+## explicit; go 1.19
+# github.com/moby/sys/sequential v0.5.0
+## explicit; go 1.17
 # github.com/mochi-mqtt/server/v2 v2.4.6
 ## explicit; go 1.21
 github.com/mochi-mqtt/server/v2
@@ -291,7 +302,6 @@ github.com/openshift/build-machinery-go/make/targets/openshift/operator
 github.com/openshift/build-machinery-go/scripts
 # github.com/openshift/library-go v0.0.0-20240116081341-964bcb3f545c
 ## explicit; go 1.21
-github.com/openshift/library-go/pkg/certs
 github.com/openshift/library-go/pkg/crypto
 github.com/openshift/library-go/pkg/operator/events
 # github.com/pkg/errors v0.9.1
@@ -444,7 +454,7 @@ go.uber.org/zap/internal/pool
 go.uber.org/zap/internal/stacktrace
 go.uber.org/zap/zapcore
 go.uber.org/zap/zapgrpc
-# golang.org/x/crypto v0.19.0
+# golang.org/x/crypto v0.21.0
 ## explicit; go 1.18
 golang.org/x/crypto/bcrypt
 golang.org/x/crypto/blowfish
@@ -461,7 +471,7 @@ golang.org/x/crypto/scrypt
 ## explicit; go 1.20
 golang.org/x/exp/constraints
 golang.org/x/exp/slices
-# golang.org/x/net v0.21.0
+# golang.org/x/net v0.23.0
 ## explicit; go 1.18
 golang.org/x/net/context
 golang.org/x/net/html
@@ -484,14 +494,14 @@ golang.org/x/oauth2/internal
 ## explicit; go 1.18
 golang.org/x/sync/semaphore
 golang.org/x/sync/singleflight
-# golang.org/x/sys v0.17.0
+# golang.org/x/sys v0.18.0
 ## explicit; go 1.18
 golang.org/x/sys/cpu
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
-# golang.org/x/term v0.17.0
+# golang.org/x/term v0.18.0
 ## explicit; go 1.18
 golang.org/x/term
 # golang.org/x/text v0.14.0
@@ -1391,31 +1401,36 @@ open-cluster-management.io/api/utils/work/v1/workapplier
 open-cluster-management.io/api/utils/work/v1/workvalidator
 open-cluster-management.io/api/work/v1
 open-cluster-management.io/api/work/v1alpha1
-# open-cluster-management.io/sdk-go v0.13.1-0.20240416062924-20307e6fe090
+# open-cluster-management.io/sdk-go v0.13.1-0.20240614070053-a01091a14da7
 ## explicit; go 1.21
 open-cluster-management.io/sdk-go/pkg/apis/work/v1/applier
 open-cluster-management.io/sdk-go/pkg/apis/work/v1/builder
 open-cluster-management.io/sdk-go/pkg/apis/work/v1/validator
+open-cluster-management.io/sdk-go/pkg/basecontroller/events
+open-cluster-management.io/sdk-go/pkg/basecontroller/factory
+open-cluster-management.io/sdk-go/pkg/cloudevents/constants
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options
+open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/cert
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc/protobuf/v1
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc/protocol
+open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/kafka
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/mqtt
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/payload
 open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types
 open-cluster-management.io/sdk-go/pkg/cloudevents/work
 open-cluster-management.io/sdk-go/pkg/cloudevents/work/agent/client
 open-cluster-management.io/sdk-go/pkg/cloudevents/work/agent/codec
-open-cluster-management.io/sdk-go/pkg/cloudevents/work/agent/handler
+open-cluster-management.io/sdk-go/pkg/cloudevents/work/agent/lister
 open-cluster-management.io/sdk-go/pkg/cloudevents/work/common
 open-cluster-management.io/sdk-go/pkg/cloudevents/work/internal
 open-cluster-management.io/sdk-go/pkg/cloudevents/work/payload
 open-cluster-management.io/sdk-go/pkg/cloudevents/work/source/client
 open-cluster-management.io/sdk-go/pkg/cloudevents/work/source/codec
-open-cluster-management.io/sdk-go/pkg/cloudevents/work/source/handler
+open-cluster-management.io/sdk-go/pkg/cloudevents/work/source/lister
+open-cluster-management.io/sdk-go/pkg/cloudevents/work/store
 open-cluster-management.io/sdk-go/pkg/cloudevents/work/utils
-open-cluster-management.io/sdk-go/pkg/cloudevents/work/watcher
 open-cluster-management.io/sdk-go/pkg/patcher
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.28.0
 ## explicit; go 1.20

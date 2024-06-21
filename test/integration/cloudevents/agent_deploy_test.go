@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work"
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
@@ -156,6 +157,7 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 	var agentWorkClient workv1client.ManifestWorkInterface
 	var agentWorkInformer workv1informers.ManifestWorkInformer
 	var agentWorkLister workv1listers.ManifestWorkNamespaceLister
+	var clientHolder *work.ClientHolder
 
 	ginkgo.BeforeEach(func() {
 		ctx, cancel = context.WithCancel(context.Background())
@@ -184,9 +186,9 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 
 		// start work agent for the managed cluster
 		ginkgo.By("Start agent for managed cluster")
-		clientHolder, err := startWorkAgent(ctx, managedClusterName)
+		clientHolder, agentWorkInformer, err = startWorkAgent(ctx, managedClusterName)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		agentWorkInformer = clientHolder.ManifestWorkInformer()
+
 		agentWorkLister = agentWorkInformer.Lister().ManifestWorks(managedClusterName)
 		agentWorkClient = clientHolder.ManifestWorks(managedClusterName)
 	})
