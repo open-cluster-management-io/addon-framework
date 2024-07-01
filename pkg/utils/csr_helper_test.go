@@ -2,10 +2,10 @@ package utils
 
 import (
 	"crypto/x509/pkix"
+	"net"
 	"testing"
 	"time"
 
-	"github.com/openshift/library-go/pkg/crypto"
 	"github.com/stretchr/testify/assert"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
@@ -56,14 +56,9 @@ func newAddon(name, namespace string) *addonapiv1alpha1.ManagedClusterAddOn {
 }
 
 func TestDefaultSigner(t *testing.T) {
-	caConfig, err := crypto.MakeSelfSignedCAConfig("test", 10)
+	ca, key, err := certutil.GenerateSelfSignedCertKey("test", []net.IP{}, []string{})
 	if err != nil {
 		t.Errorf("Failed to generate self signed CA config: %v", err)
-	}
-
-	ca, key, err := caConfig.GetPEMBytes()
-	if err != nil {
-		t.Errorf("Failed to get ca cert/key: %v", err)
 	}
 
 	signer := DefaultSignerWithExpiry(key, ca, 24*time.Hour)
@@ -73,7 +68,7 @@ func TestDefaultSigner(t *testing.T) {
 		t.Errorf("Expect cert to be signed")
 	}
 
-	certs, err := crypto.CertsFromPEM(cert)
+	certs, err := certutil.ParseCertsPEM(cert)
 	if err != nil {
 		t.Errorf("Failed to parse cert: %v", err)
 	}
@@ -82,7 +77,7 @@ func TestDefaultSigner(t *testing.T) {
 		t.Errorf("Expect 1 cert signed but got %d", len(certs))
 	}
 
-	if certs[0].Issuer.CommonName != "test" {
+	if certs[0].Subject.CommonName != "test" {
 		t.Errorf("CommonName is not correct")
 	}
 }

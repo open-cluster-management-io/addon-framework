@@ -1,7 +1,6 @@
 package kube
 
 import (
-	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -17,8 +16,8 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/rand"
+	certutil "k8s.io/client-go/util/cert"
 
-	"github.com/openshift/library-go/pkg/crypto"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -111,13 +110,10 @@ var _ = ginkgo.Describe("Addon CSR", func() {
 	ginkgo.It("Should sign csr successfully", func() {
 		testAddonImpl.approveCSR = true
 		signerName := fmt.Sprintf("%s@%d", "open-cluster-management.io/test", time.Now().Unix())
-		ca, _ := crypto.MakeSelfSignedCAConfigForDuration(signerName, 1*time.Hour)
-		certBytes := &bytes.Buffer{}
-		keyBytes := &bytes.Buffer{}
-		err = ca.WriteCertConfig(certBytes, keyBytes)
+		certBytes, _, _ := certutil.GenerateSelfSignedCertKey(signerName, []net.IP{}, []string{})
 		gomega.Expect(err).To(gomega.BeNil())
 
-		testAddonImpl.cert = certBytes.Bytes()
+		testAddonImpl.cert = certBytes
 
 		csr := newCSR(managedClusterName, testAddonImpl.name, "open-cluster-management.io/test")
 		_, err = hubKubeClient.CertificatesV1().CertificateSigningRequests().Create(context.Background(), csr, metav1.CreateOptions{})
