@@ -44,6 +44,7 @@ func (t *healthCheckTestAgent) Manifests(cluster *clusterv1.ManagedCluster,
 
 	return []runtime.Object{
 		NewFakeDeployment("test-deployment", "default"),
+		NewFakeZeroReplicasDeployment("test-zero-replicas-deployment", "default"),
 		NewFakeDaemonSet("test-daemonset", "default"),
 	}, nil
 }
@@ -64,6 +65,39 @@ func NewFakeDeployment(namespace, name string) *appsv1.Deployment {
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &one,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": "test",
+				},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"addon": "test",
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "test",
+							Image: "test",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func NewFakeZeroReplicasDeployment(namespace, name string) *appsv1.Deployment {
+	var zero int32 = 0
+	return &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      namespace,
+			Namespace: name,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &zero,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": "test",
