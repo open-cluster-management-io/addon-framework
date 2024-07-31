@@ -6,10 +6,12 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -25,6 +27,7 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/constants"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
 	cloudeventswork "open-cluster-management.io/sdk-go/pkg/cloudevents/work"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/garbagecollector"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/source/codec"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/store"
 )
@@ -49,6 +52,7 @@ func (a *cloudeventsAddonManager) Start(ctx context.Context) error {
 	// ManifestWork client that implements the ManifestWorkInterface and ManifestWork informer based on different
 	// driver configuration.
 	// Refer to Event Based Manifestwork proposal in enhancements repo to get more details.
+	var clientHolder *cloudeventswork.ClientHolder
 	var workClient workclientset.Interface
 	var watcherStore *store.SourceInformerWatcherStore
 	var err error
@@ -67,7 +71,7 @@ func (a *cloudeventsAddonManager) Start(ctx context.Context) error {
 			return err
 		}
 
-		clientHolder, err := cloudeventswork.NewClientHolderBuilder(clientConfig).
+		clientHolder, err = cloudeventswork.NewClientHolderBuilder(clientConfig).
 			WithClientID(a.options.CloudEventsClientID).
 			WithSourceID(a.options.SourceID).
 			WithCodecs(codec.NewManifestBundleCodec()).
@@ -100,6 +104,11 @@ func (a *cloudeventsAddonManager) Start(ctx context.Context) error {
 	)
 
 	kubeClient, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return err
+	}
+
+	metadataClient, err := metadata.NewForConfig(config)
 	if err != nil {
 		return err
 	}
@@ -176,6 +185,22 @@ func (a *cloudeventsAddonManager) Start(ctx context.Context) error {
 		})
 	if err != nil {
 		return err
+	}
+
+	// Start the garbage collector for work clients with cloudevents driver
+	if a.options.WorkDriver == constants.ConfigTypeGRPC || a.options.WorkDriver == constants.ConfigTypeMQTT {
+		if len(addonNames) == 0 {
+			return fmt.Errorf("no addon names provided")
+		}
+		addonName := addonNames[0]
+		listOptions := &metav1.ListOptions{
+			FieldSelector: fmt.Sprintf("metadata.name=%s", addonName),
+		}
+		ownerGVRFilters := map[schema.GroupVersionResource]*metav1.ListOptions{
+			addonv1alpha1.SchemeGroupVersion.WithResource("managedclusteraddons"): listOptions,
+		}
+		garbageCollector := garbagecollector.NewGarbageCollector(clientHolder, workInformers, metadataClient, ownerGVRFilters)
+		go garbageCollector.Run(ctx, 1)
 	}
 
 	err = a.StartWithInformers(ctx, workClient, workInformers, kubeInformers, addonInformers, clusterInformers, dynamicInformers)
