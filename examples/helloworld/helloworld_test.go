@@ -100,6 +100,13 @@ func TestManifestAddonAgent(t *testing.T) {
 							Namespace: "cluster1",
 							Name:      "config",
 						},
+						DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+								Namespace: "cluster1",
+								Name:      "config",
+							},
+							SpecHash: "fake-spec-hash",
+						},
 					},
 				}
 				return addon

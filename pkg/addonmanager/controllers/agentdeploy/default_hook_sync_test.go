@@ -379,6 +379,43 @@ func TestDefaultHookReconcile(t *testing.T) {
 				addontesting.AssertActions(t, actions, "update")
 			},
 		},
+		{
+			name:    "deploy hook manifest when ConfigCheckEnabled is true",
+			key:     "cluster1/test",
+			addon:   []runtime.Object{addontesting.NewAddonWithConditions("test", "cluster1", registrationAppliedCondition, configuredCondition)},
+			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			testaddon: &testAgent{name: "test", objects: []runtime.Object{
+				addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
+				addontesting.NewHookJob("default", "test")}, ConfigCheckEnabled: true},
+			validateWorkActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "create")
+				actual := actions[0].(clienttesting.CreateActionImpl).Object
+				deployWork := actual.(*workapiv1.ManifestWork)
+				if deployWork.Namespace != "cluster1" || deployWork.Name != fmt.Sprintf("%s-%d", constants.DeployWorkNamePrefix("test"), 0) {
+					t.Errorf("the deployWork %v/%v is incorrect.", deployWork.Namespace, deployWork.Name)
+				}
+			},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "update")
+				actual := actions[0].(clienttesting.UpdateActionImpl).Object
+				addOn := actual.(*addonapiv1alpha1.ManagedClusterAddOn)
+				if !addonHasFinalizer(addOn, addonapiv1alpha1.AddonPreDeleteHookFinalizer) {
+					t.Errorf("the preDeleteHookFinalizer should be added.")
+				}
+			},
+		},
+		{
+			name:    "not deploy hook manifest when ConfigCheckEnabled is true",
+			key:     "cluster1/test",
+			addon:   []runtime.Object{addontesting.NewAddonWithConditions("test", "cluster1", registrationAppliedCondition)},
+			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			testaddon: &testAgent{name: "test", objects: []runtime.Object{
+				addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
+				addontesting.NewHookJob("default", "test")},
+				ConfigCheckEnabled: true},
+			validateWorkActions:  addontesting.AssertNoActions,
+			validateAddonActions: addontesting.AssertNoActions,
+		},
 	}
 
 	for _, c := range cases {
@@ -431,8 +468,11 @@ func TestDefaultHookReconcile(t *testing.T) {
 
 			syncContext := addontesting.NewFakeSyncContext(t)
 			err = controller.sync(context.TODO(), syncContext, c.key)
-			if err != nil {
-				t.Errorf("expected no error when sync: %v", err)
+			if (err == nil && c.testaddon.err != nil) || (err != nil && c.testaddon.err == nil) {
+				t.Errorf("expected error %v when sync got %v", c.testaddon.err, err)
+			}
+			if err != nil && c.testaddon.err != nil && err.Error() != c.testaddon.err.Error() {
+				t.Errorf("expected error %v when sync got %v", c.testaddon.err, err)
 			}
 			c.validateAddonActions(t, fakeAddonClient.Actions())
 			c.validateWorkActions(t, fakeWorkClient.Actions())

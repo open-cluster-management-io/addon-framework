@@ -43,13 +43,21 @@ var mainfestWorkAppliedCondition = metav1.Condition{
 	Message: "Registration of the addon agent is configured",
 }
 
+var configuredCondition = metav1.Condition{
+	Type:    addonapiv1alpha1.ManagedClusterAddOnConditionConfigured,
+	Status:  metav1.ConditionTrue,
+	Reason:  "ConfigurationsConfigured",
+	Message: "Configurations configured",
+}
+
 type testAgent struct {
-	name            string
-	objects         []runtime.Object
-	err             error
-	healthProber    *agent.HealthProber
-	Updaters        []agent.Updater
-	ManifestConfigs []workapiv1.ManifestConfigOption
+	name               string
+	objects            []runtime.Object
+	err                error
+	healthProber       *agent.HealthProber
+	Updaters           []agent.Updater
+	ManifestConfigs    []workapiv1.ManifestConfigOption
+	ConfigCheckEnabled bool
 }
 
 func (t *testAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
@@ -58,10 +66,11 @@ func (t *testAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapi
 
 func (t *testAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
 	return agent.AgentAddonOptions{
-		AddonName:       t.name,
-		HealthProber:    t.healthProber,
-		Updaters:        t.Updaters,
-		ManifestConfigs: t.ManifestConfigs,
+		AddonName:          t.name,
+		HealthProber:       t.healthProber,
+		Updaters:           t.Updaters,
+		ManifestConfigs:    t.ManifestConfigs,
+		ConfigCheckEnabled: t.ConfigCheckEnabled,
 	}
 }
 
@@ -247,6 +256,30 @@ func TestDefaultReconcile(t *testing.T) {
 					t.Errorf("Condition Reason is not correct: %v", addOn.Status.Conditions)
 				}
 			},
+		},
+		{
+			name:    "deploy manifests for an addon when ConfigCheckEnabled is true",
+			key:     "cluster1/test",
+			addon:   []runtime.Object{addontesting.NewAddonWithConditions("test", "cluster1", registrationAppliedCondition, configuredCondition)},
+			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			testaddon: &testAgent{name: "test", objects: []runtime.Object{
+				addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
+			}, ConfigCheckEnabled: true},
+			validateAddonActions: addontesting.AssertNoActions,
+			validateWorkActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "create")
+			},
+		},
+		{
+			name:    "not deploy manifests for an addon when ConfigCheckEnabled is true",
+			key:     "cluster1/test",
+			addon:   []runtime.Object{addontesting.NewAddonWithConditions("test", "cluster1", registrationAppliedCondition)},
+			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			testaddon: &testAgent{name: "test", objects: []runtime.Object{
+				addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
+			}, ConfigCheckEnabled: true},
+			validateAddonActions: addontesting.AssertNoActions,
+			validateWorkActions:  addontesting.AssertNoActions,
 		},
 	}
 

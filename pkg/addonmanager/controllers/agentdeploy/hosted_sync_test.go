@@ -30,9 +30,10 @@ import (
 )
 
 type testHostedAgent struct {
-	name    string
-	objects []runtime.Object
-	err     error
+	name               string
+	objects            []runtime.Object
+	err                error
+	ConfigCheckEnabled bool
 }
 
 func (t *testHostedAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (
@@ -45,6 +46,7 @@ func (t *testHostedAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
 		AddonName:          t.name,
 		HostedModeEnabled:  true,
 		HostedModeInfoFunc: constants.GetHostedModeInfo,
+		ConfigCheckEnabled: t.ConfigCheckEnabled,
 	}
 }
 
@@ -397,6 +399,72 @@ func TestHostingReconcile(t *testing.T) {
 					t.Errorf("expected hosting manifest finalizer")
 				}
 			},
+		},
+		{
+			name: "deploy manifests for an addon when ConfigCheckEnabled is true",
+			key:  "cluster1/test",
+			addon: []runtime.Object{addontesting.NewHostedModeAddonWithFinalizer("test", "cluster1", "cluster2",
+				registrationAppliedCondition, configuredCondition)},
+			cluster: []runtime.Object{
+				addontesting.NewManagedCluster("cluster1"),
+				addontesting.NewManagedCluster("cluster2"),
+			},
+			testaddon: &testHostedAgent{name: "test", objects: []runtime.Object{
+				addontesting.NewHostingUnstructured("v1", "ConfigMap", "default", "test"),
+			}, ConfigCheckEnabled: true},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch")
+				assertHostingClusterValid(t, actions[0])
+
+				patch := actions[0].(clienttesting.PatchActionImpl).Patch
+				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				err := json.Unmarshal(patch, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
+				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHostingClusterValidity)
+				if addOnCond == nil {
+					t.Fatal("condition should not be nil")
+				}
+				if addOnCond.Reason != addonapiv1alpha1.HostingClusterValidityReasonValid {
+					t.Errorf("Condition Reason is not correct: %v", addOnCond.Reason)
+				}
+			},
+			validateWorkActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "create")
+			},
+		},
+		{
+			name: "not deploy manifests for an addon when ConfigCheckEnabled is true",
+			key:  "cluster1/test",
+			addon: []runtime.Object{addontesting.NewHostedModeAddonWithFinalizer("test", "cluster1", "cluster2",
+				registrationAppliedCondition)},
+			cluster: []runtime.Object{
+				addontesting.NewManagedCluster("cluster1"),
+				addontesting.NewManagedCluster("cluster2"),
+			},
+			testaddon: &testHostedAgent{name: "test", objects: []runtime.Object{
+				addontesting.NewHostingUnstructured("v1", "ConfigMap", "default", "test"),
+			}, ConfigCheckEnabled: true},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch")
+				assertHostingClusterValid(t, actions[0])
+
+				patch := actions[0].(clienttesting.PatchActionImpl).Patch
+				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				err := json.Unmarshal(patch, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
+				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHostingClusterValidity)
+				if addOnCond == nil {
+					t.Fatal("condition should not be nil")
+				}
+				if addOnCond.Reason != addonapiv1alpha1.HostingClusterValidityReasonValid {
+					t.Errorf("Condition Reason is not correct: %v", addOnCond.Reason)
+				}
+			},
+			validateWorkActions: addontesting.AssertNoActions,
 		},
 	}
 
