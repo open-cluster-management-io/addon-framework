@@ -1,3 +1,18 @@
+/*
+ * Copyright (c) 2024 Contributors to the Eclipse Foundation
+ *
+ *  All rights reserved. This program and the accompanying materials
+ *  are made available under the terms of the Eclipse Public License v2.0
+ *  and Eclipse Distribution License v1.0 which accompany this distribution.
+ *
+ * The Eclipse Public License is available at
+ *    https://www.eclipse.org/legal/epl-2.0/
+ *  and the Eclipse Distribution License is available at
+ *    http://www.eclipse.org/org/documents/edl-v10.php.
+ *
+ *  SPDX-License-Identifier: EPL-2.0 OR BSD-3-Clause
+ */
+
 package packets
 
 import (
@@ -109,6 +124,7 @@ func (c *ControlPacket) PacketID() uint16 {
 	}
 }
 
+// PacketType returns the packet type as a string
 func (c *ControlPacket) PacketType() string {
 	return [...]string{
 		"",
@@ -128,6 +144,44 @@ func (c *ControlPacket) PacketType() string {
 		"DISCONNECT",
 		"AUTH",
 	}[c.FixedHeader.Type]
+}
+
+// String implements fmt.Stringer (mainly for debugging purposes)
+func (c *ControlPacket) String() string {
+	switch p := c.Content.(type) {
+	case *Connect:
+		return p.String()
+	case *Connack:
+		return p.String()
+	case *Publish:
+		return p.String()
+	case *Puback:
+		return p.String()
+	case *Pubrec:
+		return p.String()
+	case *Pubrel:
+		return p.String()
+	case *Pubcomp:
+		return p.String()
+	case *Subscribe:
+		return p.String()
+	case *Suback:
+		return p.String()
+	case *Unsubscribe:
+		return p.String()
+	case *Unsuback:
+		return p.String()
+	case *Pingreq:
+		return p.String()
+	case *Pingresp:
+		return p.String()
+	case *Disconnect:
+		return p.String()
+	case *Auth:
+		return p.String()
+	default:
+		return fmt.Sprintf("Unknown packet type: %d", c.Type)
+	}
 }
 
 // NewControlPacket takes a packetType and returns a pointer to a
@@ -157,10 +211,7 @@ func NewControlPacket(t byte) *ControlPacket {
 		cp.Content = &Pubcomp{Properties: &Properties{}}
 	case SUBSCRIBE:
 		cp.Flags = 2
-		cp.Content = &Subscribe{
-			Subscriptions: make(map[string]SubOptions),
-			Properties:    &Properties{},
-		}
+		cp.Content = &Subscribe{Properties: &Properties{}}
 	case SUBACK:
 		cp.Content = &Suback{Properties: &Properties{}}
 	case UNSUBSCRIBE:
@@ -220,10 +271,7 @@ func ReadPacket(r io.Reader) (*ControlPacket, error) {
 		cp.Content = &Pubcomp{Properties: &Properties{}}
 	case SUBSCRIBE:
 		cp.Flags = 2
-		cp.Content = &Subscribe{
-			Subscriptions: make(map[string]SubOptions),
-			Properties:    &Properties{},
-		}
+		cp.Content = &Subscribe{Properties: &Properties{}}
 	case SUBACK:
 		cp.Content = &Suback{Properties: &Properties{}}
 	case UNSUBSCRIBE:
@@ -245,8 +293,10 @@ func ReadPacket(r io.Reader) (*ControlPacket, error) {
 	}
 
 	cp.Flags = t[0] & 0xF
-	if cp.Type == PUBLISH {
-		cp.Content.(*Publish).QoS = (cp.Flags & 0x6) >> 1
+	if cp.Type == PUBLISH { // Publish is the only packet with flags in the fixed header
+		cp.Content.(*Publish).QoS = (cp.Flags >> 1) & 0x3
+		cp.Content.(*Publish).Duplicate = cp.Flags&(1<<3) != 0
+		cp.Content.(*Publish).Retain = cp.Flags&1 != 0
 	}
 	vbi, err := getVBI(r)
 	if err != nil {
@@ -278,9 +328,22 @@ func ReadPacket(r io.Reader) (*ControlPacket, error) {
 // WriteTo writes a packet to an io.Writer, handling packing all the parts of
 // a control packet.
 func (c *ControlPacket) WriteTo(w io.Writer) (int64, error) {
+	c.remainingLength = 0 // ignore previous remainingLength (if any)
 	buffers := c.Content.Buffers()
 	for _, b := range buffers {
 		c.remainingLength += len(b)
+	}
+
+	if c.Type == PUBLISH { // Fixed flags for PUBLISH packets contain QOS, DUP and RETAIN flags.
+		p := c.Content.(*Publish)
+		f := p.QoS << 1
+		if p.Duplicate {
+			f |= 1 << 3
+		}
+		if p.Retain {
+			f |= 1
+		}
+		c.FixedHeader.Flags = c.Type<<4 | f
 	}
 
 	var header bytes.Buffer
