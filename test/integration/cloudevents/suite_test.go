@@ -80,7 +80,10 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	err := mqttBroker.AddHook(new(auth.AllowHook), nil)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-	err = mqttBroker.AddListener(listeners.NewTCP("test-mqtt-broker", mqttBrokerHost, nil))
+	err = mqttBroker.AddListener(listeners.NewTCP(listeners.Config{
+		ID:      "test-mqtt-broker",
+		Address: mqttBrokerHost,
+	}))
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 	// start the mqtt broker
@@ -282,7 +285,8 @@ func startWorkAgent(ctx context.Context, clusterName string) (*work.ClientHolder
 	}
 
 	workClient := clientHolder.WorkInterface()
-	factory := workinformers.NewSharedInformerFactoryWithOptions(workClient, 30*time.Minute)
+	factory := workinformers.NewSharedInformerFactoryWithOptions(
+		workClient, 30*time.Minute, workinformers.WithNamespace(clusterName))
 	workInformers := factory.Work().V1().ManifestWorks()
 
 	// For cloudevents work client, we use the informer store as the client store
