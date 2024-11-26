@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	testImg           = "test.io/open-cluster-management/addon-examples:latest"
+	testImg           = "quay.io/open-cluster-management/addon-examples:latest"
 	testImgPullSecret = "test-pull-secret"
 )
 
@@ -91,6 +91,13 @@ func TestManifestAddonAgent(t *testing.T) {
 						ConfigReferent: addonapiv1alpha1.ConfigReferent{
 							Namespace: "cluster1",
 							Name:      "deploy-config",
+						},
+						DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+								Namespace: "cluster1",
+								Name:      "deploy-config",
+							},
+							SpecHash: "fake-spec-hash",
 						},
 					},
 				}
