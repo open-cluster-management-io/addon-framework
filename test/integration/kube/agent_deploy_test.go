@@ -444,6 +444,219 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
+	ginkgo.It("Should deploy agents and get available with prober func including wildcard", func() {
+		deploy1 := &unstructured.Unstructured{}
+		err := deploy1.UnmarshalJSON([]byte(deploymentJson))
+		deploy1.SetName("deployment1")
+		deploy1.SetNamespace("ns1")
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		deploy2 := &unstructured.Unstructured{}
+		err = deploy2.UnmarshalJSON([]byte(deploymentJson))
+		deploy2.SetName("deployment2")
+		deploy2.SetNamespace("ns2")
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		testAddonImpl.manifests[managedClusterName] = []runtime.Object{deploy1, deploy2}
+		testAddonImpl.prober = utils.NewAllDeploymentsProber()
+
+		addon := &addonapiv1alpha1.ManagedClusterAddOn{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: testAddonImpl.name,
+			},
+			Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
+				InstallNamespace: "default",
+			},
+		}
+		createManagedClusterAddOnwithOwnerRefs(managedClusterName, addon, cma)
+
+		gomega.Eventually(func() error {
+			work, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), manifestWorkName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			if len(work.Spec.Workload.Manifests) != 2 {
+				return fmt.Errorf("unexpected number of work manifests")
+			}
+
+			if len(work.Spec.ManifestConfigs) != 1 {
+				return fmt.Errorf("unexpected number of work manifests configuration")
+			}
+
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		// Update work status to trigger addon status
+		work, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), manifestWorkName, metav1.GetOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		meta.SetStatusCondition(&work.Status.Conditions, metav1.Condition{Type: workapiv1.WorkAvailable, Status: metav1.ConditionTrue, Reason: "WorkAvailable"})
+
+		replica := int64(1)
+
+		// update work status to a wrong feedback status
+		work.Status.ResourceStatus = workapiv1.ManifestResourceStatus{
+			Manifests: []workapiv1.ManifestCondition{
+				{
+					ResourceMeta: workapiv1.ManifestResourceMeta{
+						Ordinal:   0,
+						Group:     "apps",
+						Resource:  "deployments",
+						Name:      "deployment1",
+						Namespace: "ns1",
+					},
+					StatusFeedbacks: workapiv1.StatusFeedbackResult{
+						Values: []workapiv1.FeedbackValue{
+							{
+								Name: "Replicas",
+								Value: workapiv1.FieldValue{
+									Type:    workapiv1.Integer,
+									Integer: &replica,
+								},
+							},
+						},
+					},
+					Conditions: []metav1.Condition{
+						{
+							Type:               "Available",
+							Status:             metav1.ConditionTrue,
+							Reason:             "MinimumReplicasAvailable",
+							Message:            "Deployment has minimum availability.",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+				},
+				{
+					ResourceMeta: workapiv1.ManifestResourceMeta{
+						Ordinal:   1,
+						Group:     "apps",
+						Resource:  "deployments",
+						Name:      "deployment2",
+						Namespace: "ns2",
+					},
+					StatusFeedbacks: workapiv1.StatusFeedbackResult{
+						Values: []workapiv1.FeedbackValue{},
+					},
+					Conditions: []metav1.Condition{
+						{
+							Type:               "Available",
+							Status:             metav1.ConditionFalse,
+							Reason:             "MinimumReplicasAvailable",
+							Message:            "Deployment has minimum availability.",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+				},
+			},
+		}
+		meta.SetStatusCondition(&work.Status.Conditions, metav1.Condition{Type: workapiv1.WorkApplied, Status: metav1.ConditionTrue, Reason: "WorkApplied"})
+		_, err = hubWorkClient.WorkV1().ManifestWorks(managedClusterName).UpdateStatus(context.Background(), work, metav1.UpdateOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		gomega.Eventually(func() error {
+			addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testAddonImpl.name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			if !meta.IsStatusConditionFalse(addon.Status.Conditions, "Available") {
+				return fmt.Errorf("unexpected addon available condition, %#v", addon.Status)
+			}
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		// update to the correct condition
+		work, err = hubWorkClient.WorkV1().ManifestWorks(managedClusterName).Get(context.Background(), manifestWorkName, metav1.GetOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		work.Status.ResourceStatus = workapiv1.ManifestResourceStatus{
+			Manifests: []workapiv1.ManifestCondition{
+				{
+					ResourceMeta: workapiv1.ManifestResourceMeta{
+						Ordinal:   0,
+						Group:     "apps",
+						Resource:  "deployments",
+						Name:      "deployment1",
+						Namespace: "ns1",
+					},
+					StatusFeedbacks: workapiv1.StatusFeedbackResult{
+						Values: []workapiv1.FeedbackValue{
+							{
+								Name: "ReadyReplicas",
+								Value: workapiv1.FieldValue{
+									Type:    workapiv1.Integer,
+									Integer: &replica,
+								},
+							},
+							{
+								Name: "Replicas",
+								Value: workapiv1.FieldValue{
+									Type:    workapiv1.Integer,
+									Integer: &replica,
+								},
+							},
+						},
+					},
+					Conditions: []metav1.Condition{
+						{
+							Type:               "Available",
+							Status:             metav1.ConditionTrue,
+							Reason:             "MinimumReplicasAvailable",
+							Message:            "Deployment has minimum availability.",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+				},
+				{
+					ResourceMeta: workapiv1.ManifestResourceMeta{
+						Ordinal:   1,
+						Group:     "apps",
+						Resource:  "deployments",
+						Name:      "deployment2",
+						Namespace: "ns2",
+					},
+					StatusFeedbacks: workapiv1.StatusFeedbackResult{
+						Values: []workapiv1.FeedbackValue{
+							{
+								Name: "ReadyReplicas",
+								Value: workapiv1.FieldValue{
+									Type:    workapiv1.Integer,
+									Integer: &replica,
+								},
+							},
+							{
+								Name: "Replicas",
+								Value: workapiv1.FieldValue{
+									Type:    workapiv1.Integer,
+									Integer: &replica,
+								},
+							},
+						},
+					},
+					Conditions: []metav1.Condition{
+						{
+							Type:               "Available",
+							Status:             metav1.ConditionTrue,
+							Reason:             "MinimumReplicasAvailable",
+							Message:            "Deployment has minimum availability.",
+							LastTransitionTime: metav1.NewTime(time.Now()),
+						},
+					},
+				},
+			},
+		}
+		_, err = hubWorkClient.WorkV1().ManifestWorks(managedClusterName).UpdateStatus(context.Background(), work, metav1.UpdateOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		gomega.Eventually(func() error {
+			addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testAddonImpl.name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			if !meta.IsStatusConditionTrue(addon.Status.Conditions, "Available") {
+				return fmt.Errorf("unexpected addon available condition, %v", addon.Status.Conditions)
+			}
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+	})
 
 	ginkgo.It("Should deploy agent and get available with deployment availability prober func", func() {
 		obj := &unstructured.Unstructured{}

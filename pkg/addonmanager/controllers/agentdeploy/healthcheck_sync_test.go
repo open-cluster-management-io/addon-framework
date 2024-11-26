@@ -2,6 +2,7 @@ package agentdeploy
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -362,7 +363,163 @@ func TestHealthCheckReconcile(t *testing.T) {
 				Message: "test add-on is available.",
 			},
 		},
-
+		{
+			name: "Health check mode is work and WorkProber check pass with addonHealthCheckAllFunc",
+			testAddon: &healthCheckTestAgent{name: "test",
+				health: newDeploymentsCheckAllProber(types.NamespacedName{Name: "test-deployment0", Namespace: "default"},
+					types.NamespacedName{Name: "test-deployment1", Namespace: "default"}),
+			},
+			addon: addontesting.NewAddonWithConditions("test", "cluster1", manifestAppliedCondition),
+			existingWork: []runtime.Object{
+				&v1.ManifestWork{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "addon-test-deploy-01",
+						Namespace: "cluster1",
+						Labels: map[string]string{
+							"open-cluster-management.io/addon-name": "test",
+						},
+					},
+					Spec: v1.ManifestWorkSpec{},
+					Status: v1.ManifestWorkStatus{
+						ResourceStatus: v1.ManifestResourceStatus{
+							Manifests: []v1.ManifestCondition{
+								{
+									ResourceMeta: v1.ManifestResourceMeta{
+										Ordinal:   0,
+										Group:     "apps",
+										Version:   "",
+										Kind:      "",
+										Resource:  "deployments",
+										Name:      "test-deployment0",
+										Namespace: "default",
+									},
+									StatusFeedbacks: v1.StatusFeedbackResult{
+										Values: []v1.FeedbackValue{
+											{
+												Name: "Replicas",
+												Value: v1.FieldValue{
+													Integer: boolPtr(1),
+												},
+											},
+											{
+												Name: "ReadyReplicas",
+												Value: v1.FieldValue{
+													Integer: boolPtr(2),
+												},
+											},
+										},
+									},
+								},
+								{
+									ResourceMeta: v1.ManifestResourceMeta{
+										Ordinal:   0,
+										Group:     "apps",
+										Version:   "",
+										Kind:      "",
+										Resource:  "deployments",
+										Name:      "test-deployment1",
+										Namespace: "default",
+									},
+									StatusFeedbacks: v1.StatusFeedbackResult{},
+								},
+							},
+						},
+						Conditions: []metav1.Condition{
+							{
+								Type:   v1.WorkAvailable,
+								Status: metav1.ConditionTrue,
+							},
+						},
+					},
+				},
+			},
+			expectedErr:             nil,
+			expectedHealthCheckMode: addonapiv1alpha1.HealthCheckModeCustomized,
+			expectAvailableCondition: metav1.Condition{
+				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+				Status:  metav1.ConditionTrue,
+				Reason:  addonapiv1alpha1.AddonAvailableReasonProbeAvailable,
+				Message: "test add-on is available.",
+			},
+		},
+		{
+			name: "Health check mode is work and WorkProber check pass with addonHealthCheckAllFunc and wildcard",
+			testAddon: &healthCheckTestAgent{name: "test",
+				health: newDeploymentsCheckAllProber(types.NamespacedName{Name: "*", Namespace: "*"}),
+			},
+			addon: addontesting.NewAddonWithConditions("test", "cluster1", manifestAppliedCondition),
+			existingWork: []runtime.Object{
+				&v1.ManifestWork{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "addon-test-deploy-01",
+						Namespace: "cluster1",
+						Labels: map[string]string{
+							"open-cluster-management.io/addon-name": "test",
+						},
+					},
+					Spec: v1.ManifestWorkSpec{},
+					Status: v1.ManifestWorkStatus{
+						ResourceStatus: v1.ManifestResourceStatus{
+							Manifests: []v1.ManifestCondition{
+								{
+									ResourceMeta: v1.ManifestResourceMeta{
+										Ordinal:   0,
+										Group:     "apps",
+										Version:   "",
+										Kind:      "",
+										Resource:  "deployments",
+										Name:      "test-deployment0",
+										Namespace: "default",
+									},
+									StatusFeedbacks: v1.StatusFeedbackResult{
+										Values: []v1.FeedbackValue{
+											{
+												Name: "Replicas",
+												Value: v1.FieldValue{
+													Integer: boolPtr(1),
+												},
+											},
+											{
+												Name: "ReadyReplicas",
+												Value: v1.FieldValue{
+													Integer: boolPtr(2),
+												},
+											},
+										},
+									},
+								},
+								{
+									ResourceMeta: v1.ManifestResourceMeta{
+										Ordinal:   0,
+										Group:     "apps",
+										Version:   "",
+										Kind:      "",
+										Resource:  "deployments",
+										Name:      "test-deployment1",
+										Namespace: "default",
+									},
+									StatusFeedbacks: v1.StatusFeedbackResult{},
+								},
+							},
+						},
+						Conditions: []metav1.Condition{
+							{
+								Type:   v1.WorkAvailable,
+								Status: metav1.ConditionTrue,
+							},
+						},
+					},
+				},
+			},
+			expectedErr:             nil,
+			expectedHealthCheckMode: addonapiv1alpha1.HealthCheckModeCustomized,
+			expectAvailableCondition: metav1.Condition{
+				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+				Status:  metav1.ConditionTrue,
+				Reason:  addonapiv1alpha1.AddonAvailableReasonProbeAvailable,
+				Message: "test add-on is available.",
+			},
+		},
 		{
 			name: "Health check mode is deployment availability but manifestApplied condition is not true",
 			testAddon: &healthCheckTestAgent{name: "test",
@@ -927,5 +1084,37 @@ func TestHealthCheckReconcile(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func addonHealthCheckAllFunc(resultFields []agent.FieldResult, cluster *clusterv1.ManagedCluster,
+	addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+	for _, field := range resultFields {
+		switch field.ResourceIdentifier.Resource {
+		case "deployments":
+			err := utils.DeploymentAvailabilityHealthCheck(field.ResourceIdentifier, field.FeedbackResult)
+			if err == nil {
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("not meet the results")
+}
+
+func newDeploymentsCheckAllProber(deployments ...types.NamespacedName) *agent.HealthProber {
+	probeFields := []agent.ProbeField{}
+	for _, deploy := range deployments {
+		mc := utils.DeploymentWellKnowManifestConfig(deploy.Namespace, deploy.Name)
+		probeFields = append(probeFields, agent.ProbeField{
+			ResourceIdentifier: mc.ResourceIdentifier,
+			ProbeRules:         mc.FeedbackRules,
+		})
+	}
+	return &agent.HealthProber{
+		Type: agent.HealthProberTypeWork,
+		WorkProber: &agent.WorkHealthProber{
+			ProbeFields:   probeFields,
+			HealthChecker: addonHealthCheckAllFunc,
+		},
 	}
 }

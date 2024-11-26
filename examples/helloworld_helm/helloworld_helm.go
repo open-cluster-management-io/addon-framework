@@ -9,8 +9,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
+	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	workapiv1 "open-cluster-management.io/api/work/v1"
 )
 
 const (
@@ -110,5 +112,48 @@ func GetImageValues(kubeClient kubernetes.Interface) addonfactory.GetValuesFunc 
 		}
 
 		return overrideValues, nil
+	}
+}
+
+func AgentHealthProber() *agent.HealthProber {
+	return &agent.HealthProber{
+		Type: agent.HealthProberTypeWork,
+		WorkProber: &agent.WorkHealthProber{
+			ProbeFields: []agent.ProbeField{
+				{
+					ResourceIdentifier: workapiv1.ResourceIdentifier{
+						Group:     "apps",
+						Resource:  "deployments",
+						Name:      "*",
+						Namespace: "*",
+					},
+					ProbeRules: []workapiv1.FeedbackRule{
+						{
+							Type: workapiv1.WellKnownStatusType,
+						},
+					},
+				},
+			},
+			HealthChecker: func(fields []agent.FieldResult, cluster *clusterv1.ManagedCluster,
+				addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+				if len(fields) == 0 {
+					return fmt.Errorf("no fields found in health checker")
+				}
+				for _, field := range fields {
+					if len(field.FeedbackResult.Values) == 0 {
+						continue
+					}
+					switch field.ResourceIdentifier.Name {
+					case "helloworldhelm-agent":
+						for _, value := range field.FeedbackResult.Values {
+							if value.Name == "AvailableReplicas" && *value.Value.Integer == 1 {
+								return nil
+							}
+						}
+					}
+				}
+				return fmt.Errorf("helloworldhelmhm agent is not ready")
+			},
+		},
 	}
 }
