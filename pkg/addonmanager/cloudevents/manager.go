@@ -160,8 +160,7 @@ func (a *cloudeventsAddonManager) Start(ctx context.Context) error {
 
 	err = addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().AddIndexers(
 		cache.Indexers{
-			index.ManagedClusterAddonByNamespace: index.IndexManagedClusterAddonByNamespace, // addonDeployController
-			index.ManagedClusterAddonByName:      index.IndexManagedClusterAddonByName,      // addonConfigController
+			index.ManagedClusterAddonByNamespace: index.IndexManagedClusterAddonByNamespace, // agentDeployController
 			index.AddonByConfig:                  index.IndexAddonByConfig,                  // addonConfigController
 		},
 	)
@@ -171,8 +170,7 @@ func (a *cloudeventsAddonManager) Start(ctx context.Context) error {
 
 	err = addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Informer().AddIndexers(
 		cache.Indexers{
-			index.ClusterManagementAddonByConfig:    index.IndexClusterManagementAddonByConfig,    // managementAddonConfigController
-			index.ClusterManagementAddonByPlacement: index.IndexClusterManagementAddonByPlacement, // addonConfigController
+			index.ClusterManagementAddonByConfig: index.IndexClusterManagementAddonByConfig, // cmaConfigController
 		})
 	if err != nil {
 		return err
