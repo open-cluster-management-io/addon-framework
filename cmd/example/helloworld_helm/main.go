@@ -118,6 +118,7 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 				utils.NewAddOnDeploymentConfigGetter(addonClient),
 				addonfactory.ToAddOnNodePlacementValues,
 				addonfactory.ToAddOnProxyConfigValues,
+				addonfactory.ToAddOnResourceRequirementsValues,
 			),
 			addonfactory.GetAgentImageValues(
 				utils.NewAddOnDeploymentConfigGetter(addonClient),
