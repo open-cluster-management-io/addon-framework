@@ -54,15 +54,12 @@ curl -s -f \
   -o "${KUBECTL}"
 chmod +x "${KUBECTL}"
 
-CLUSTERADM="${WORK_DIR}/bin/clusteradm"
+CLUSTERADM="clusteradm"
 
 export PATH=$PATH:${WORK_DIR}/bin
 
-echo "############  Download clusteradm"
-mkdir -p "${WORK_DIR}/bin"
-wget -qO- https://github.com/open-cluster-management-io/clusteradm/releases/latest/download/clusteradm_${GOHOSTOS}_${GOHOSTARCH}.tar.gz | sudo tar -xvz -C ${WORK_DIR}/bin/
-chmod +x "${CLUSTERADM}"
-
+echo "############  Install clusteradm"
+go install open-cluster-management.io/clusteradm/cmd/clusteradm@main
 
 echo "###### installing e2e test cluster : ${REPO_DIR}/.kubeconfig"
 ${KIND} delete cluster --name ${MANAGED_CLUSTER_NAME}

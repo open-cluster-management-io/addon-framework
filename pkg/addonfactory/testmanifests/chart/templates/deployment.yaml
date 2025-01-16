@@ -2,7 +2,8 @@
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: {{ template "test.fullname" . }}-addon
+  {{- $deploymentName := printf "%s-addon" (include "test.fullname" .) }}
+  name: {{ $deploymentName }}
   namespace: {{ .Release.Namespace }}
   labels:
     app: {{ template "test.name" . }}-addon
@@ -33,11 +34,19 @@ spec:
     spec:
       serviceAccountName: {{ template "test.fullname" . }}
       containers:
-        - name: test
+        {{- $containerName := "test" }}
+        - name: {{ $containerName }}
           image: "{{ .Values.global.imageOverrides.testImage }}"
           imagePullPolicy: "{{ .Values.imagePullPolicy }}"
+          {{- $containerID := printf "deployments:%s:%s" $deploymentName $containerName }}
+          {{- $reverseResourceRequirements := reverse .Values.global.resourceRequirements }}
+          {{- range $item := $reverseResourceRequirements }}
+            {{- if regexMatch $item.containerIDRegex $containerID }}
           resources:
-          {{- toYaml .Values.resources | nindent 10 }}
+              {{- toYaml $item.resources | nindent 12 }}
+              {{- break -}}
+            {{- end -}}
+          {{- end }}
           command: ["test"]
           env:
             - name: WATCH_NAMESPACE

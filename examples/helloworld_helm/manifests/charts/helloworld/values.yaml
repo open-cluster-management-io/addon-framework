@@ -6,12 +6,6 @@ clusterName: null
 addonInstallNamespace: null
 hubKubeConfigSecret: null
 
-resources:
-  requests:
-    memory: 32Mi
-  limits:
-    memory: 128Mi
-
 tolerations: []
 
 global:
@@ -24,3 +18,10 @@ global:
     HTTP_PROXY: null
     HTTPS_PROXY: null
     NO_PROXY: null
+  resourceRequirements:
+  - containerIDRegex: ^.+:.+:.+$
+    resources:
+      requests:
+        memory: 32Mi
+      limits:
+        memory: 128Mi

@@ -3,9 +3,12 @@ package addonfactory
 import (
 	"embed"
 	"fmt"
+	"reflect"
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -45,6 +48,7 @@ func TestTemplateAddon_Manifests(t *testing.T) {
 		expectedObjectCnt               int
 		expectedHubKubeConfigSecret     string
 		expectedManagedKubeConfigSecret string
+		expectedResourceRequirements    *corev1.ResourceRequirements
 	}{
 		{
 			name:             "template render ok with annotation config and default scheme",
@@ -58,11 +62,12 @@ func TestTemplateAddon_Manifests(t *testing.T) {
 				config := config{Image: "quay.io/helloworld:latest"}
 				return StructToValues(config), nil
 			},
-			annotationConfig:         `{"NodeSelector":{"host":"ssd"},"Image":"quay.io/helloworld:2.4"}`,
-			expectedInstallNamespace: "myNs",
-			expectedNodeSelector:     map[string]string{"host": "ssd"},
-			expectedImage:            "quay.io/helloworld:2.4",
-			expectedObjectCnt:        2,
+			annotationConfig:             `{"NodeSelector":{"host":"ssd"},"Image":"quay.io/helloworld:2.4"}`,
+			expectedInstallNamespace:     "myNs",
+			expectedNodeSelector:         map[string]string{"host": "ssd"},
+			expectedImage:                "quay.io/helloworld:2.4",
+			expectedObjectCnt:            2,
+			expectedResourceRequirements: &corev1.ResourceRequirements{},
 		},
 		{
 			name:        "deployment template render ok with default scheme but no annotation config",
@@ -75,46 +80,50 @@ func TestTemplateAddon_Manifests(t *testing.T) {
 				config := config{Image: "quay.io/helloworld:latest"}
 				return StructToValues(config), nil
 			},
-			expectedInstallNamespace: AddonDefaultInstallNamespace,
-			expectedNodeSelector:     map[string]string{},
-			expectedImage:            "quay.io/helloworld:latest",
-			expectedObjectCnt:        2,
+			expectedInstallNamespace:     AddonDefaultInstallNamespace,
+			expectedNodeSelector:         map[string]string{},
+			expectedImage:                "quay.io/helloworld:latest",
+			expectedObjectCnt:            2,
+			expectedResourceRequirements: &corev1.ResourceRequirements{},
 		},
 		{
-			name:                     "deployment template render ok with default scheme,but no userConfig",
-			dir:                      "testmanifests/template",
-			clusterName:              "cluster1",
-			addonName:                "helloworld",
-			scheme:                   scheme,
-			annotationConfig:         `{"NodeSelector":{"host":"ssd"},"Image":"quay.io/helloworld:2.4"}`,
-			expectedInstallNamespace: AddonDefaultInstallNamespace,
-			expectedNodeSelector:     map[string]string{"host": "ssd"},
-			expectedImage:            "quay.io/helloworld:2.4",
-			expectedObjectCnt:        2,
+			name:                         "deployment template render ok with default scheme,but no userConfig",
+			dir:                          "testmanifests/template",
+			clusterName:                  "cluster1",
+			addonName:                    "helloworld",
+			scheme:                       scheme,
+			annotationConfig:             `{"NodeSelector":{"host":"ssd"},"Image":"quay.io/helloworld:2.4"}`,
+			expectedInstallNamespace:     AddonDefaultInstallNamespace,
+			expectedNodeSelector:         map[string]string{"host": "ssd"},
+			expectedImage:                "quay.io/helloworld:2.4",
+			expectedObjectCnt:            2,
+			expectedResourceRequirements: &corev1.ResourceRequirements{},
 		},
 		{
-			name:                     "template render ok with userConfig and custom scheme",
-			dir:                      "testmanifests/template",
-			scheme:                   scheme,
-			clusterName:              "cluster1",
-			addonName:                "helloworld",
-			annotationConfig:         `{"NodeSelector":{"host":"ssd"},"Image":"quay.io/helloworld:2.4"}`,
-			expectedInstallNamespace: AddonDefaultInstallNamespace,
-			expectedNodeSelector:     map[string]string{"host": "ssd"},
-			expectedImage:            "quay.io/helloworld:2.4",
-			expectedObjectCnt:        2,
+			name:                         "template render ok with userConfig and custom scheme",
+			dir:                          "testmanifests/template",
+			scheme:                       scheme,
+			clusterName:                  "cluster1",
+			addonName:                    "helloworld",
+			annotationConfig:             `{"NodeSelector":{"host":"ssd"},"Image":"quay.io/helloworld:2.4"}`,
+			expectedInstallNamespace:     AddonDefaultInstallNamespace,
+			expectedNodeSelector:         map[string]string{"host": "ssd"},
+			expectedImage:                "quay.io/helloworld:2.4",
+			expectedObjectCnt:            2,
+			expectedResourceRequirements: &corev1.ResourceRequirements{},
 		},
 		{
-			name:                     "template render ok with empty yaml",
-			dir:                      "testmanifests/template",
-			scheme:                   scheme,
-			clusterName:              "local-cluster",
-			addonName:                "helloworld",
-			annotationConfig:         `{"NodeSelector":{"host":"ssd"},"Image":"quay.io/helloworld:2.4"}`,
-			expectedInstallNamespace: AddonDefaultInstallNamespace,
-			expectedNodeSelector:     map[string]string{"host": "ssd"},
-			expectedImage:            "quay.io/helloworld:2.4",
-			expectedObjectCnt:        1,
+			name:                         "template render ok with empty yaml",
+			dir:                          "testmanifests/template",
+			scheme:                       scheme,
+			clusterName:                  "local-cluster",
+			addonName:                    "helloworld",
+			annotationConfig:             `{"NodeSelector":{"host":"ssd"},"Image":"quay.io/helloworld:2.4"}`,
+			expectedInstallNamespace:     AddonDefaultInstallNamespace,
+			expectedNodeSelector:         map[string]string{"host": "ssd"},
+			expectedImage:                "quay.io/helloworld:2.4",
+			expectedObjectCnt:            1,
+			expectedResourceRequirements: &corev1.ResourceRequirements{},
 		},
 		{
 			name:             "deployment template render ok with overriden secret names",
@@ -137,6 +146,39 @@ func TestTemplateAddon_Manifests(t *testing.T) {
 			expectedObjectCnt:               2,
 			expectedHubKubeConfigSecret:     "external-hub-kubeconfig",
 			expectedManagedKubeConfigSecret: "external-managed-kubeconfig",
+			expectedResourceRequirements:    &corev1.ResourceRequirements{},
+		},
+		{
+			name:             "deployment template render ok with resource requirements",
+			dir:              "testmanifests/template",
+			clusterName:      "local-cluster",
+			addonName:        "helloworld",
+			scheme:           scheme,
+			annotationConfig: `{"Image":"quay.io/helloworld:2.4"}`,
+			getValuesFunc: func(cluster *clusterv1.ManagedCluster,
+				addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
+				return Values{
+					"ResourceRequirements": []regexResourceRequirements{
+						{
+							ContainerIDRegex: "^.+:.+:.+$",
+							Resources: resourceRequirements{
+								Requests: map[string]string{
+									"memory": "64Mi",
+								},
+							},
+						},
+					},
+				}, nil
+			},
+			expectedInstallNamespace: AddonDefaultInstallNamespace,
+			expectedNodeSelector:     map[string]string{},
+			expectedImage:            "quay.io/helloworld:2.4",
+			expectedObjectCnt:        1,
+			expectedResourceRequirements: &corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceMemory: resource.MustParse("64Mi"),
+				},
+			},
 		},
 	}
 	for _, c := range cases {
@@ -189,6 +231,10 @@ func TestTemplateAddon_Manifests(t *testing.T) {
 
 					if object.Spec.Template.Spec.Containers[0].Image != c.expectedImage {
 						t.Errorf("expected image is %s, but got %s", c.expectedImage, object.Spec.Template.Spec.Containers[0].Image)
+					}
+
+					if !reflect.DeepEqual(&object.Spec.Template.Spec.Containers[0].Resources, c.expectedResourceRequirements) {
+						t.Errorf("expected resource requirements is %v, but got %v", c.expectedResourceRequirements, object.Spec.Template.Spec.Containers[0].Resources)
 					}
 				case *clusterv1apha1.ClusterClaim:
 					if object.GetName() != c.expectedInstallNamespace {

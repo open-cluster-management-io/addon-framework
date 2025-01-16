@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -608,6 +609,68 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 
 			if !equality.Semantic.DeepEqual(proxyConfig, deployProxyConfig) {
 				return fmt.Errorf("expected proxy settings %v, but got %v", proxyConfig, deployProxyConfig)
+			}
+
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+	})
+
+	ginkgo.It("addon should adopt the resource requirements from addondeploymentconfig", func() {
+		ginkgo.By("Prepare a AddOnDeploymentConfig for resource requirement settings")
+		gomega.Eventually(func() error {
+			return prepareResourceRequirementsAddOnDeploymentConfig(managedClusterName)
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		ginkgo.By("Add the configs to ManagedClusterAddOn")
+		gomega.Eventually(func() error {
+			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(
+				context.Background(), helloWorldHelmAddonName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			newAddon := addon.DeepCopy()
+			newAddon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+				{
+					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+						Group:    "addon.open-cluster-management.io",
+						Resource: "addondeploymentconfigs",
+					},
+					ConfigReferent: addonapiv1alpha1.ConfigReferent{
+						Namespace: managedClusterName,
+						Name:      deployResourceRequirementConfigName,
+					},
+				},
+			}
+			_, err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Update(
+				context.Background(), newAddon, metav1.UpdateOptions{})
+			if err != nil {
+				return err
+			}
+			return nil
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		ginkgo.By("Make sure addon is configured")
+		gomega.Eventually(func() error {
+			agentDeploy, err := hubKubeClient.AppsV1().Deployments(addonInstallNamespace).Get(
+				context.Background(), "helloworldhelm-agent", metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			containers := agentDeploy.Spec.Template.Spec.Containers
+			if len(containers) != 1 {
+				return fmt.Errorf("expect one container, but %v", containers)
+			}
+
+			// check the resource requirements
+			required := corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceMemory: resource.MustParse("32Mi"),
+				},
+			}
+
+			if !equality.Semantic.DeepEqual(containers[0].Resources, required) {
+				return fmt.Errorf("expected resource requirement %v, but got %v", required, containers[0].Resources)
 			}
 
 			return nil

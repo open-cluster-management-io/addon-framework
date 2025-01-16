@@ -31,6 +31,30 @@ spec:
       - name: helloworld-agent
         image: {{ .Image }}
         imagePullPolicy: IfNotPresent
+{{- with .ResourceRequirements}}
+    {{- $matchedIndex := -1 }}
+    {{- range $index, $item := . }}
+        {{- if regexMatch $item.ContainerIDRegex "deployments:helloworld-agent:helloworld-agent" }}
+          {{- $matchedIndex = $index }}
+        {{- end }}
+    {{- end }}
+    {{- if ne $matchedIndex -1 }}
+        {{- $matched := index . $matchedIndex }}
+        resources:
+        {{- if $matched.Resources.Requests}}
+          requests:
+          {{- range $key, $value := $matched.Resources.Requests }}
+            "{{ $key }}": "{{ $value }}"
+          {{- end }}
+        {{- end }}
+        {{- if $matched.Resources.Limits}}
+          limits:
+          {{- range $key, $value := $matched.Resources.Limits }}
+            "{{ $key }}": "{{ $value }}"
+          {{- end }}
+        {{- end }}
+    {{- end }}
+{{- end }}
         args:
           - "/helloworld"
           - "agent"

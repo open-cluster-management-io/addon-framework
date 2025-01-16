@@ -3,12 +3,14 @@ package addonfactory
 import (
 	"embed"
 	"fmt"
+	"reflect"
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -62,6 +64,24 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 	_ = apiextensionsv1beta1.AddToScheme(testScheme)
 	_ = scheme.AddToScheme(testScheme)
 
+	defaultResourceReqirements := corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("128Mi"),
+		},
+		Limits: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("256Mi"),
+		},
+	}
+
+	customResourceReqirements := corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("64Mi"),
+		},
+		Limits: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("512Mi"),
+		},
+	}
+
 	cases := []struct {
 		name                            string
 		scheme                          *runtime.Scheme
@@ -79,42 +99,46 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 		expectedHubKubeConfigSecret     string
 		expectedManagedKubeConfigSecret string
 		expectedNamespace               bool
+		expectedResourceRequirements    *corev1.ResourceRequirements
 	}{
 		{
-			name:                     "template render ok with annotation values",
-			scheme:                   testScheme,
-			clusterName:              "cluster1",
-			addonName:                "helloworld",
-			installNamespace:         "myNs",
-			annotationValues:         `{"global": {"nodeSelector":{"host":"ssd"},"imageOverrides":{"testImage":"quay.io/helloworld:2.4"}}}`,
-			expectedInstallNamespace: "myNs",
-			expectedNodeSelector:     map[string]string{"host": "ssd"},
-			expectedImage:            "quay.io/helloworld:2.4",
-			expectedObjCnt:           4,
+			name:                         "template render ok with annotation values",
+			scheme:                       testScheme,
+			clusterName:                  "cluster1",
+			addonName:                    "helloworld",
+			installNamespace:             "myNs",
+			annotationValues:             `{"global": {"nodeSelector":{"host":"ssd"},"imageOverrides":{"testImage":"quay.io/helloworld:2.4"}}}`,
+			expectedInstallNamespace:     "myNs",
+			expectedNodeSelector:         map[string]string{"host": "ssd"},
+			expectedImage:                "quay.io/helloworld:2.4",
+			expectedObjCnt:               4,
+			expectedResourceRequirements: &defaultResourceReqirements,
 		},
 		{
-			name:                     "template render ok with empty yaml",
-			scheme:                   testScheme,
-			clusterName:              "local-cluster",
-			addonName:                "helloworld",
-			installNamespace:         "myNs",
-			annotationValues:         `{"global": {"nodeSelector":{"host":"ssd"},"imageOverrides":{"testImage":"quay.io/helloworld:2.4"}}}`,
-			expectedInstallNamespace: "myNs",
-			expectedNodeSelector:     map[string]string{"host": "ssd"},
-			expectedImage:            "quay.io/helloworld:2.4",
-			expectedObjCnt:           2,
+			name:                         "template render ok with empty yaml",
+			scheme:                       testScheme,
+			clusterName:                  "local-cluster",
+			addonName:                    "helloworld",
+			installNamespace:             "myNs",
+			annotationValues:             `{"global": {"nodeSelector":{"host":"ssd"},"imageOverrides":{"testImage":"quay.io/helloworld:2.4"}}}`,
+			expectedInstallNamespace:     "myNs",
+			expectedNodeSelector:         map[string]string{"host": "ssd"},
+			expectedImage:                "quay.io/helloworld:2.4",
+			expectedObjCnt:               2,
+			expectedResourceRequirements: &defaultResourceReqirements,
 		},
 		{
-			name:                     "template render ok with multiple resources in one file",
-			scheme:                   testScheme,
-			clusterName:              "cluster2",
-			addonName:                "helloworld",
-			installNamespace:         "myNs",
-			annotationValues:         `{"global": {"nodeSelector":{"host":"ssd"},"imageOverrides":{"testImage":"quay.io/helloworld:2.4"}}}`,
-			expectedInstallNamespace: "myNs",
-			expectedNodeSelector:     map[string]string{"host": "ssd"},
-			expectedImage:            "quay.io/helloworld:2.4",
-			expectedObjCnt:           6,
+			name:                         "template render ok with multiple resources in one file",
+			scheme:                       testScheme,
+			clusterName:                  "cluster2",
+			addonName:                    "helloworld",
+			installNamespace:             "myNs",
+			annotationValues:             `{"global": {"nodeSelector":{"host":"ssd"},"imageOverrides":{"testImage":"quay.io/helloworld:2.4"}}}`,
+			expectedInstallNamespace:     "myNs",
+			expectedNodeSelector:         map[string]string{"host": "ssd"},
+			expectedImage:                "quay.io/helloworld:2.4",
+			expectedObjCnt:               6,
+			expectedResourceRequirements: &defaultResourceReqirements,
 		},
 		{
 			name:             "template render ok with getValuesFunc",
@@ -135,31 +159,59 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 			expectedObjCnt:                  4,
 			expectedHubKubeConfigSecret:     "external-hub-kubeconfig",
 			expectedManagedKubeConfigSecret: "external-managed-kubeconfig",
+			expectedResourceRequirements:    &defaultResourceReqirements,
 		},
 		{
-			name:                     "template render ok with newer hosting cluster",
-			scheme:                   testScheme,
-			clusterName:              "cluster1",
-			hostingCluster:           NewFakeManagedCluster("hosting-cluster", "1.25.0"),
-			addonName:                "helloworld",
-			installNamespace:         "myNs",
-			expectedInstallNamespace: "myNs",
-			expectedImage:            "quay.io/testimage:test",
-			expectedObjCnt:           5,
-			expectedNamespace:        true,
+			name:                         "template render ok with newer hosting cluster",
+			scheme:                       testScheme,
+			clusterName:                  "cluster1",
+			hostingCluster:               NewFakeManagedCluster("hosting-cluster", "1.25.0"),
+			addonName:                    "helloworld",
+			installNamespace:             "myNs",
+			expectedInstallNamespace:     "myNs",
+			expectedImage:                "quay.io/testimage:test",
+			expectedObjCnt:               5,
+			expectedNamespace:            true,
+			expectedResourceRequirements: &defaultResourceReqirements,
 		},
 		{
-			name:                        "template render ok, getting hosting cluster with client",
-			scheme:                      testScheme,
-			clusterName:                 "cluster1",
-			hostingCluster:              NewFakeManagedCluster("hosting-cluster", "1.25.0"),
-			getHostingClusterWithClient: true,
-			addonName:                   "helloworld",
-			installNamespace:            "myNs",
-			expectedInstallNamespace:    "myNs",
-			expectedImage:               "quay.io/testimage:test",
-			expectedObjCnt:              5,
-			expectedNamespace:           true,
+			name:                         "template render ok, getting hosting cluster with client",
+			scheme:                       testScheme,
+			clusterName:                  "cluster1",
+			hostingCluster:               NewFakeManagedCluster("hosting-cluster", "1.25.0"),
+			getHostingClusterWithClient:  true,
+			addonName:                    "helloworld",
+			installNamespace:             "myNs",
+			expectedInstallNamespace:     "myNs",
+			expectedImage:                "quay.io/testimage:test",
+			expectedObjCnt:               5,
+			expectedNamespace:            true,
+			expectedResourceRequirements: &defaultResourceReqirements,
+		},
+		{
+			name:             "template render ok with resource requirements",
+			scheme:           testScheme,
+			clusterName:      "cluster1",
+			addonName:        "helloworld",
+			installNamespace: "myNs",
+			annotationValues: `{"global": {"nodeSelector":{"host":"ssd"},"imageOverrides":{"testImage":"quay.io/helloworld:2.4"}}}`,
+			getValuesFunc: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
+				return ToAddOnResourceRequirementsValues(addonapiv1alpha1.AddOnDeploymentConfig{
+					Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+						ResourceRequirements: []addonapiv1alpha1.ContainerResourceRequirements{
+							{
+								ContainerID: "*:*:*",
+								Resources:   customResourceReqirements,
+							},
+						},
+					},
+				})
+			},
+			expectedInstallNamespace:     "myNs",
+			expectedNodeSelector:         map[string]string{"host": "ssd"},
+			expectedImage:                "quay.io/helloworld:2.4",
+			expectedObjCnt:               4,
+			expectedResourceRequirements: &customResourceReqirements,
 		},
 	}
 
@@ -222,6 +274,10 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 
 					if object.Spec.Template.Spec.Containers[0].Image != c.expectedImage {
 						t.Errorf("expected Image is %s, but got %s", c.expectedImage, object.Spec.Template.Spec.Containers[0].Image)
+					}
+
+					if !reflect.DeepEqual(&object.Spec.Template.Spec.Containers[0].Resources, c.expectedResourceRequirements) {
+						t.Errorf("expected resource requirements is %v, but got %v", c.expectedResourceRequirements, object.Spec.Template.Spec.Containers[0].Resources)
 					}
 				case *clusterv1apha1.ClusterClaim:
 					if object.Spec.Value != c.clusterName {

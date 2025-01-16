@@ -11,14 +11,12 @@ DEPLOY_DIR="$(dirname "$BUILD_DIR")"
 EXAMPLE_DIR="$(dirname "$DEPLOY_DIR")"
 REPO_DIR="$(dirname "$EXAMPLE_DIR")"
 WORK_DIR="${REPO_DIR}/_output"
-CLUSTERADM="${WORK_DIR}/bin/clusteradm"
+CLUSTERADM="clusteradm"
 
 export PATH=$PATH:${WORK_DIR}/bin
 
-echo "############  Download clusteradm"
-mkdir -p "${WORK_DIR}/bin"
-wget -qO- https://github.com/open-cluster-management-io/clusteradm/releases/latest/download/clusteradm_${GOHOSTOS}_${GOHOSTARCH}.tar.gz | sudo tar -xvz -C ${WORK_DIR}/bin/
-chmod +x "${CLUSTERADM}"
+echo "############  Install clusteradm"
+go install open-cluster-management.io/clusteradm/cmd/clusteradm@main
 
 echo "############ Init hub"
 ${CLUSTERADM} init --wait --bundle-version=latest

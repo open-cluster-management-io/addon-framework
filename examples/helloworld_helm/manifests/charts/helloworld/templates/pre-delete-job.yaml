@@ -1,7 +1,8 @@
 kind: Job
 apiVersion: batch/v1
 metadata:
-  name: {{ template "helloworldhelm.name" . }}-cleanup-configmap
+  {{- $jobName := printf "%s-cleanup-configmap" (include "helloworldhelm.name" .) }}
+  name: {{ $jobName }}
   namespace: {{ .Release.Namespace }}
   annotations:
     "addon.open-cluster-management.io/addon-pre-delete": ""
@@ -18,11 +19,19 @@ spec:
       serviceAccountName: {{ template "helloworldhelm.name" . }}-agent-sa
       restartPolicy: Never
       containers:
-      - name: {{ template "helloworldhelm.name" . }}-agent
+      {{- $containerName := printf "%s-agent" (include "helloworldhelm.name" .) }}
+      - name: {{ $containerName }}
         image: {{ .Values.global.imageOverrides.helloWorldHelm }}
         imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        {{- $containerID := printf "jobs:%s:%s" $jobName $containerName }}
+        {{- $reverseResourceRequirements := reverse .Values.global.resourceRequirements }}
+        {{- range $item := $reverseResourceRequirements }}
+          {{- if regexMatch $item.containerIDRegex $containerID }}
         resources:
-          {{- toYaml .Values.resources | nindent 10 }}
+            {{- toYaml $item.resources | nindent 10 }}
+            {{- break -}}
+          {{- end -}}
+        {{- end }}
         args:
           - "/helloworld_helm"
           - "cleanup"

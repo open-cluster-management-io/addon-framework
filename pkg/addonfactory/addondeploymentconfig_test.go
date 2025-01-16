@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
@@ -190,6 +191,109 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 				"HTTPSProxy":    "https://10.2.3.4.3129",
 				"NoProxy":       "example.com",
 				"ProxyCABundle": string([]byte("fake-ca-bndle")),
+			},
+		},
+		{
+			name:          "to addon resource requirements",
+			toValuesFuncs: []AddOnDeploymentConfigToValuesFunc{ToAddOnDeploymentConfigValues},
+			addOnObjs: []runtime.Object{
+				func() *addonapiv1alpha1.ManagedClusterAddOn {
+					addon := addontesting.NewAddon("test", "cluster1")
+					addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+						{
+							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+								Group:    "addon.open-cluster-management.io",
+								Resource: "addondeploymentconfigs",
+							},
+							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+									Namespace: "cluster1",
+									Name:      "config",
+								},
+								SpecHash: "dummy",
+							},
+						},
+					}
+					return addon
+				}(),
+				&addonapiv1alpha1.AddOnDeploymentConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "config",
+						Namespace: "cluster1",
+					},
+					Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+						ResourceRequirements: []addonapiv1alpha1.ContainerResourceRequirements{
+							{
+								ContainerID: "a:b:c",
+								Resources: corev1.ResourceRequirements{
+									Requests: corev1.ResourceList{
+										corev1.ResourceMemory: resource.MustParse("64Mi"),
+									},
+								},
+							},
+							{
+								ContainerID: "*:b:c",
+								Resources: corev1.ResourceRequirements{
+									Requests: corev1.ResourceList{
+										corev1.ResourceMemory: resource.MustParse("128Mi"),
+									},
+								},
+							},
+							{
+								ContainerID: "*:*:c",
+								Resources: corev1.ResourceRequirements{
+									Requests: corev1.ResourceList{
+										corev1.ResourceMemory: resource.MustParse("256Mi"),
+									},
+								},
+							},
+							{
+								ContainerID: "*:*:*",
+								Resources: corev1.ResourceRequirements{
+									Requests: corev1.ResourceList{
+										corev1.ResourceMemory: resource.MustParse("512Mi"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedValues: Values{
+				"ResourceRequirements": []regexResourceRequirements{
+					{
+						ContainerIDRegex: "^a:b:c$",
+						Resources: resourceRequirements{
+							Requests: map[string]string{
+								"memory": "64Mi",
+							},
+						},
+					},
+					{
+						ContainerIDRegex: "^.+:b:c$",
+						Resources: resourceRequirements{
+							Requests: map[string]string{
+								"memory": "128Mi",
+							},
+						},
+					},
+					{
+						ContainerIDRegex: "^.+:.+:c$",
+						Resources: resourceRequirements{
+							Requests: map[string]string{
+								"memory": "256Mi",
+							},
+						},
+					},
+					{
+						ContainerIDRegex: "^.+:.+:.+$",
+						Resources: resourceRequirements{
+							Requests: map[string]string{
+								"memory": "512Mi",
+							},
+						},
+					},
+				},
 			},
 		},
 		{
@@ -610,6 +714,126 @@ func TestGetAgentImageValues(t *testing.T) {
 
 			if !equality.Semantic.DeepEqual(values, c.expectedValues) {
 				t.Errorf("expected values %v, but got values %v", c.expectedValues, values)
+			}
+		})
+	}
+}
+
+func TestGetRegexResourceRequirements(t *testing.T) {
+	reqirement := corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("128Mi"),
+		},
+		Limits: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("256Mi"),
+		},
+	}
+	expectedReqirement := resourceRequirements{
+		Requests: map[string]string{
+			"memory": "128Mi",
+		},
+		Limits: map[string]string{
+			"memory": "256Mi",
+		},
+	}
+
+	cases := []struct {
+		name                          string
+		containerResourceRequirements []addonapiv1alpha1.ContainerResourceRequirements
+		expectedResourceRequirements  []regexResourceRequirements
+		expectedErr                   error
+	}{
+		{
+			name: "empty",
+		},
+		{
+			name: "invalid ContainerID",
+			containerResourceRequirements: []addonapiv1alpha1.ContainerResourceRequirements{
+				{
+					ContainerID: "abc",
+					Resources:   reqirement,
+				},
+			},
+			expectedErr: fmt.Errorf("invalid ContainerID: %s", "abc"),
+		},
+		{
+			name: "no wildcard",
+			containerResourceRequirements: []addonapiv1alpha1.ContainerResourceRequirements{
+				{
+					ContainerID: "a:b:c",
+					Resources:   reqirement,
+				},
+			},
+			expectedResourceRequirements: []regexResourceRequirements{
+				{
+					ContainerIDRegex: "^a:b:c$",
+					Resources:        expectedReqirement,
+				},
+			},
+		},
+		{
+			name: "type is wildcard",
+			containerResourceRequirements: []addonapiv1alpha1.ContainerResourceRequirements{
+				{
+					ContainerID: "*:b:c",
+					Resources:   reqirement,
+				},
+			},
+			expectedResourceRequirements: []regexResourceRequirements{
+				{
+					ContainerIDRegex: "^.+:b:c$",
+					Resources:        expectedReqirement,
+				},
+			},
+		},
+		{
+			name: "type and name are wildcard",
+			containerResourceRequirements: []addonapiv1alpha1.ContainerResourceRequirements{
+				{
+					ContainerID: "*:*:c",
+					Resources:   reqirement,
+				},
+			},
+			expectedResourceRequirements: []regexResourceRequirements{
+				{
+					ContainerIDRegex: "^.+:.+:c$",
+					Resources:        expectedReqirement,
+				},
+			},
+		},
+		{
+			name: "all are wildcard",
+			containerResourceRequirements: []addonapiv1alpha1.ContainerResourceRequirements{
+				{
+					ContainerID: "*:*:*",
+					Resources:   reqirement,
+				},
+			},
+			expectedResourceRequirements: []regexResourceRequirements{
+				{
+					ContainerIDRegex: "^.+:.+:.+$",
+					Resources:        expectedReqirement,
+				},
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+
+			requirements, err := getRegexResourceRequirements(c.containerResourceRequirements)
+			if err != nil {
+				if c.expectedErr == nil || !strings.EqualFold(err.Error(), c.expectedErr.Error()) {
+					t.Errorf("expected error %v, but got error %s", c.expectedErr, err)
+				}
+			} else {
+				if c.expectedErr != nil {
+					t.Errorf("expected error %v, but got no error", c.expectedErr)
+				}
+			}
+
+			if !equality.Semantic.DeepEqual(requirements, c.expectedResourceRequirements) {
+				t.Errorf("expected ResourceRequirements %v, but got %v", c.expectedResourceRequirements, requirements)
 			}
 		})
 	}

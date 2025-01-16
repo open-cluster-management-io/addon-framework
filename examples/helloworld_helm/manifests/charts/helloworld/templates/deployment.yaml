@@ -1,7 +1,8 @@
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: {{ template "helloworldhelm.name" . }}-agent
+  {{- $deploymentName := printf "%s-agent" (include "helloworldhelm.name" .) }}
+  name: {{ $deploymentName }}
   namespace: {{ .Release.Namespace }}
   labels:
     app: {{ template "helloworldhelm.name" . }}
@@ -38,9 +39,19 @@ spec:
       nodeSelector: {{ toYaml .Values.global.nodeSelector | nindent 8 }}
       {{- end }}
       containers:
-      - name: {{ template "helloworldhelm.name" . }}-agent
+      {{- $containerName := printf "%s-agent" (include "helloworldhelm.name" .) }}
+      - name: {{ $containerName }}
         image: {{ .Values.global.imageOverrides.helloWorldHelm }}
         imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        {{- $containerID := printf "deployments:%s:%s" $deploymentName $containerName }}
+        {{- $reverseResourceRequirements := reverse .Values.global.resourceRequirements }}
+        {{- range $item := $reverseResourceRequirements }}
+          {{- if regexMatch $item.containerIDRegex $containerID }}
+        resources:
+            {{- toYaml $item.resources | nindent 10 }}
+            {{- break -}}
+          {{- end -}}
+        {{- end }}
         {{- if or .Values.global.proxyConfig.HTTP_PROXY .Values.global.proxyConfig.HTTPS_PROXY }}
         env:
           {{- if .Values.global.proxyConfig.HTTP_PROXY }}
@@ -56,8 +67,6 @@ spec:
             value: {{ .Values.global.proxyConfig.NO_PROXY }}
           {{- end }}
         {{- end }}
-        resources:
-          {{- toYaml .Values.resources | nindent 10 }}
         args:
           - "/helloworld_helm"
           - "agent"
