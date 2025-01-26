@@ -91,12 +91,6 @@ func TestSync(t *testing.T) {
 							},
 						},
 					}
-					addon.Status.SupportedConfigs = []addonapiv1alpha1.ConfigGroupResource{
-						{
-							Group:    fakeGVR.Group,
-							Resource: fakeGVR.Resource,
-						},
-					}
 					return addon
 				}(),
 			},
@@ -128,7 +122,7 @@ func TestSync(t *testing.T) {
 						{
 							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
 								Group:    fakeGVR.Group,
-								Resource: fakeGVR.Resource,
+								Resource: fakeGVR.Resource + "-unsupported",
 							},
 							ConfigReferent: addonapiv1alpha1.ConfigReferent{
 								Namespace: "cluster1",
@@ -140,13 +134,13 @@ func TestSync(t *testing.T) {
 						{
 							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
 								Group:    fakeGVR.Group,
-								Resource: fakeGVR.Resource,
+								Resource: fakeGVR.Resource + "-unsupported",
 							},
 							ConfigReferent: addonapiv1alpha1.ConfigReferent{
 								Namespace: "cluster1",
 								Name:      "test",
 							},
-							LastObservedGeneration: 1,
+							LastObservedGeneration: 0,
 							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
 								ConfigReferent: addonapiv1alpha1.ConfigReferent{
 									Namespace: "cluster1",
@@ -160,20 +154,7 @@ func TestSync(t *testing.T) {
 			},
 			configs: []runtime.Object{newTestConfing("test", "cluster1", 2)},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
-				patch := actions[0].(clienttesting.PatchActionImpl).Patch
-				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
-				err := json.Unmarshal(patch, addOn)
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				if addOn.Status.ConfigReferences[0].LastObservedGeneration != 2 {
-					t.Errorf("Expect addon config generation is 2, but got %v", addOn.Status.ConfigReferences[0].LastObservedGeneration)
-				}
-
-				if addOn.Status.ConfigReferences[0].DesiredConfig.SpecHash != "" {
-					t.Errorf("Expect addon config spec hash is empty, but got %v", addOn.Status.ConfigReferences[0].DesiredConfig.SpecHash)
-				}
+				addontesting.AssertNoActions(t, actions)
 			},
 		},
 		{
