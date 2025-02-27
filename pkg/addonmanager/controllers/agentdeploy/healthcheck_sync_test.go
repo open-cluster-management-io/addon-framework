@@ -45,7 +45,8 @@ func (t *healthCheckTestAgent) Manifests(cluster *clusterv1.ManagedCluster,
 
 	return []runtime.Object{
 		NewFakeDeployment("test-deployment", "default"),
-		NewFakeZeroReplicasDeployment("test-zero-replicas-deployment", "default"),
+		NewFakeDeploymentZeroReplicas("test-deployment-zero-replicas", "default"),
+		NewFakeDeploymentReplicasNotSet("test-deployment-replicas-not-set", "default"),
 		NewFakeDaemonSet("test-daemonset", "default"),
 	}, nil
 }
@@ -57,12 +58,12 @@ func (t *healthCheckTestAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
 	}
 }
 
-func NewFakeDeployment(namespace, name string) *appsv1.Deployment {
+func NewFakeDeployment(name, namespace string) *appsv1.Deployment {
 	var one int32 = 1
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      namespace,
-			Namespace: name,
+			Name:      name,
+			Namespace: namespace,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &one,
@@ -90,12 +91,12 @@ func NewFakeDeployment(namespace, name string) *appsv1.Deployment {
 	}
 }
 
-func NewFakeZeroReplicasDeployment(namespace, name string) *appsv1.Deployment {
+func NewFakeDeploymentZeroReplicas(name, namespace string) *appsv1.Deployment {
 	var zero int32 = 0
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      namespace,
-			Namespace: name,
+			Name:      name,
+			Namespace: namespace,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &zero,
@@ -123,11 +124,42 @@ func NewFakeZeroReplicasDeployment(namespace, name string) *appsv1.Deployment {
 	}
 }
 
-func NewFakeDaemonSet(namespace, name string) *appsv1.DaemonSet {
+func NewFakeDeploymentReplicasNotSet(name, namespace string) *appsv1.Deployment {
+	return &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": "test",
+				},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"addon": "test",
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "test",
+							Image: "test",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func NewFakeDaemonSet(name, namespace string) *appsv1.DaemonSet {
 	return &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      namespace,
-			Namespace: name,
+			Name:      name,
+			Namespace: namespace,
 		},
 		Spec: appsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{
@@ -736,6 +768,33 @@ func TestHealthCheckReconcile(t *testing.T) {
 										},
 									},
 								},
+								{
+									ResourceMeta: v1.ManifestResourceMeta{
+										Ordinal:   0,
+										Group:     "apps",
+										Version:   "",
+										Kind:      "",
+										Resource:  "deployments",
+										Name:      "test-deployment-replicas-not-set",
+										Namespace: "default",
+									},
+									StatusFeedbacks: v1.StatusFeedbackResult{
+										Values: []v1.FeedbackValue{
+											{
+												Name: "Replicas",
+												Value: v1.FieldValue{
+													Integer: boolPtr(1),
+												},
+											},
+											{
+												Name: "ReadyReplicas",
+												Value: v1.FieldValue{
+													Integer: boolPtr(1),
+												},
+											},
+										},
+									},
+								},
 							},
 						},
 						Conditions: []metav1.Condition{
@@ -968,6 +1027,33 @@ func TestHealthCheckReconcile(t *testing.T) {
 												Name: "ReadyReplicas",
 												Value: v1.FieldValue{
 													Integer: boolPtr(2),
+												},
+											},
+										},
+									},
+								},
+								{
+									ResourceMeta: v1.ManifestResourceMeta{
+										Ordinal:   0,
+										Group:     "apps",
+										Version:   "",
+										Kind:      "",
+										Resource:  "deployments",
+										Name:      "test-deployment-replicas-not-set",
+										Namespace: "default",
+									},
+									StatusFeedbacks: v1.StatusFeedbackResult{
+										Values: []v1.FeedbackValue{
+											{
+												Name: "Replicas",
+												Value: v1.FieldValue{
+													Integer: boolPtr(1),
+												},
+											},
+											{
+												Name: "ReadyReplicas",
+												Value: v1.FieldValue{
+													Integer: boolPtr(1),
 												},
 											},
 										},
