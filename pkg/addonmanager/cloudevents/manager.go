@@ -70,7 +70,7 @@ func (a *cloudeventsAddonManager) Start(ctx context.Context) error {
 		clientHolder, err := cloudeventswork.NewClientHolderBuilder(clientConfig).
 			WithClientID(a.options.CloudEventsClientID).
 			WithSourceID(a.options.SourceID).
-			WithCodecs(codec.NewManifestBundleCodec()).
+			WithCodec(codec.NewManifestBundleCodec()).
 			WithWorkClientWatcherStore(watcherStore).
 			NewSourceClientHolder(ctx)
 		if err != nil {
@@ -143,7 +143,7 @@ func (a *cloudeventsAddonManager) Start(ctx context.Context) error {
 
 	// For cloudevents work client, we use the informer store as the client store
 	if watcherStore != nil {
-		watcherStore.SetStore(workInformers.Informer().GetStore())
+		watcherStore.SetInformer(workInformers.Informer())
 	}
 
 	// addonDeployController
