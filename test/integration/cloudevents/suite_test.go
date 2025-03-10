@@ -277,7 +277,7 @@ func startWorkAgent(ctx context.Context, clusterName string) (*work.ClientHolder
 	clientHolder, err := work.NewClientHolderBuilder(config).
 		WithClientID(clusterName).
 		WithClusterName(clusterName).
-		WithCodecs(codec.NewManifestBundleCodec()).
+		WithCodec(codec.NewManifestBundleCodec()).
 		WithWorkClientWatcherStore(watcherStore).
 		NewAgentClientHolder(ctx)
 	if err != nil {
@@ -291,7 +291,7 @@ func startWorkAgent(ctx context.Context, clusterName string) (*work.ClientHolder
 
 	// For cloudevents work client, we use the informer store as the client store
 	if watcherStore != nil {
-		watcherStore.SetStore(workInformers.Informer().GetStore())
+		watcherStore.SetInformer(workInformers.Informer())
 	}
 
 	go workInformers.Informer().Run(ctx.Done())

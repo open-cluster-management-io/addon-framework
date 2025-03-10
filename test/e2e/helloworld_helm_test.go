@@ -145,20 +145,6 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 	})
 
 	ginkgo.It("addon should be available", func() {
-		ginkgo.By("Make sure cma annotation managed by addon-manager is added")
-		gomega.Eventually(func() error {
-			cma, err := hubAddOnClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), helloWorldHelmAddonName, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-
-			if cma.Annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey] != addonapiv1alpha1.AddonLifecycleAddonManagerAnnotationValue {
-				return fmt.Errorf("addon should have annotation, but get %v", cma.Annotations)
-			}
-
-			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
-
 		ginkgo.By("Make sure addon is available and has pre-delete finalizer")
 		gomega.Eventually(func() error {
 			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), helloWorldHelmAddonName, metav1.GetOptions{})

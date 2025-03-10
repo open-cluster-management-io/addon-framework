@@ -7,6 +7,7 @@ import (
 	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
+	cloudeventstypes "github.com/cloudevents/sdk-go/v2/types"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
@@ -23,7 +24,7 @@ import (
 type CloudEventSourceClient[T ResourceObject] struct {
 	*baseClient
 	lister           Lister[T]
-	codecs           map[types.CloudEventsDataType]Codec[T]
+	codec            Codec[T]
 	statusHashGetter StatusHashGetter[T]
 	sourceID         string
 }
@@ -34,33 +35,30 @@ type CloudEventSourceClient[T ResourceObject] struct {
 //     sending/receiving the cloudevents.
 //   - lister gets the resources from a cache/store of a source.
 //   - statusHashGetter calculates the resource status hash.
-//   - codecs is list of codecs for encoding/decoding a resource objet/cloudevent to/from a cloudevent/resource objet.
+//   - codec is used to encode/decode a resource objet/cloudevent to/from a cloudevent/resource objet.
 func NewCloudEventSourceClient[T ResourceObject](
 	ctx context.Context,
 	sourceOptions *options.CloudEventsSourceOptions,
 	lister Lister[T],
 	statusHashGetter StatusHashGetter[T],
-	codecs ...Codec[T],
+	codec Codec[T],
 ) (*CloudEventSourceClient[T], error) {
 	baseClient := &baseClient{
+		clientID:               sourceOptions.SourceID,
 		cloudEventsOptions:     sourceOptions.CloudEventsOptions,
 		cloudEventsRateLimiter: NewRateLimiter(sourceOptions.EventRateLimit),
 		reconnectedChan:        make(chan struct{}),
+		dataType:               codec.EventDataType(),
 	}
 
 	if err := baseClient.connect(ctx); err != nil {
 		return nil, err
 	}
 
-	evtCodes := make(map[types.CloudEventsDataType]Codec[T])
-	for _, codec := range codecs {
-		evtCodes[codec.EventDataType()] = codec
-	}
-
 	return &CloudEventSourceClient[T]{
 		baseClient:       baseClient,
 		lister:           lister,
-		codecs:           evtCodes,
+		codec:            codec,
 		statusHashGetter: statusHashGetter,
 		sourceID:         sourceOptions.SourceID,
 	}, nil
@@ -72,59 +70,57 @@ func (c *CloudEventSourceClient[T]) ReconnectedChan() <-chan struct{} {
 
 // Resync the resources status by sending a status resync request from the current source to a specified cluster.
 func (c *CloudEventSourceClient[T]) Resync(ctx context.Context, clusterName string) error {
-	// only resync the resources whose event data type is registered
-	for eventDataType := range c.codecs {
-		// list the resource objects that are maintained by the current source with a specified cluster
-		options := types.ListOptions{Source: c.sourceID, ClusterName: clusterName, CloudEventsDataType: eventDataType}
-		objs, err := c.lister.List(options)
+	// list the resource objects that are maintained by the current source with a specified cluster
+	options := types.ListOptions{Source: c.sourceID, ClusterName: clusterName, CloudEventsDataType: c.codec.EventDataType()}
+	objs, err := c.lister.List(options)
+	if err != nil {
+		return err
+	}
+
+	hashes := &payload.ResourceStatusHashList{Hashes: make([]payload.ResourceStatusHash, len(objs))}
+	for i, obj := range objs {
+		statusHash, err := c.statusHashGetter(obj)
 		if err != nil {
 			return err
 		}
 
-		hashes := &payload.ResourceStatusHashList{Hashes: make([]payload.ResourceStatusHash, len(objs))}
-		for i, obj := range objs {
-			statusHash, err := c.statusHashGetter(obj)
-			if err != nil {
-				return err
-			}
-
-			hashes.Hashes[i] = payload.ResourceStatusHash{
-				ResourceID: string(obj.GetUID()),
-				StatusHash: statusHash,
-			}
-		}
-
-		eventType := types.CloudEventsType{
-			CloudEventsDataType: eventDataType,
-			SubResource:         types.SubResourceStatus,
-			Action:              types.ResyncRequestAction,
-		}
-
-		evt := types.NewEventBuilder(c.sourceID, eventType).WithClusterName(clusterName).NewEvent()
-		if err := evt.SetData(cloudevents.ApplicationJSON, hashes); err != nil {
-			return fmt.Errorf("failed to set data to cloud event: %v", err)
-		}
-
-		if err := c.publish(ctx, evt); err != nil {
-			return err
+		hashes.Hashes[i] = payload.ResourceStatusHash{
+			ResourceID: string(obj.GetUID()),
+			StatusHash: statusHash,
 		}
 	}
+
+	eventType := types.CloudEventsType{
+		CloudEventsDataType: c.codec.EventDataType(),
+		SubResource:         types.SubResourceStatus,
+		Action:              types.ResyncRequestAction,
+	}
+
+	evt := types.NewEventBuilder(c.sourceID, eventType).WithClusterName(clusterName).NewEvent()
+	if err := evt.SetData(cloudevents.ApplicationJSON, hashes); err != nil {
+		return fmt.Errorf("failed to set data to cloud event: %v", err)
+	}
+
+	if err := c.publish(ctx, evt); err != nil {
+		return err
+	}
+
+	increaseCloudEventsSentCounter(evt.Source(), "", clusterName, c.codec.EventDataType().String(), string(eventType.SubResource), string(eventType.Action))
 
 	return nil
 }
 
 // Publish a resource spec from a source to an agent.
 func (c *CloudEventSourceClient[T]) Publish(ctx context.Context, eventType types.CloudEventsType, obj T) error {
+	if eventType.CloudEventsDataType != c.codec.EventDataType() {
+		return fmt.Errorf("unsupported event data type %s", eventType.CloudEventsDataType)
+	}
+
 	if eventType.SubResource != types.SubResourceSpec {
 		return fmt.Errorf("unsupported event eventType %s", eventType)
 	}
 
-	codec, ok := c.codecs[eventType.CloudEventsDataType]
-	if !ok {
-		return fmt.Errorf("failed to find the codec for event %s", eventType.CloudEventsDataType)
-	}
-
-	evt, err := codec.Encode(c.sourceID, eventType, obj)
+	evt, err := c.codec.Encode(c.sourceID, eventType, obj)
 	if err != nil {
 		return err
 	}
@@ -132,6 +128,9 @@ func (c *CloudEventSourceClient[T]) Publish(ctx context.Context, eventType types
 	if err := c.publish(ctx, *evt); err != nil {
 		return err
 	}
+
+	clusterName := evt.Context.GetExtensions()[types.ExtensionClusterName].(string)
+	increaseCloudEventsSentCounter(evt.Source(), "", clusterName, eventType.CloudEventsDataType.String(), string(eventType.SubResource), string(eventType.Action))
 
 	return nil
 }
@@ -151,6 +150,15 @@ func (c *CloudEventSourceClient[T]) receive(ctx context.Context, evt cloudevents
 		klog.Errorf("failed to parse cloud event type, %v", err)
 		return
 	}
+
+	// clusterName is not required for agent to send the request, in case of missing clusterName, set it to
+	// empty string, as the source is sufficient to infer the event's originating cluster.
+	cn, err := cloudeventstypes.ToString(evt.Context.GetExtensions()[types.ExtensionClusterName])
+	if err != nil {
+		cn = ""
+	}
+
+	increaseCloudEventsReceivedCounter(evt.Source(), cn, eventType.CloudEventsDataType.String(), string(eventType.SubResource), string(eventType.Action))
 
 	if eventType.Action == types.ResyncRequestAction {
 		if eventType.SubResource != types.SubResourceSpec {
@@ -173,9 +181,8 @@ func (c *CloudEventSourceClient[T]) receive(ctx context.Context, evt cloudevents
 		return
 	}
 
-	codec, ok := c.codecs[eventType.CloudEventsDataType]
-	if !ok {
-		klog.Warningf("failed to find the codec for event %s, ignore", eventType.CloudEventsDataType)
+	if eventType.CloudEventsDataType != c.codec.EventDataType() {
+		klog.Warningf("unsupported event data type %s, ignore", eventType.CloudEventsDataType)
 		return
 	}
 
@@ -184,7 +191,7 @@ func (c *CloudEventSourceClient[T]) receive(ctx context.Context, evt cloudevents
 		return
 	}
 
-	obj, err := codec.Decode(&evt)
+	obj, err := c.codec.Decode(&evt)
 	if err != nil {
 		klog.Errorf("failed to decode status, %v", err)
 		return
@@ -283,6 +290,7 @@ func (c *CloudEventSourceClient[T]) respondResyncSpecRequest(
 		if err := c.publish(ctx, evt); err != nil {
 			return err
 		}
+		increaseCloudEventsSentCounter(evt.Source(), "", fmt.Sprintf("%s", clusterName), evtDataType.String(), string(eventType.SubResource), string(eventType.Action))
 	}
 
 	return nil
