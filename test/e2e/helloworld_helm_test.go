@@ -663,7 +663,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
 
-	ginkgo.It("addon registraion agent install namespace should work", func() {
+	ginkgo.It("addon registration agent install namespace should work", func() {
 		ginkgo.By("Prepare a AddOnDeploymentConfig for addon agent install namespace")
 		gomega.Eventually(func() error {
 			return prepareAgentInstallNamespaceAddOnDeploymentConfig(managedClusterName)

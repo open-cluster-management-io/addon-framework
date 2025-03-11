@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/component-base/logs"
+	utilversion "k8s.io/component-base/version"
 	"k8s.io/klog/v2"
 )
 
@@ -131,6 +132,7 @@ func (c *ControllerCommandConfig) StartController(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	serverConfig.EffectiveVersion = utilversion.NewEffectiveVersion("v1.0.0")
 	serverConfig.HealthzChecks = append(serverConfig.HealthzChecks, c.healthChecks...)
 
 	server, err = serverConfig.Complete(nil).New(c.componentName, genericapiserver.NewEmptyDelegate())
