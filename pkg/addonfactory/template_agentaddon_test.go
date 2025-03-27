@@ -158,7 +158,7 @@ func TestTemplateAddon_Manifests(t *testing.T) {
 			getValuesFunc: func(cluster *clusterv1.ManagedCluster,
 				addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
 				return Values{
-					"ResourceRequirements": []regexResourceRequirements{
+					"ResourceRequirements": []RegexResourceRequirements{
 						{
 							ContainerIDRegex: "^.+:.+:.+$",
 							Resources: resourceRequirements{
