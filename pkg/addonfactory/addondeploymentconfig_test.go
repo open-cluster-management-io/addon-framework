@@ -260,36 +260,36 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 				},
 			},
 			expectedValues: Values{
-				"ResourceRequirements": []regexResourceRequirements{
+				"ResourceRequirements": []RegexResourceRequirements{
 					{
 						ContainerIDRegex: "^a:b:c$",
-						Resources: resourceRequirements{
-							Requests: map[string]string{
-								"memory": "64Mi",
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceMemory: resource.MustParse("64Mi"),
 							},
 						},
 					},
 					{
 						ContainerIDRegex: "^.+:b:c$",
-						Resources: resourceRequirements{
-							Requests: map[string]string{
-								"memory": "128Mi",
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceMemory: resource.MustParse("128Mi"),
 							},
 						},
 					},
 					{
 						ContainerIDRegex: "^.+:.+:c$",
-						Resources: resourceRequirements{
-							Requests: map[string]string{
-								"memory": "256Mi",
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceMemory: resource.MustParse("256Mi"),
 							},
 						},
 					},
 					{
 						ContainerIDRegex: "^.+:.+:.+$",
-						Resources: resourceRequirements{
-							Requests: map[string]string{
-								"memory": "512Mi",
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceMemory: resource.MustParse("512Mi"),
 							},
 						},
 					},
@@ -728,19 +728,19 @@ func TestGetRegexResourceRequirements(t *testing.T) {
 			corev1.ResourceMemory: resource.MustParse("256Mi"),
 		},
 	}
-	expectedReqirement := resourceRequirements{
-		Requests: map[string]string{
-			"memory": "128Mi",
+	expectedReqirement := corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("128Mi"),
 		},
-		Limits: map[string]string{
-			"memory": "256Mi",
+		Limits: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("256Mi"),
 		},
 	}
 
 	cases := []struct {
 		name                          string
 		containerResourceRequirements []addonapiv1alpha1.ContainerResourceRequirements
-		expectedResourceRequirements  []regexResourceRequirements
+		expectedResourceRequirements  []RegexResourceRequirements
 		expectedErr                   error
 	}{
 		{
@@ -764,7 +764,7 @@ func TestGetRegexResourceRequirements(t *testing.T) {
 					Resources:   reqirement,
 				},
 			},
-			expectedResourceRequirements: []regexResourceRequirements{
+			expectedResourceRequirements: []RegexResourceRequirements{
 				{
 					ContainerIDRegex: "^a:b:c$",
 					Resources:        expectedReqirement,
@@ -779,7 +779,7 @@ func TestGetRegexResourceRequirements(t *testing.T) {
 					Resources:   reqirement,
 				},
 			},
-			expectedResourceRequirements: []regexResourceRequirements{
+			expectedResourceRequirements: []RegexResourceRequirements{
 				{
 					ContainerIDRegex: "^.+:b:c$",
 					Resources:        expectedReqirement,
@@ -794,7 +794,7 @@ func TestGetRegexResourceRequirements(t *testing.T) {
 					Resources:   reqirement,
 				},
 			},
-			expectedResourceRequirements: []regexResourceRequirements{
+			expectedResourceRequirements: []RegexResourceRequirements{
 				{
 					ContainerIDRegex: "^.+:.+:c$",
 					Resources:        expectedReqirement,
@@ -809,7 +809,7 @@ func TestGetRegexResourceRequirements(t *testing.T) {
 					Resources:   reqirement,
 				},
 			},
-			expectedResourceRequirements: []regexResourceRequirements{
+			expectedResourceRequirements: []RegexResourceRequirements{
 				{
 					ContainerIDRegex: "^.+:.+:.+$",
 					Resources:        expectedReqirement,
@@ -821,7 +821,7 @@ func TestGetRegexResourceRequirements(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 
-			requirements, err := getRegexResourceRequirements(c.containerResourceRequirements)
+			requirements, err := GetRegexResourceRequirements(c.containerResourceRequirements)
 			if err != nil {
 				if c.expectedErr == nil || !strings.EqualFold(err.Error(), c.expectedErr.Error()) {
 					t.Errorf("expected error %v, but got error %s", c.expectedErr, err)
