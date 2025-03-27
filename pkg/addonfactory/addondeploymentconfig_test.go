@@ -263,7 +263,12 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 				"ResourceRequirements": []RegexResourceRequirements{
 					{
 						ContainerIDRegex: "^a:b:c$",
-						Resources: corev1.ResourceRequirements{
+						Resources: resourceRequirements{
+							Requests: map[string]string{
+								"memory": "64Mi",
+							},
+						},
+						ResourcesRaw: corev1.ResourceRequirements{
 							Requests: corev1.ResourceList{
 								corev1.ResourceMemory: resource.MustParse("64Mi"),
 							},
@@ -271,7 +276,12 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 					},
 					{
 						ContainerIDRegex: "^.+:b:c$",
-						Resources: corev1.ResourceRequirements{
+						Resources: resourceRequirements{
+							Requests: map[string]string{
+								"memory": "128Mi",
+							},
+						},
+						ResourcesRaw: corev1.ResourceRequirements{
 							Requests: corev1.ResourceList{
 								corev1.ResourceMemory: resource.MustParse("128Mi"),
 							},
@@ -279,7 +289,12 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 					},
 					{
 						ContainerIDRegex: "^.+:.+:c$",
-						Resources: corev1.ResourceRequirements{
+						Resources: resourceRequirements{
+							Requests: map[string]string{
+								"memory": "256Mi",
+							},
+						},
+						ResourcesRaw: corev1.ResourceRequirements{
 							Requests: corev1.ResourceList{
 								corev1.ResourceMemory: resource.MustParse("256Mi"),
 							},
@@ -287,7 +302,12 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 					},
 					{
 						ContainerIDRegex: "^.+:.+:.+$",
-						Resources: corev1.ResourceRequirements{
+						Resources: resourceRequirements{
+							Requests: map[string]string{
+								"memory": "512Mi",
+							},
+						},
+						ResourcesRaw: corev1.ResourceRequirements{
 							Requests: corev1.ResourceList{
 								corev1.ResourceMemory: resource.MustParse("512Mi"),
 							},
@@ -728,7 +748,15 @@ func TestGetRegexResourceRequirements(t *testing.T) {
 			corev1.ResourceMemory: resource.MustParse("256Mi"),
 		},
 	}
-	expectedReqirement := corev1.ResourceRequirements{
+	expectedReqirement := resourceRequirements{
+		Requests: map[string]string{
+			"memory": "128Mi",
+		},
+		Limits: map[string]string{
+			"memory": "256Mi",
+		},
+	}
+	expectedReqirementRaw := corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
 			corev1.ResourceMemory: resource.MustParse("128Mi"),
 		},
@@ -768,6 +796,7 @@ func TestGetRegexResourceRequirements(t *testing.T) {
 				{
 					ContainerIDRegex: "^a:b:c$",
 					Resources:        expectedReqirement,
+					ResourcesRaw:     expectedReqirementRaw,
 				},
 			},
 		},
@@ -783,6 +812,7 @@ func TestGetRegexResourceRequirements(t *testing.T) {
 				{
 					ContainerIDRegex: "^.+:b:c$",
 					Resources:        expectedReqirement,
+					ResourcesRaw:     expectedReqirementRaw,
 				},
 			},
 		},
@@ -798,6 +828,7 @@ func TestGetRegexResourceRequirements(t *testing.T) {
 				{
 					ContainerIDRegex: "^.+:.+:c$",
 					Resources:        expectedReqirement,
+					ResourcesRaw:     expectedReqirementRaw,
 				},
 			},
 		},
@@ -813,6 +844,7 @@ func TestGetRegexResourceRequirements(t *testing.T) {
 				{
 					ContainerIDRegex: "^.+:.+:.+$",
 					Resources:        expectedReqirement,
+					ResourcesRaw:     expectedReqirementRaw,
 				},
 			},
 		},

@@ -161,9 +161,9 @@ func TestTemplateAddon_Manifests(t *testing.T) {
 					"ResourceRequirements": []RegexResourceRequirements{
 						{
 							ContainerIDRegex: "^.+:.+:.+$",
-							Resources: corev1.ResourceRequirements{
-								Requests: corev1.ResourceList{
-									corev1.ResourceMemory: resource.MustParse("64Mi"),
+							Resources: resourceRequirements{
+								Requests: map[string]string{
+									"memory": "64Mi",
 								},
 							},
 						},

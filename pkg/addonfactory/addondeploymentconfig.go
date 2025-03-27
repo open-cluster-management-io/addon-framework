@@ -22,13 +22,21 @@ var AddOnDeploymentConfigGVR = schema.GroupVersionResource{
 	Resource: "addondeploymentconfigs",
 }
 
+type resourceRequirements struct {
+	Limits   map[string]string `json:"limits,omitempty"`
+	Requests map[string]string `json:"requests,omitempty"`
+}
+
 // RegexResourceRequirements defines a resource requirement rule for containers. A container is eligible for the
 // specified resource requirements if its container ID matches the regular expression.
 type RegexResourceRequirements struct {
 	// ContainerIDRegex is the regular expression used to match container IDs.
 	ContainerIDRegex string `json:"containerIDRegex"`
-	// Resources defines the resource requirements for matched containers
-	Resources corev1.ResourceRequirements `json:"resources"`
+	// Resources defines the resource requirements for matched containers, its resource value is plain string
+	Resources resourceRequirements `json:"resources"`
+
+	// ResourcesRaw defines the resource requirements for matched containers, its resource value is structure
+	ResourcesRaw corev1.ResourceRequirements `json:"resourcesRaw"`
 }
 
 // ToAddOnNodePlacementValues only transform the AddOnDeploymentConfig NodePlacement part into Values object that has
@@ -231,14 +239,26 @@ func GetRegexResourceRequirements(requirements []addonapiv1alpha1.ContainerResou
 		}
 		newRequirements = append(newRequirements, RegexResourceRequirements{
 			ContainerIDRegex: fmt.Sprintf("^%s:%s:%s$", parts[0], parts[1], parts[2]),
-			Resources: corev1.ResourceRequirements{
-				Requests: item.Resources.Requests,
-				Limits:   item.Resources.Limits,
+			Resources: resourceRequirements{
+				Requests: toStringResourceList(item.Resources.Requests),
+				Limits:   toStringResourceList(item.Resources.Limits),
 			},
+			ResourcesRaw: item.Resources,
 		})
 	}
 
 	return newRequirements, nil
+}
+
+func toStringResourceList(resourceList corev1.ResourceList) map[string]string {
+	if len(resourceList) == 0 {
+		return nil
+	}
+	newResourceList := map[string]string{}
+	for key, value := range resourceList {
+		newResourceList[string(key)] = value.String()
+	}
+	return newResourceList
 }
 
 // ToAddOnDeploymentConfigValues transform the AddOnDeploymentConfig object into Values object that is a plain value map
