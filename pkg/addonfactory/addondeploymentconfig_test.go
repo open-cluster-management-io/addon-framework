@@ -260,12 +260,17 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 				},
 			},
 			expectedValues: Values{
-				"ResourceRequirements": []regexResourceRequirements{
+				"ResourceRequirements": []RegexResourceRequirements{
 					{
 						ContainerIDRegex: "^a:b:c$",
 						Resources: resourceRequirements{
 							Requests: map[string]string{
 								"memory": "64Mi",
+							},
+						},
+						ResourcesRaw: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceMemory: resource.MustParse("64Mi"),
 							},
 						},
 					},
@@ -276,6 +281,11 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 								"memory": "128Mi",
 							},
 						},
+						ResourcesRaw: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceMemory: resource.MustParse("128Mi"),
+							},
+						},
 					},
 					{
 						ContainerIDRegex: "^.+:.+:c$",
@@ -284,12 +294,22 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 								"memory": "256Mi",
 							},
 						},
+						ResourcesRaw: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceMemory: resource.MustParse("256Mi"),
+							},
+						},
 					},
 					{
 						ContainerIDRegex: "^.+:.+:.+$",
 						Resources: resourceRequirements{
 							Requests: map[string]string{
 								"memory": "512Mi",
+							},
+						},
+						ResourcesRaw: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceMemory: resource.MustParse("512Mi"),
 							},
 						},
 					},
@@ -736,11 +756,19 @@ func TestGetRegexResourceRequirements(t *testing.T) {
 			"memory": "256Mi",
 		},
 	}
+	expectedReqirementRaw := corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("128Mi"),
+		},
+		Limits: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("256Mi"),
+		},
+	}
 
 	cases := []struct {
 		name                          string
 		containerResourceRequirements []addonapiv1alpha1.ContainerResourceRequirements
-		expectedResourceRequirements  []regexResourceRequirements
+		expectedResourceRequirements  []RegexResourceRequirements
 		expectedErr                   error
 	}{
 		{
@@ -764,10 +792,11 @@ func TestGetRegexResourceRequirements(t *testing.T) {
 					Resources:   reqirement,
 				},
 			},
-			expectedResourceRequirements: []regexResourceRequirements{
+			expectedResourceRequirements: []RegexResourceRequirements{
 				{
 					ContainerIDRegex: "^a:b:c$",
 					Resources:        expectedReqirement,
+					ResourcesRaw:     expectedReqirementRaw,
 				},
 			},
 		},
@@ -779,10 +808,11 @@ func TestGetRegexResourceRequirements(t *testing.T) {
 					Resources:   reqirement,
 				},
 			},
-			expectedResourceRequirements: []regexResourceRequirements{
+			expectedResourceRequirements: []RegexResourceRequirements{
 				{
 					ContainerIDRegex: "^.+:b:c$",
 					Resources:        expectedReqirement,
+					ResourcesRaw:     expectedReqirementRaw,
 				},
 			},
 		},
@@ -794,10 +824,11 @@ func TestGetRegexResourceRequirements(t *testing.T) {
 					Resources:   reqirement,
 				},
 			},
-			expectedResourceRequirements: []regexResourceRequirements{
+			expectedResourceRequirements: []RegexResourceRequirements{
 				{
 					ContainerIDRegex: "^.+:.+:c$",
 					Resources:        expectedReqirement,
+					ResourcesRaw:     expectedReqirementRaw,
 				},
 			},
 		},
@@ -809,10 +840,11 @@ func TestGetRegexResourceRequirements(t *testing.T) {
 					Resources:   reqirement,
 				},
 			},
-			expectedResourceRequirements: []regexResourceRequirements{
+			expectedResourceRequirements: []RegexResourceRequirements{
 				{
 					ContainerIDRegex: "^.+:.+:.+$",
 					Resources:        expectedReqirement,
+					ResourcesRaw:     expectedReqirementRaw,
 				},
 			},
 		},
@@ -821,7 +853,7 @@ func TestGetRegexResourceRequirements(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 
-			requirements, err := getRegexResourceRequirements(c.containerResourceRequirements)
+			requirements, err := GetRegexResourceRequirements(c.containerResourceRequirements)
 			if err != nil {
 				if c.expectedErr == nil || !strings.EqualFold(err.Error(), c.expectedErr.Error()) {
 					t.Errorf("expected error %v, but got error %s", c.expectedErr, err)
