@@ -142,6 +142,9 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 
 			return err
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		ginkgo.By(fmt.Sprintf("Clean up CSRs for addon: %s", helloWorldHelmAddonName))
+		_ = cleanupCSR(hubKubeClient, helloWorldHelmAddonName)
 	})
 
 	ginkgo.It("addon should be available", func() {

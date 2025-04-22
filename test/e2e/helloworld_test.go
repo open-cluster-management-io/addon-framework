@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/client-go/kubernetes"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 )
 
@@ -100,6 +101,9 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 
 			return err
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+
+		ginkgo.By(fmt.Sprintf("Clean up CSRs for addon: %s", addonName))
+		_ = cleanupCSR(hubKubeClient, addonName)
 	})
 
 	ginkgo.It("addon should be worked", func() {
@@ -672,4 +676,27 @@ func prepareAgentInstallNamespaceAddOnDeploymentConfig(namespace string) error {
 	}
 
 	return err
+}
+
+func cleanupCSR(hubKubeClient kubernetes.Interface, addonName string) error {
+	csrs, err := hubKubeClient.CertificatesV1().CertificateSigningRequests().List(
+		context.Background(), metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("%s=%s", addonapiv1alpha1.AddonLabelKey, addonName),
+		})
+	if err != nil {
+		return err
+	}
+
+	for _, csr := range csrs.Items {
+
+		if csr.Status.Certificate == nil {
+			continue
+		}
+		err := hubKubeClient.CertificatesV1().CertificateSigningRequests().Delete(
+			context.Background(), csr.Name, *&metav1.DeleteOptions{})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
