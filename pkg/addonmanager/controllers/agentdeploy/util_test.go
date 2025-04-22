@@ -507,7 +507,8 @@ func TestGetManifestConfigOption(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			manifestConfigOptions := getManifestConfigOption(c.agentAddon, nil, nil)
+			manifestConfigOptions, err := getManifestConfigOption(c.agentAddon, nil, nil)
+			assert.Nil(t, err)
 			assert.Equal(t, c.expectedManifestConfigOption, manifestConfigOptions)
 		})
 	}
