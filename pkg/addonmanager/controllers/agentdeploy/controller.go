@@ -406,7 +406,11 @@ func (c *addonDeployController) buildDeployManifestWorksFunc(addonWorkBuilder *a
 			mode, _ = agentAddon.GetAgentAddonOptions().HostedModeInfoFunc(addon, cluster)
 		}
 
-		manifestOptions := getManifestConfigOption(agentAddon, cluster, addon)
+		manifestOptions, err := getManifestConfigOption(agentAddon, cluster, addon)
+		if err != nil {
+			return nil, nil, fmt.Errorf("get manifest config option error: %v", err)
+		}
+
 		existingWorksCopy := []workapiv1.ManifestWork{}
 		for _, work := range existingWorks {
 			existingWorksCopy = append(existingWorksCopy, *work)
