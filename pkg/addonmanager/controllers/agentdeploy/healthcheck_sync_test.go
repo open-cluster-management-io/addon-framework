@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/index"
 	"open-cluster-management.io/addon-framework/pkg/utils"
@@ -53,8 +54,9 @@ func (t *healthCheckTestAgent) Manifests(cluster *clusterv1.ManagedCluster,
 
 func (t *healthCheckTestAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
 	return agent.AgentAddonOptions{
-		AddonName:    t.name,
-		HealthProber: t.health,
+		AddonName:          t.name,
+		HealthProber:       t.health,
+		HostedModeInfoFunc: constants.GetHostedModeInfo,
 	}
 }
 
@@ -1106,6 +1108,128 @@ func TestHealthCheckReconcile(t *testing.T) {
 				Message: "test add-on is available.",
 			},
 		},
+		{
+			name: "Health check mode is workload availability and WorkProber check pass for hosted addon",
+			testAddon: &healthCheckTestAgent{name: "test",
+				health: &agent.HealthProber{Type: agent.HealthProberTypeWorkloadAvailability},
+			},
+			addon: addontesting.NewHostedModeAddon("test", "cluster1",
+				"hostingcluster", manifestAppliedCondition),
+			existingWork: []runtime.Object{
+				&v1.ManifestWork{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "addon-test-deploy-01",
+						Namespace: "hostingcluster",
+						Labels: map[string]string{
+							"open-cluster-management.io/addon-name":      "test",
+							"open-cluster-management.io/addon-namespace": "cluster1",
+						},
+					},
+					Spec: v1.ManifestWorkSpec{},
+					Status: v1.ManifestWorkStatus{
+						ResourceStatus: v1.ManifestResourceStatus{
+							Manifests: []v1.ManifestCondition{
+								{
+									ResourceMeta: v1.ManifestResourceMeta{
+										Ordinal:   0,
+										Group:     "apps",
+										Version:   "",
+										Kind:      "",
+										Resource:  "deployments",
+										Name:      "test-deployment",
+										Namespace: "default",
+									},
+									StatusFeedbacks: v1.StatusFeedbackResult{
+										Values: []v1.FeedbackValue{
+											{
+												Name: "Replicas",
+												Value: v1.FieldValue{
+													Integer: boolPtr(2),
+												},
+											},
+											{
+												Name: "ReadyReplicas",
+												Value: v1.FieldValue{
+													Integer: boolPtr(2),
+												},
+											},
+										},
+									},
+								},
+								{
+									ResourceMeta: v1.ManifestResourceMeta{
+										Ordinal:   0,
+										Group:     "apps",
+										Version:   "",
+										Kind:      "",
+										Resource:  "deployments",
+										Name:      "test-deployment-replicas-not-set",
+										Namespace: "default",
+									},
+									StatusFeedbacks: v1.StatusFeedbackResult{
+										Values: []v1.FeedbackValue{
+											{
+												Name: "Replicas",
+												Value: v1.FieldValue{
+													Integer: boolPtr(1),
+												},
+											},
+											{
+												Name: "ReadyReplicas",
+												Value: v1.FieldValue{
+													Integer: boolPtr(1),
+												},
+											},
+										},
+									},
+								},
+								{
+									ResourceMeta: v1.ManifestResourceMeta{
+										Ordinal:   0,
+										Group:     "apps",
+										Version:   "",
+										Kind:      "",
+										Resource:  "daemonsets",
+										Name:      "test-daemonset",
+										Namespace: "default",
+									},
+									StatusFeedbacks: v1.StatusFeedbackResult{
+										Values: []v1.FeedbackValue{
+											{
+												Name: "DesiredNumberScheduled",
+												Value: v1.FieldValue{
+													Integer: boolPtr(2),
+												},
+											},
+											{
+												Name: "NumberReady",
+												Value: v1.FieldValue{
+													Integer: boolPtr(2),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+						Conditions: []metav1.Condition{
+							{
+								Type:   v1.WorkAvailable,
+								Status: metav1.ConditionTrue,
+							},
+						},
+					},
+				},
+			},
+			expectedErr:             nil,
+			expectedHealthCheckMode: addonapiv1alpha1.HealthCheckModeCustomized,
+			expectAvailableCondition: metav1.Condition{
+				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+				Status:  metav1.ConditionTrue,
+				Reason:  addonapiv1alpha1.AddonAvailableReasonProbeAvailable,
+				Message: "test add-on is available.",
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -1134,8 +1258,9 @@ func TestHealthCheckReconcile(t *testing.T) {
 			}
 
 			healthCheckSyncer := healthCheckSyncer{
-				getWorkByAddon: addonDeploymentController.getWorksByAddonFn(index.ManifestWorkByAddon),
-				agentAddon:     addonDeploymentController.agentAddons[c.testAddon.name],
+				getWorkByAddon:       addonDeploymentController.getWorksByAddonFn(index.ManifestWorkByAddon),
+				getWorkByHostedAddon: addonDeploymentController.getWorksByAddonFn(index.ManifestWorkByHostedAddon),
+				agentAddon:           addonDeploymentController.agentAddons[c.testAddon.name],
 			}
 
 			addon, err := healthCheckSyncer.sync(context.TODO(), addontesting.NewFakeSyncContext(t), c.cluster, c.addon)

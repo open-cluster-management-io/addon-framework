@@ -289,8 +289,9 @@ func (c *addonDeployController) sync(ctx context.Context, syncCtx factory.SyncCo
 			getWorkByAddon: c.getWorksByAddonFn(index.ManifestWorkHookByHostedAddon),
 			agentAddon:     agentAddon},
 		&healthCheckSyncer{
-			getWorkByAddon: c.getWorksByAddonFn(index.ManifestWorkByAddon),
-			agentAddon:     agentAddon,
+			getWorkByAddon:       c.getWorksByAddonFn(index.ManifestWorkByAddon),
+			getWorkByHostedAddon: c.getWorksByAddonFn(index.ManifestWorkByHostedAddon),
+			agentAddon:           agentAddon,
 		},
 	}
 

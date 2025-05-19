@@ -85,6 +85,7 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 		name:          "test",
 		manifests:     map[string][]runtime.Object{},
 		registrations: map[string][]addonapiv1alpha1.RegistrationConfig{},
+		hostInfoFn:    constants.GetHostedModeInfo,
 	}
 
 	testHostedAddonImpl = &testAddon{
@@ -99,12 +100,14 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 		name:          "test-install-all",
 		manifests:     map[string][]runtime.Object{},
 		registrations: map[string][]addonapiv1alpha1.RegistrationConfig{},
+		hostInfoFn:    constants.GetHostedModeInfo,
 	}
 
 	testMultiWorksAddonImpl = &testAddon{
 		name:          "test-multi-works",
 		manifests:     map[string][]runtime.Object{},
 		registrations: map[string][]addonapiv1alpha1.RegistrationConfig{},
+		hostInfoFn:    constants.GetHostedModeInfo,
 	}
 
 	mgrContext, cancel = context.WithCancel(context.TODO())
