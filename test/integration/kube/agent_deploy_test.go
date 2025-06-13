@@ -996,6 +996,7 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 							},
 						},
 					},
+					Conditions: []metav1.Condition{},
 				},
 			},
 		}
