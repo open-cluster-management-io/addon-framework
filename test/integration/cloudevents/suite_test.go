@@ -3,6 +3,7 @@ package cloudevents
 import (
 	"context"
 	"fmt"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/options"
 	"os"
 	"path"
 	"path/filepath"
@@ -16,10 +17,10 @@ import (
 	"github.com/onsi/gomega"
 	"gopkg.in/yaml.v2"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/agent/codec"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/mqtt"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/work"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/agent/codec"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -37,7 +38,7 @@ import (
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/store"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/store"
 )
 
 const (
@@ -277,12 +278,11 @@ func startWorkAgent(ctx context.Context, clusterName string) (*work.ClientHolder
 	}
 	watcherStore := store.NewAgentInformerWatcherStore()
 
-	clientHolder, err := work.NewClientHolderBuilder(config).
-		WithClientID(clusterName).
+	clientOptions := options.NewGenericClientOptions(
+		config, codec.NewManifestBundleCodec(), clusterName).
 		WithClusterName(clusterName).
-		WithCodec(codec.NewManifestBundleCodec()).
-		WithWorkClientWatcherStore(watcherStore).
-		NewAgentClientHolder(ctx)
+		WithClientWatcherStore(watcherStore)
+	clientHolder, err := work.NewAgentClientHolder(ctx, clientOptions)
 	if err != nil {
 		return nil, nil, err
 	}

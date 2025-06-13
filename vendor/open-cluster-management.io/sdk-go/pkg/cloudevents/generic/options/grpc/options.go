@@ -5,13 +5,16 @@ import (
 	"crypto/tls"
 	"fmt"
 	"os"
+	"sync"
 	"time"
+
+	"google.golang.org/grpc/credentials/insecure"
+	"k8s.io/klog/v2"
 
 	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/credentials/oauth"
 	"google.golang.org/grpc/keepalive"
 	"gopkg.in/yaml.v2"
@@ -29,8 +32,9 @@ type GRPCDialer struct {
 	URL              string
 	KeepAliveOptions KeepAliveOptions
 	TLSConfig        *tls.Config
-	TokenFile        string
-	conn             *grpc.ClientConn
+	Token            string
+	mu               sync.Mutex       // Mutex to protect the connection.
+	conn             *grpc.ClientConn // Cached gRPC client connection.
 }
 
 // KeepAliveOptions holds the keepalive options for the gRPC client.
@@ -43,6 +47,15 @@ type KeepAliveOptions struct {
 
 // Dial connects to the gRPC server and returns a gRPC client connection.
 func (d *GRPCDialer) Dial() (*grpc.ClientConn, error) {
+	// Return the cached connection if it exists and is ready.
+	// Should not return a nil or unready connection, otherwise the caller (cloudevents client)
+	// will not use the connection for sending and receiving events in reconnect scenarios.
+	// lock the connection to ensure the connection is not created by multiple goroutines concurrently.
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.conn != nil && (d.conn.GetState() == connectivity.Connecting || d.conn.GetState() == connectivity.Ready) {
+		return d.conn, nil
+	}
 	// Prepare gRPC dial options.
 	dialOpts := []grpc.DialOption{}
 	if d.KeepAliveOptions.Enable {
@@ -55,22 +68,17 @@ func (d *GRPCDialer) Dial() (*grpc.ClientConn, error) {
 	if d.TLSConfig != nil {
 		// Enable TLS
 		dialOpts = append(dialOpts, grpc.WithTransportCredentials(credentials.NewTLS(d.TLSConfig)))
-		if len(d.TokenFile) != 0 {
-			// Use token-based authentication if token file is provided.
-			token, err := os.ReadFile(d.TokenFile)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read token file %s, %v", d.TokenFile, err)
-			}
+		if len(d.Token) != 0 {
 			perRPCCred := oauth.TokenSource{
 				TokenSource: oauth2.StaticTokenSource(&oauth2.Token{
-					AccessToken: string(token),
+					AccessToken: d.Token,
 				})}
 			// Add per-RPC credentials to the dial options.
 			dialOpts = append(dialOpts, grpc.WithPerRPCCredentials(perRPCCred))
 		}
 
 		// Establish a TLS connection to the gRPC server.
-		conn, err := grpc.Dial(d.URL, dialOpts...)
+		conn, err := grpc.NewClient(d.URL, dialOpts...)
 		if err != nil {
 			return nil, fmt.Errorf("failed to connect to grpc server %s, %v", d.URL, err)
 		}
@@ -82,7 +90,8 @@ func (d *GRPCDialer) Dial() (*grpc.ClientConn, error) {
 
 	// Insecure connection option; should not be used in production.
 	dialOpts = append(dialOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	conn, err := grpc.Dial(d.URL, dialOpts...)
+	conn, err := grpc.NewClient(d.URL, dialOpts...)
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to grpc server %s, %v", d.URL, err)
 	}
@@ -94,6 +103,8 @@ func (d *GRPCDialer) Dial() (*grpc.ClientConn, error) {
 
 // Close closes the gRPC client connection.
 func (d *GRPCDialer) Close() error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	if d.conn != nil {
 		return d.conn.Close()
 	}
@@ -107,16 +118,16 @@ type GRPCOptions struct {
 
 // GRPCConfig holds the information needed to build connect to gRPC server as a given user.
 type GRPCConfig struct {
+	cert.CertConfig `json:",inline" yaml:",inline"`
+
 	// URL is the address of the gRPC server (host:port).
 	URL string `json:"url" yaml:"url"`
-	// CAFile is the file path to a cert file for the gRPC server certificate authority.
-	CAFile string `json:"caFile,omitempty" yaml:"caFile,omitempty"`
-	// ClientCertFile is the file path to a client cert file for TLS.
-	ClientCertFile string `json:"clientCertFile,omitempty" yaml:"clientCertFile,omitempty"`
-	// ClientKeyFile is the file path to a client key file for TLS.
-	ClientKeyFile string `json:"clientKeyFile,omitempty" yaml:"clientKeyFile,omitempty"`
+
 	// TokenFile is the file path to a token file for authentication.
 	TokenFile string `json:"tokenFile,omitempty" yaml:"tokenFile,omitempty"`
+	// Token is the token for authentication
+	Token string `json:"token" yaml:"token"`
+
 	// keepalive options
 	KeepAliveConfig KeepAliveConfig `json:"keepAliveConfig,omitempty" yaml:"keepAliveConfig,omitempty"`
 }
@@ -139,8 +150,7 @@ type KeepAliveConfig struct {
 	PermitWithoutStream bool `json:"permitWithoutStream,omitempty" yaml:"permitWithoutStream,omitempty"`
 }
 
-// BuildGRPCOptionsFromFlags builds configs from a config filepath.
-func BuildGRPCOptionsFromFlags(configPath string) (*GRPCOptions, error) {
+func LoadConfig(configPath string) (*GRPCConfig, error) {
 	configData, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, err
@@ -151,25 +161,44 @@ func BuildGRPCOptionsFromFlags(configPath string) (*GRPCOptions, error) {
 		return nil, err
 	}
 
+	if err := config.CertConfig.EmbedCerts(); err != nil {
+		return nil, err
+	}
+
+	return config, nil
+}
+
+// BuildGRPCOptionsFromFlags builds configs from a config filepath.
+func BuildGRPCOptionsFromFlags(configPath string) (*GRPCOptions, error) {
+	config, err := LoadConfig(configPath)
+	if err != nil {
+		return nil, err
+	}
+
 	if config.URL == "" {
 		return nil, fmt.Errorf("url is required")
 	}
 
-	if (config.ClientCertFile == "" && config.ClientKeyFile != "") ||
-		(config.ClientCertFile != "" && config.ClientKeyFile == "") {
-		return nil, fmt.Errorf("either both or none of clientCertFile and clientKeyFile must be set")
+	if err := config.CertConfig.Validate(); err != nil {
+		return nil, err
 	}
-	if config.ClientCertFile != "" && config.ClientKeyFile != "" && config.CAFile == "" {
-		return nil, fmt.Errorf("setting clientCertFile and clientKeyFile requires caFile")
+
+	token := config.Token
+	if config.Token == "" && config.TokenFile != "" {
+		tokenBytes, err := os.ReadFile(config.TokenFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read token file %s, %v", config.TokenFile, err)
+		}
+		token = string(tokenBytes)
 	}
-	if config.TokenFile != "" && config.CAFile == "" {
-		return nil, fmt.Errorf("setting tokenFile requires caFile")
+	if token != "" && len(config.CAData) == 0 {
+		return nil, fmt.Errorf("setting token requires authority certificates")
 	}
 
 	options := &GRPCOptions{
 		Dialer: &GRPCDialer{
-			URL:       config.URL,
-			TokenFile: config.TokenFile,
+			URL:   config.URL,
+			Token: token,
 		},
 	}
 
@@ -192,10 +221,22 @@ func BuildGRPCOptionsFromFlags(configPath string) (*GRPCOptions, error) {
 	// Set the keepalive options
 	options.Dialer.KeepAliveOptions = keepAliveOptions
 
-	// Set up TLS configuration for the gRPC connection, the certificates will be reloaded periodically.
-	options.Dialer.TLSConfig, err = cert.AutoLoadTLSConfig(config.CAFile, config.ClientCertFile, config.ClientKeyFile, options.Dialer)
-	if err != nil {
-		return nil, err
+	if token != "" || config.CertConfig.HasCerts() {
+		// Set up TLS configuration for the gRPC connection, the certificates will be reloaded periodically.
+		options.Dialer.TLSConfig, err = cert.AutoLoadTLSConfig(
+			config.CertConfig,
+			func() (*cert.CertConfig, error) {
+				config, err := LoadConfig(configPath)
+				if err != nil {
+					return nil, err
+				}
+				return &config.CertConfig, nil
+			},
+			options.Dialer,
+		)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return options, nil
@@ -213,31 +254,35 @@ func (o *GRPCOptions) GetCloudEventsProtocol(ctx context.Context, errorHandler f
 
 	// Periodically (every 100ms) check the connection status and reconnect if necessary.
 	go func() {
-		ticker := time.NewTicker(100 * time.Millisecond)
+		state := conn.GetState()
 		for {
-			select {
-			case <-ctx.Done():
-				ticker.Stop()
-				conn.Close()
-			case <-ticker.C:
-				connState := conn.GetState()
-				// If any failure in any of the steps needed to establish connection, or any failure encountered while
-				// expecting successful communication on established channel, the grpc client connection state will be
-				// TransientFailure.
-				// For a connected grpc client, if the connections is down, the grpc client connection state will be
-				// changed from Ready to Idle.
-				// When client certificate is expired, client will proactively close the connection, which will result
-				// in connection state changed from Ready to Shutdown.
-				if connState == connectivity.TransientFailure || connState == connectivity.Idle || connState == connectivity.Shutdown {
-					errorHandler(fmt.Errorf("grpc connection is disconnected (state=%s)", connState))
-					ticker.Stop()
-					if connState != connectivity.Shutdown {
-						// don't close the connection if it's already shutdown
-						conn.Close()
-					}
-					return // exit the goroutine as the error handler function will handle the reconnection.
-				}
+			if !conn.WaitForStateChange(ctx, state) {
+				// the ctx is closed, stop this watch
+				klog.Infof("Stop watch grpc connection state")
+				return
 			}
+
+			newState := conn.GetState()
+			// If any failure in any of the steps needed to establish connection, or any failure
+			// encountered while expecting successful communication on established channel, the
+			// grpc client connection state will be TransientFailure.
+			// When client certificate is expired, client will proactively close the connection,
+			// which will result in connection state changed from Ready to Shutdown.
+			// When server is closed, client will NOT close or reestablish the connection proactively,
+			// it will only change the connection state from Ready to Idle.
+			if newState == connectivity.TransientFailure || newState == connectivity.Shutdown ||
+				newState == connectivity.Idle {
+				errorHandler(fmt.Errorf("grpc connection is disconnected (state=%s)", newState))
+				if newState != connectivity.Shutdown {
+					// don't close the connection if it's already shutdown
+					if err := conn.Close(); err != nil {
+						klog.Errorf("failed to close gRPC connection, %v", err)
+					}
+				}
+				return // exit the goroutine as the error handler function will handle the reconnection.
+			}
+
+			state = newState
 		}
 	}()
 

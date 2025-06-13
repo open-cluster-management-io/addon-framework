@@ -22,11 +22,12 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
 	"open-cluster-management.io/addon-framework/pkg/index"
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/options"
+	cloudeventswork "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/source/codec"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/store"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/constants"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
-	cloudeventswork "open-cluster-management.io/sdk-go/pkg/cloudevents/work"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/source/codec"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/work/store"
 )
 
 // cloudeventsAddonManager is the implementation of AddonManager with
@@ -67,12 +68,11 @@ func (a *cloudeventsAddonManager) Start(ctx context.Context) error {
 			return err
 		}
 
-		clientHolder, err := cloudeventswork.NewClientHolderBuilder(clientConfig).
-			WithClientID(a.options.CloudEventsClientID).
+		clientOptions := options.NewGenericClientOptions(
+			clientConfig, codec.NewManifestBundleCodec(), a.options.CloudEventsClientID).
 			WithSourceID(a.options.SourceID).
-			WithCodec(codec.NewManifestBundleCodec()).
-			WithWorkClientWatcherStore(watcherStore).
-			NewSourceClientHolder(ctx)
+			WithClientWatcherStore(watcherStore)
+		clientHolder, err := cloudeventswork.NewSourceClientHolder(ctx, clientOptions)
 		if err != nil {
 			return err
 		}
