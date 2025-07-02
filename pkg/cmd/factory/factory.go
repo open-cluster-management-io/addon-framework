@@ -28,8 +28,8 @@ import (
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/component-base/logs"
 	utilversion "k8s.io/component-base/compatibility"
+	"k8s.io/component-base/logs"
 	"k8s.io/klog/v2"
 )
 
