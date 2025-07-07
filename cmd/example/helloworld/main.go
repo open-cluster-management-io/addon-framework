@@ -146,6 +146,7 @@ func (c *addManagerConfig) runController(ctx context.Context, kubeConfig *rest.C
 	if err != nil {
 		klog.Fatal(err)
 	}
+
 	<-ctx.Done()
 
 	return nil
