@@ -275,11 +275,11 @@ func (s *healthCheckSyncer) analyzeWorkProber(
 		}
 		return nil, nil, nil, fmt.Errorf("work prober is not configured")
 	case agent.HealthProberTypeDeploymentAvailability:
-		probeFields, heathCheck, err := s.analyzeDeploymentWorkProber(agentAddon, cluster, addon)
-		return probeFields, heathCheck, nil, err
+		probeFields, heathChecker, err := s.analyzeDeploymentWorkProber(agentAddon, cluster, addon)
+		return probeFields, nil, heathChecker, err
 	case agent.HealthProberTypeWorkloadAvailability:
-		probeFields, heathCheck, err := s.analyzeWorkloadsWorkProber(agentAddon, cluster, addon)
-		return probeFields, heathCheck, nil, err
+		probeFields, heathChecker, err := s.analyzeWorkloadsWorkProber(agentAddon, cluster, addon)
+		return probeFields, nil, heathChecker, err
 	default:
 		return nil, nil, nil, fmt.Errorf("unsupported health prober type %s", agentAddon.GetAgentAddonOptions().HealthProber.Type)
 	}
@@ -289,7 +289,7 @@ func (s *healthCheckSyncer) analyzeDeploymentWorkProber(
 	agentAddon agent.AgentAddon,
 	cluster *clusterv1.ManagedCluster,
 	addon *addonapiv1alpha1.ManagedClusterAddOn,
-) ([]agent.ProbeField, agent.AddonHealthCheckFunc, error) {
+) ([]agent.ProbeField, agent.AddonHealthCheckerFunc, error) {
 	probeFields := []agent.ProbeField{}
 
 	manifests, err := agentAddon.Manifests(cluster, addon)
@@ -310,14 +310,14 @@ func (s *healthCheckSyncer) analyzeDeploymentWorkProber(
 		})
 	}
 
-	return probeFields, utils.DeploymentAvailabilityHealthCheck, nil
+	return probeFields, utils.DeploymentAvailabilityHealthChecker, nil
 }
 
 func (s *healthCheckSyncer) analyzeWorkloadsWorkProber(
 	agentAddon agent.AgentAddon,
 	cluster *clusterv1.ManagedCluster,
 	addon *addonapiv1alpha1.ManagedClusterAddOn,
-) ([]agent.ProbeField, agent.AddonHealthCheckFunc, error) {
+) ([]agent.ProbeField, agent.AddonHealthCheckerFunc, error) {
 	probeFields := []agent.ProbeField{}
 
 	manifests, err := agentAddon.Manifests(cluster, addon)
@@ -344,7 +344,7 @@ func (s *healthCheckSyncer) analyzeWorkloadsWorkProber(
 		})
 	}
 
-	return probeFields, utils.WorkloadAvailabilityHealthCheck, nil
+	return probeFields, utils.WorkloadAvailabilityHealthChecker, nil
 }
 
 func findResultsByIdentifier(identifier workapiv1.ResourceIdentifier,

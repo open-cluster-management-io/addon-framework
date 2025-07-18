@@ -2,7 +2,6 @@ package agentdeploy
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -1298,20 +1297,6 @@ func TestHealthCheckReconcile(t *testing.T) {
 	}
 }
 
-func addonHealthCheckAllFunc(resultFields []agent.FieldResult, cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) error {
-	for _, field := range resultFields {
-		switch field.ResourceIdentifier.Resource {
-		case "deployments":
-			err := utils.DeploymentAvailabilityHealthCheck(field.ResourceIdentifier, field.FeedbackResult)
-			if err == nil {
-				return nil
-			}
-		}
-	}
-	return fmt.Errorf("not meet the results")
-}
-
 func newDeploymentsCheckAllProber(deployments ...types.NamespacedName) *agent.HealthProber {
 	probeFields := []agent.ProbeField{}
 	for _, deploy := range deployments {
@@ -1325,7 +1310,7 @@ func newDeploymentsCheckAllProber(deployments ...types.NamespacedName) *agent.He
 		Type: agent.HealthProberTypeWork,
 		WorkProber: &agent.WorkHealthProber{
 			ProbeFields:   probeFields,
-			HealthChecker: addonHealthCheckAllFunc,
+			HealthChecker: utils.DeploymentAvailabilityHealthChecker,
 		},
 	}
 }
