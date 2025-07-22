@@ -8,6 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"open-cluster-management.io/addon-framework/pkg/agent"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
 
@@ -113,8 +114,12 @@ func TestDeploymentProbe(t *testing.T) {
 			prober := NewDeploymentProber(types.NamespacedName{Name: "test", Namespace: "testns"})
 
 			fields := prober.WorkProber.ProbeFields
-
-			err := prober.WorkProber.HealthCheck(fields[0].ResourceIdentifier, c.result)
+			err := prober.WorkProber.HealthChecker([]agent.FieldResult{
+				{
+					ResourceIdentifier: fields[0].ResourceIdentifier,
+					FeedbackResult:     c.result,
+				},
+			}, nil, nil)
 			if err != nil && err.Error() != c.expectedErr {
 				t.Errorf("expected error %s but got %v", c.expectedErr, err)
 			}
