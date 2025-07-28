@@ -9,7 +9,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -61,7 +60,6 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 	testScheme := runtime.NewScheme()
 	_ = clusterv1apha1.Install(testScheme)
 	_ = apiextensionsv1.AddToScheme(testScheme)
-	_ = apiextensionsv1beta1.AddToScheme(testScheme)
 	_ = scheme.AddToScheme(testScheme)
 
 	defaultResourceReqirements := corev1.ResourceRequirements{
@@ -230,7 +228,7 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 				c.expectedManagedKubeConfigSecret = fmt.Sprintf("%s-managed-kubeconfig", c.addonName)
 			}
 
-			cluster := NewFakeManagedCluster(c.clusterName, "1.10.1")
+			cluster := NewFakeManagedCluster(c.clusterName, "1.16.0")
 			clusterAddon := NewFakeManagedClusterAddon(c.addonName, c.clusterName, c.installNamespace, c.annotationValues)
 
 			factory := NewAgentAddonFactory(c.addonName, chartFS, "testmanifests/chart").
@@ -294,17 +292,7 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 						}
 					}
 				case *apiextensionsv1.CustomResourceDefinition:
-					if object.Name != "test.cluster.open-cluster-management.io" {
-						t.Errorf("expected v1 crd test, but got %v", object.Name)
-					}
 					if !validateTrimCRDv1(object) {
-						t.Errorf("the crd is not compredded")
-					}
-				case *apiextensionsv1beta1.CustomResourceDefinition:
-					if object.Name != "clusterclaims.cluster.open-cluster-management.io" {
-						t.Errorf("expected v1 crd clusterclaims, but got %v", object.Name)
-					}
-					if !validateTrimCRDv1beta1(object) {
 						t.Errorf("the crd is not compredded")
 					}
 				case *corev1.Namespace:
@@ -423,126 +411,6 @@ func hasDescriptionV1(p *apiextensionsv1.JSONSchemaProps) bool {
 	if len(p.Definitions) != 0 {
 		for _, v := range p.Definitions {
 			if hasDescriptionV1(&v) {
-				return true
-			}
-		}
-	}
-
-	if p.ExternalDocs != nil && p.ExternalDocs.Description != "" {
-		return true
-	}
-
-	return false
-}
-
-func validateTrimCRDv1beta1(crd *apiextensionsv1beta1.CustomResourceDefinition) bool {
-	versions := crd.Spec.Versions
-	for i := range versions {
-		if versions[i].Schema == nil {
-			return true
-		}
-		if versions[i].Schema.OpenAPIV3Schema == nil {
-			return true
-		}
-		properties := versions[i].Schema.OpenAPIV3Schema.Properties
-		for _, p := range properties {
-			if hasDescriptionV1beta1(&p) {
-				return false
-			}
-		}
-	}
-	return true
-}
-
-func hasDescriptionV1beta1(p *apiextensionsv1beta1.JSONSchemaProps) bool {
-	if p == nil {
-		return false
-	}
-
-	if p.Description != "" {
-		return true
-	}
-
-	if p.Items != nil {
-		if hasDescriptionV1beta1(p.Items.Schema) {
-			return true
-		}
-		for _, v := range p.Items.JSONSchemas {
-			if hasDescriptionV1beta1(&v) {
-				return true
-			}
-		}
-	}
-
-	if len(p.AllOf) != 0 {
-		for _, v := range p.AllOf {
-			if hasDescriptionV1beta1(&v) {
-				return true
-			}
-		}
-	}
-
-	if len(p.OneOf) != 0 {
-		for _, v := range p.OneOf {
-			if hasDescriptionV1beta1(&v) {
-				return true
-			}
-		}
-	}
-
-	if len(p.AnyOf) != 0 {
-		for _, v := range p.AnyOf {
-			if hasDescriptionV1beta1(&v) {
-				return true
-			}
-		}
-	}
-
-	if p.Not != nil {
-		if hasDescriptionV1beta1(p.Not) {
-			return true
-		}
-	}
-
-	if len(p.Properties) != 0 {
-		for _, v := range p.Properties {
-			if hasDescriptionV1beta1(&v) {
-				return true
-			}
-		}
-	}
-
-	if len(p.PatternProperties) != 0 {
-		for _, v := range p.PatternProperties {
-			if hasDescriptionV1beta1(&v) {
-				return true
-			}
-		}
-	}
-
-	if p.AdditionalProperties != nil {
-		if hasDescriptionV1beta1(p.AdditionalProperties.Schema) {
-			return true
-		}
-	}
-
-	if len(p.Dependencies) != 0 {
-		for _, v := range p.Dependencies {
-			if hasDescriptionV1beta1(v.Schema) {
-				return true
-			}
-		}
-	}
-
-	if p.AdditionalItems != nil {
-		if hasDescriptionV1beta1(p.AdditionalItems.Schema) {
-			return true
-		}
-	}
-
-	if len(p.Definitions) != 0 {
-		for _, v := range p.Definitions {
-			if hasDescriptionV1beta1(&v) {
 				return true
 			}
 		}
