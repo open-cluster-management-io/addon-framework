@@ -1,46 +1,95 @@
-# AddOn Framework
+# Open Cluster Management Addon Framework
 
-This is to define an AddOn framework library.
+A Go library that provides a framework for developing addons for Open Cluster Management (OCM). This framework simplifies the process of creating, installing, and managing addons across multiple Kubernetes clusters in an OCM environment.
 
-## Community, discussion, contribution, and support
+## Overview
 
-Check the [CONTRIBUTING Doc](CONTRIBUTING.md) for how to contribute to the repo.
+Open Cluster Management (OCM) is a Kubernetes-native solution for managing multiple clusters. The Addon Framework enables developers to build addons that can be deployed and managed across these clusters with minimal complexity. The framework handles addon lifecycle management, configuration, registration, and deployment patterns.
 
-<!--
+## Features
 
-You can reach the maintainers of this project at:
+- **Multiple Deployment Methods**: Support for Go templates, Helm charts, and template-based deployments
+- **Lifecycle Management**: Automated installation, upgrade, and removal of addons across managed clusters
+- **Configuration Management**: Flexible configuration system supporting various configuration types
+- **Hosting Modes**: Support for both standard and hosted deployment modes
+- **Registration Framework**: Automatic addon registration with cluster management
+- **RBAC Integration**: Built-in support for role-based access control
+- **Multi-cluster Support**: Deploy addons across multiple managed clusters from a central hub
 
-- [#xxx on Slack](https://slack.com/signin?redir=%2Fmessages%2Fxxx)
+## Core Concepts
 
--->
+The framework is built around several key Kubernetes custom resources:
 
-------
-## Purpose
+- **[ClusterManagementAddOn](https://github.com/open-cluster-management-io/api/blob/main/addon/v1alpha1/types_clustermanagementaddon.go)**: Hub cluster resource that defines addon metadata and installation strategy
+- **[ManagedClusterAddOn](https://github.com/open-cluster-management-io/api/blob/main/addon/v1alpha1/types_managedclusteraddon.go)**: Managed cluster resource that represents addon installation state
+- **AddOnTemplate**: Template-based addon deployment without dedicated controllers
 
-This library is used to implement AddOn management like installation, registration etc.
-So developers could be able to develop their own addon functions more easily.
+## Getting Started
 
-## Concepts
+### Prerequisites
 
-* [ManagedClusterAddon](https://github.com/open-cluster-management-io/api/blob/main/addon/v1alpha1/types_managedclusteraddon.go)
-* [ClusterManagementAddOn](https://github.com/open-cluster-management-io/api/blob/main/addon/v1alpha1/types_clustermanagementaddon.go)
+- One or more Kubernetes clusters
+- [Open Cluster Management](https://github.com/open-cluster-management-io/registration-operator) installed and configured
+- At least one managed cluster imported and accepted
 
-## Design Doc
+### Installation
 
-* [AddOn Framework](https://github.com/open-cluster-management-io/enhancements/tree/main/enhancements/sig-architecture/8-addon-framework)
+Add the framework to your Go module:
 
-## AddOn Consumers
-* [cluster-proxy](https://github.com/open-cluster-management-io/cluster-proxy) 
+```bash
+go get open-cluster-management.io/addon-framework
+```
 
-* [managed-serviceaccount](https://github.com/open-cluster-management-io/managed-serviceaccount)
+### Basic Usage
 
-## AddOn Contributions
+The framework supports multiple addon implementation patterns:
 
-A [collection of OCM addons](https://github.com/open-cluster-management-io/addon-contrib)
-for staging and testing PoC purposes:
+1. **Go Template Based**: Use Go templates to define addon resources
+2. **Helm Chart Based**: Deploy addons using Helm charts
+3. **Template Based**: Use AddOnTemplate for simplified deployment
+4. **Hosted Mode**: Run addon agents on hosting clusters
 
-AI integration, IoT layer, cluster proxy, telemetry, resource usage collection and more.
+For detailed examples and tutorials, see the [examples directory](examples/README.md).
 
-## AddOn Examples 
+For comprehensive documentation on OCM addons, refer to:
+- [OCM Add-on Concepts](https://open-cluster-management.io/docs/concepts/add-on-extensibility/addon/) - Core concepts and architecture
+- [OCM Add-on Developer Guide](https://open-cluster-management.io/docs/developer-guides/addon/) - Complete development guide
 
-We have examples to implement AddOn using Helm Chart or Go Template. You can find more details in [examples](examples/README.md).
+### Framework Documentation
+- [Design Documentation](https://github.com/open-cluster-management-io/enhancements/tree/main/enhancements/sig-architecture/8-addon-framework)
+- [Helm Agent Addon Guide](docs/helmAgentAddon.md)
+- [Template Agent Addon Guide](docs/templateAgentAddon.md)
+- [Pre-delete Hook Guide](docs/preDeleteHook.md)
+
+## Examples
+
+The repository includes several example addons:
+
+- **HelloWorld**: Basic addon using Go templates
+- **HelloWorld Helm**: Addon implemented with Helm charts
+- **HelloWorld Hosted**: Addon with hosted deployment mode
+- **Kubernetes Dashboard**: Real-world addon example
+
+See [examples/README.md](examples/README.md) for detailed instructions.
+
+## Community Addons
+
+### Active Projects
+
+- [cluster-proxy](https://github.com/open-cluster-management-io/cluster-proxy): Provides secure proxy access to managed clusters
+- [managed-serviceaccount](https://github.com/open-cluster-management-io/managed-serviceaccount): Manages service accounts across clusters
+
+### Contributed Addons
+
+A [collection of community addons](https://github.com/open-cluster-management-io/addon-contrib) including:
+AI integration, IoT layer, cluster proxy, telemetry, resource usage collection, and more.
+
+## Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to contribute to this project.
+
+## Support
+
+For questions and support:
+- Open an issue in this repository
+- Join the Open Cluster Management community discussions
