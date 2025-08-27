@@ -19,9 +19,12 @@ import (
 	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 
 	"open-cluster-management.io/addon-framework/pkg/agent"
 )
+
+const defaultGRPCServiceAccount = "system:serviceaccount:open-cluster-management-hub:grpc-server-sa"
 
 var serialNumberLimit = new(big.Int).Lsh(big.NewInt(1), 128)
 
@@ -170,13 +173,20 @@ func DefaultCSRApprover(agentName string) agent.CSRApproveFunc {
 		}
 
 		// check user name
-		if strings.HasPrefix(csr.Spec.Username, "system:open-cluster-management:"+cluster.Name) {
+		username := csr.Spec.Username
+		if csr.Spec.Username == defaultGRPCServiceAccount {
+			// the CSR username is the service account of gRPC server rather than the user of agent.
+			// use the CSRUsernameAnnotation that identifies the agent user who requested the CSR.
+			username = csr.Annotations[operatorapiv1.CSRUsernameAnnotation]
+		}
+
+		if strings.HasPrefix(username, "system:open-cluster-management:"+cluster.Name) {
 			klog.Info("CSR approved")
 			return true
-		} else {
-			klog.Info("CSR not approved due to illegal requester", "requester", csr.Spec.Username)
-			return false
 		}
+
+		klog.Info("CSR not approved due to illegal requester", "requester", csr.Spec.Username)
+		return false
 	}
 }
 

@@ -16,6 +16,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
+	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 )
 
 func newCSR(commonName string, clusterName string, orgs ...string) *certificatesv1.CertificateSigningRequest {
@@ -117,6 +118,20 @@ func TestDefaultCSRApprover(t *testing.T) {
 			cluster:  newCluster("cluster1"),
 			addon:    newAddon("addon1", "cluster1"),
 			approved: false,
+		},
+		{
+			name: "approve grpc csr",
+			csr: func() *certificatesv1.CertificateSigningRequest {
+				csr := newCSR(agent.DefaultUser("cluster1", "addon1", "test"), "cluster1", agent.DefaultGroups("cluster1", "addon1")...)
+				csr.Spec.Username = defaultGRPCServiceAccount
+				csr.Annotations = map[string]string{
+					operatorapiv1.CSRUsernameAnnotation: "system:open-cluster-management:cluster1",
+				}
+				return csr
+			}(),
+			cluster:  newCluster("cluster1"),
+			addon:    newAddon("addon1", "cluster1"),
+			approved: true,
 		},
 	}
 
