@@ -98,11 +98,14 @@ type AgentAddonOptions struct {
 	ConfigCheckEnabled bool
 }
 
-type CSRConfigurationsFunc func(cluster *clusterv1.ManagedCluster) ([]addonapiv1alpha1.RegistrationConfig, error)
+type CSRConfigurationsFunc func(cluster *clusterv1.ManagedCluster,
+	addon *addonapiv1alpha1.ManagedClusterAddOn) ([]addonapiv1alpha1.RegistrationConfig, error)
 
-type CSRSignerFunc func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) ([]byte, error)
+type CSRSignerFunc func(cluster *clusterv1.ManagedCluster,
+	addon *addonapiv1alpha1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) ([]byte, error)
 
-type CSRApproveFunc func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool
+type CSRApproveFunc func(cluster *clusterv1.ManagedCluster,
+	addon *addonapiv1alpha1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool
 
 type PermissionConfigFunc func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error
 
@@ -236,7 +239,8 @@ const (
 )
 
 func KubeClientSignerConfigurations(addonName, agentName string) CSRConfigurationsFunc {
-	return func(cluster *clusterv1.ManagedCluster) ([]addonapiv1alpha1.RegistrationConfig, error) {
+	return func(cluster *clusterv1.ManagedCluster,
+		addon *addonapiv1alpha1.ManagedClusterAddOn) ([]addonapiv1alpha1.RegistrationConfig, error) {
 		return []addonapiv1alpha1.RegistrationConfig{
 			{
 				SignerName: certificatesv1.KubeAPIServerClientSignerName,

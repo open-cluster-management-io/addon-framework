@@ -232,7 +232,7 @@ func (t *testAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 
 	if len(t.registrations) > 0 {
 		option.Registration = &agent.RegistrationOption{
-			CSRConfigurations: func(cluster *clusterv1.ManagedCluster) ([]addonapiv1alpha1.RegistrationConfig, error) {
+			CSRConfigurations: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]addonapiv1alpha1.RegistrationConfig, error) {
 				return t.registrations[cluster.Name], nil
 			},
 			CSRApproveCheck: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool {

@@ -138,7 +138,7 @@ func (c *csrSignController) sync(ctx context.Context, syncCtx factory.SyncContex
 
 	csr.Status.Certificate, err = registrationOption.CSRSign(cluster, addon, csr)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to sign addon csr %q: %v", csr.Name, err)
 	}
 	if len(csr.Status.Certificate) == 0 {
 		return fmt.Errorf("invalid client certificate generated for addon csr %q", csr.Name)

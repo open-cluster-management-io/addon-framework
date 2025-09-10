@@ -42,7 +42,7 @@ func (t *testAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
 	agentOption := agent.AgentAddonOptions{
 		AddonName: t.name,
 		Registration: &agent.RegistrationOption{
-			CSRConfigurations: func(cluster *clusterv1.ManagedCluster) ([]addonapiv1alpha1.RegistrationConfig, error) {
+			CSRConfigurations: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]addonapiv1alpha1.RegistrationConfig, error) {
 				return t.registrations, nil
 			},
 			PermissionConfig: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
