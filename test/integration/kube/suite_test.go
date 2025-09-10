@@ -171,8 +171,9 @@ func (t *testAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 			CSRApproveCheck: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool {
 				return t.approveCSR
 			},
-			CSRSign: func(csr *certificatesv1.CertificateSigningRequest) []byte {
-				return t.cert
+			CSRSign: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn,
+				csr *certificatesv1.CertificateSigningRequest) ([]byte, error) {
+				return t.cert, nil
 			},
 		}
 	}

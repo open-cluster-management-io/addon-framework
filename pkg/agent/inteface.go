@@ -98,7 +98,7 @@ type AgentAddonOptions struct {
 	ConfigCheckEnabled bool
 }
 
-type CSRSignerFunc func(csr *certificatesv1.CertificateSigningRequest) []byte
+type CSRSignerFunc func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) ([]byte, error)
 
 type CSRApproveFunc func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool
 
