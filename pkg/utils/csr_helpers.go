@@ -30,38 +30,34 @@ var serialNumberLimit = new(big.Int).Lsh(big.NewInt(1), 128)
 
 // DefaultSignerWithExpiry generates a signer func for addon agent to sign the csr using caKey and caData with expiry date.
 func DefaultSignerWithExpiry(caKey, caData []byte, duration time.Duration) agent.CSRSignerFunc {
-	return func(csr *certificatesv1.CertificateSigningRequest) []byte {
+	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn,
+		csr *certificatesv1.CertificateSigningRequest) ([]byte, error) {
 		blockTlsCrt, _ := pem.Decode(caData)
 		if blockTlsCrt == nil {
-			klog.Errorf("Failed to decode cert")
-			return nil
+			return nil, fmt.Errorf("failed to decode cert")
 		}
 		certs, err := x509.ParseCertificates(blockTlsCrt.Bytes)
 		if err != nil {
-			klog.Errorf("Failed to parse cert: %v", err)
-			return nil
+			return nil, fmt.Errorf("failed to parse cert: %v", err)
 		}
 
 		blockTlsKey, _ := pem.Decode(caKey)
 		if blockTlsKey == nil {
-			klog.Errorf("Failed to decode key")
-			return nil
+			return nil, fmt.Errorf("failed to decode key")
 		}
 
 		// For now only PKCS#1 is supported which assures the private key algorithm is RSA.
 		// TODO: Compatibility w/ PKCS#8 key e.g. EC algorithm
 		key, err := x509.ParsePKCS1PrivateKey(blockTlsKey.Bytes)
 		if err != nil {
-			klog.Errorf("Failed to parse key: %v", err)
-			return nil
+			return nil, fmt.Errorf("failed to parse key: %v", err)
 		}
 
 		data, err := signCSR(csr, certs[0], key, duration)
 		if err != nil {
-			klog.Errorf("Failed to sign csr: %v", err)
-			return nil
+			return nil, fmt.Errorf("failed to sign csr: %v", err)
 		}
-		return data
+		return data, nil
 	}
 }
 

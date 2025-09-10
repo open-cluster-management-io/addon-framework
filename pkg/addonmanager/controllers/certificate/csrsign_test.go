@@ -34,8 +34,9 @@ func (t *testSignAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
 	return agent.AgentAddonOptions{
 		AddonName: t.name,
 		Registration: &agent.RegistrationOption{
-			CSRSign: func(csr *certv1.CertificateSigningRequest) []byte {
-				return t.cert
+			CSRSign: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn,
+				csr *certv1.CertificateSigningRequest) ([]byte, error) {
+				return t.cert, nil
 			},
 		},
 	}

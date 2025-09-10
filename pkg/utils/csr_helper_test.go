@@ -64,7 +64,10 @@ func TestDefaultSigner(t *testing.T) {
 
 	signer := DefaultSignerWithExpiry(key, ca, 24*time.Hour)
 
-	cert := signer(newCSR("test", "cluster1"))
+	cert, err := signer(nil, nil, newCSR("test", "cluster1"))
+	if err != nil {
+		t.Errorf("Failed to sign the csr, %v", err)
+	}
 	if cert == nil {
 		t.Errorf("Expect cert to be signed")
 	}
