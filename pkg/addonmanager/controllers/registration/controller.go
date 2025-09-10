@@ -163,7 +163,10 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 		return err
 	}
 
-	configs := registrationOption.CSRConfigurations(managedCluster)
+	configs, err := registrationOption.CSRConfigurations(managedCluster)
+	if err != nil {
+		return fmt.Errorf("get csr configurations failed: %v", err)
+	}
 	managedClusterAddonCopy.Status.Registrations = configs
 
 	var agentInstallNamespace string
