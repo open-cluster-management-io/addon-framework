@@ -37,6 +37,7 @@ type addonConfigController struct {
 	configListers                map[schema.GroupResource]dynamiclister.Lister
 	queue                        workqueue.TypedRateLimitingInterface[string]
 	cmaFilterFunc                factory.EventFilterFunc
+	mcaFilterFunc                utils.ManagedClusterAddOnFilterFunc
 	configGVRs                   map[schema.GroupVersionResource]bool
 	clusterManagementAddonLister addonlisterv1alpha1.ClusterManagementAddOnLister
 }
@@ -48,6 +49,7 @@ func NewAddonConfigController(
 	configInformerFactory dynamicinformer.DynamicSharedInformerFactory,
 	configGVRs map[schema.GroupVersionResource]bool,
 	cmaFilterFunc factory.EventFilterFunc,
+	mcaFilterFunc utils.ManagedClusterAddOnFilterFunc,
 ) factory.Controller {
 	syncCtx := factory.NewSyncContext(controllerName)
 
@@ -58,6 +60,7 @@ func NewAddonConfigController(
 		configListers:                map[schema.GroupResource]dynamiclister.Lister{},
 		queue:                        syncCtx.Queue(),
 		cmaFilterFunc:                cmaFilterFunc,
+		mcaFilterFunc:                mcaFilterFunc,
 		configGVRs:                   configGVRs,
 		clusterManagementAddonLister: clusterManagementAddonInformers.Lister(),
 	}
@@ -144,6 +147,10 @@ func (c *addonConfigController) sync(ctx context.Context, syncCtx factory.SyncCo
 		return err
 	}
 
+	if c.mcaFilterFunc != nil && !c.mcaFilterFunc(addon) {
+		return nil
+	}
+
 	cma, err := c.clusterManagementAddonLister.Get(addonName)
 	if errors.IsNotFound(err) {
 		// cluster management addon could be deleted, ignore
@@ -153,7 +160,7 @@ func (c *addonConfigController) sync(ctx context.Context, syncCtx factory.SyncCo
 		return err
 	}
 
-	if !c.cmaFilterFunc(cma) {
+	if c.cmaFilterFunc != nil && !c.cmaFilterFunc(cma) {
 		return nil
 	}
 

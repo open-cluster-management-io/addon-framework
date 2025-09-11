@@ -145,7 +145,7 @@ func (c *cmaConfigController) sync(ctx context.Context, syncCtx factory.SyncCont
 		return err
 	}
 
-	if !c.cmaFilterFunc(cma) {
+	if c.cmaFilterFunc != nil && !c.cmaFilterFunc(cma) {
 		return nil
 	}
 

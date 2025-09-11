@@ -29,6 +29,7 @@ type addonRegistrationController struct {
 	managedClusterLister      clusterlister.ManagedClusterLister
 	managedClusterAddonLister addonlisterv1alpha1.ManagedClusterAddOnLister
 	agentAddons               map[string]agent.AgentAddon
+	mcaFilterFunc             utils.ManagedClusterAddOnFilterFunc
 }
 
 func NewAddonRegistrationController(
@@ -36,12 +37,14 @@ func NewAddonRegistrationController(
 	clusterInformers clusterinformers.ManagedClusterInformer,
 	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
 	agentAddons map[string]agent.AgentAddon,
+	mcaFilterFunc utils.ManagedClusterAddOnFilterFunc,
 ) factory.Controller {
 	c := &addonRegistrationController{
 		addonClient:               addonClient,
 		managedClusterLister:      clusterInformers.Lister(),
 		managedClusterAddonLister: addonInformers.Lister(),
 		agentAddons:               agentAddons,
+		mcaFilterFunc:             mcaFilterFunc,
 	}
 
 	return factory.New().WithFilteredEventsInformersQueueKeysFunc(
@@ -92,6 +95,10 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 	}
 	if err != nil {
 		return err
+	}
+
+	if c.mcaFilterFunc != nil && !c.mcaFilterFunc(managedClusterAddon) {
+		return nil
 	}
 
 	managedClusterAddonCopy := managedClusterAddon.DeepCopy()
