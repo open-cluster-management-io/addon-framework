@@ -371,7 +371,7 @@ func TestSync(t *testing.T) {
 				addonLister:                  addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
 				clusterManagementAddonLister: addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
 				configListers:                map[schema.GroupResource]dynamiclister.Lister{},
-				addonFilterFunc:              func(obj interface{}) bool { return true },
+				cmaFilterFunc:                func(obj interface{}) bool { return true },
 				configGVRs:                   map[schema.GroupVersionResource]bool{fakeGVR: true},
 			}
 

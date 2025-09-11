@@ -114,7 +114,7 @@ func TestReconcile(t *testing.T) {
 				addonClient:                  fakeAddonClient,
 				clusterManagementAddonLister: addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
 				agentAddons:                  c.testaddons,
-				addonFilterFunc:              utils.FilterByAddonName(c.testaddons),
+				cmaFilterFunc:                utils.FilterByAddonName(c.testaddons),
 				addonPatcher: patcher.NewPatcher[*addonapiv1alpha1.ClusterManagementAddOn,
 					addonapiv1alpha1.ClusterManagementAddOnSpec,
 					addonapiv1alpha1.ClusterManagementAddOnStatus](fakeAddonClient.AddonV1alpha1().ClusterManagementAddOns()),
