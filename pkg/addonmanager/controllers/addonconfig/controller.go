@@ -147,9 +147,15 @@ func (c *addonConfigController) sync(ctx context.Context, syncCtx factory.SyncCo
 		return err
 	}
 
-	if c.mcaFilterFunc != nil && !c.mcaFilterFunc(addon) {
-		return nil
-	}
+	// MCA (ManagedClusterAddOn) filter is intentionally commented out for the addon-config-controller.
+	// This is because template-based addons require this controller to set the specHash in the
+	// managedclusteraddon.status.ConfigReferences for addontemplate, regardless of the filter criteria.
+	// Consider moving logic of setting the managedclusteraddon.status.ConfigReferences for addontemplate
+	// to the addon-manager.
+	//
+	// if c.mcaFilterFunc != nil && !c.mcaFilterFunc(addon) {
+	// 	return nil
+	// }
 
 	cma, err := c.clusterManagementAddonLister.Get(addonName)
 	if errors.IsNotFound(err) {

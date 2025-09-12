@@ -126,7 +126,10 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 
 	statusChanged, err := addonPatcher.PatchStatus(ctx, managedClusterAddonCopy, managedClusterAddonCopy.Status, managedClusterAddon.Status)
 	if statusChanged {
-		return err
+		if err != nil {
+			return fmt.Errorf("failed to patch status(supported configs) of managedclusteraddon: %w", err)
+		}
+		return nil
 	}
 
 	// if supported configs not change, continue to patch condition RegistrationApplied, status.Registrations and status.Namespace
@@ -139,7 +142,10 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 			Message: "Registration of the addon agent is configured",
 		})
 		_, err = addonPatcher.PatchStatus(ctx, managedClusterAddonCopy, managedClusterAddonCopy.Status, managedClusterAddon.Status)
-		return err
+		if err != nil {
+			return fmt.Errorf("failed to patch status condition(registrationOption nil) of managedclusteraddon: %w", err)
+		}
+		return nil
 	}
 
 	if registrationOption.PermissionConfig != nil {
@@ -153,7 +159,7 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 			})
 			if _, patchErr := addonPatcher.PatchStatus(
 				ctx, managedClusterAddonCopy, managedClusterAddonCopy.Status, managedClusterAddon.Status); patchErr != nil {
-				return patchErr
+				return fmt.Errorf("failed to patch status condition (set permission for hub agent) of managedclusteraddon: %w", patchErr)
 			}
 			return err
 		}
@@ -167,12 +173,15 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 			Message: "Registration of the addon agent is configured",
 		})
 		_, err = addonPatcher.PatchStatus(ctx, managedClusterAddonCopy, managedClusterAddonCopy.Status, managedClusterAddon.Status)
-		return err
+		if err != nil {
+			return fmt.Errorf("failed to patch status condition(CSRConfigurations nil) of managedclusteraddon: %w", err)
+		}
+		return nil
 	}
 
 	configs, err := registrationOption.CSRConfigurations(managedCluster, managedClusterAddonCopy)
 	if err != nil {
-		return fmt.Errorf("get csr configurations failed: %v", err)
+		return fmt.Errorf("failed to get csr configurations: %w", err)
 	}
 	managedClusterAddonCopy.Status.Registrations = configs
 
@@ -201,6 +210,8 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 	})
 
 	_, err = addonPatcher.PatchStatus(ctx, managedClusterAddonCopy, managedClusterAddonCopy.Status, managedClusterAddon.Status)
-
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to patch status condition(successfully configured) of managedclusteraddon: %w", err)
+	}
+	return nil
 }
