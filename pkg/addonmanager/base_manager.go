@@ -72,7 +72,7 @@ func (a *BaseAddonManagerImpl) Trigger(clusterName, addonName string) {
 	}
 }
 
-// SetTemplateBasedAddOn configures whether the manager is handling template-based addons.
+// SetTemplateMode configures whether the manager is handling template-based addons.
 //   - true: all ManagedClusterAddOn controllers except "addon-config-controller" will only process addons
 //     when the referenced AddOnTemplate resources in their status.configReferences are properly set;
 //     the "addon-config-controller" is responsible for setting these values
@@ -81,8 +81,8 @@ func (a *BaseAddonManagerImpl) Trigger(clusterName, addonName string) {
 // This prevents premature processing of template-based addons before their configurations
 // are fully ready, avoiding unnecessary errors and retries.
 // See https://github.com/open-cluster-management-io/ocm/issues/1181 for more context.
-func (a *BaseAddonManagerImpl) SetTemplateBasedAddOn(templateBasedAddOn bool) {
-	a.templateBasedAddOn = templateBasedAddOn
+func (a *BaseAddonManagerImpl) SetTemplateMode(enabled bool) {
+	a.templateBasedAddOn = enabled
 }
 
 func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,

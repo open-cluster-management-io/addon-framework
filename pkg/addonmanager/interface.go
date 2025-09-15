@@ -22,8 +22,8 @@ type BaseAddonManager interface {
 	// only trigger the deploy controller.
 	Trigger(clusterName, addonName string)
 
-	// SetTemplateBasedAddOn configures whether the manager is handling template-based addons.
-	SetTemplateBasedAddOn(templateBasedAddOn bool)
+	// SetTemplateMode configures whether the manager is handling template-based addons.
+	SetTemplateMode(enabled bool)
 
 	// StartWithInformers starts all registered addon agent with the given informers.
 	StartWithInformers(ctx context.Context,
