@@ -29,10 +29,11 @@ import (
 // BaseAddonManagerImpl is the base implementation of BaseAddonManager
 // that manages the addon agents and configs.
 type BaseAddonManagerImpl struct {
-	addonAgents  map[string]agent.AgentAddon
-	addonConfigs map[schema.GroupVersionResource]bool
-	config       *rest.Config
-	syncContexts []factory.SyncContext
+	addonAgents        map[string]agent.AgentAddon
+	addonConfigs       map[schema.GroupVersionResource]bool
+	config             *rest.Config
+	syncContexts       []factory.SyncContext
+	templateBasedAddOn bool
 }
 
 // NewBaseAddonManagerImpl creates a new BaseAddonManagerImpl instance with the given config.
@@ -71,6 +72,19 @@ func (a *BaseAddonManagerImpl) Trigger(clusterName, addonName string) {
 	}
 }
 
+// SetTemplateBasedAddOn configures whether the manager is handling template-based addons.
+//   - true: all ManagedClusterAddOn controllers except "addon-config-controller" will only process addons
+//     when the referenced AddOnTemplate resources in their status.configReferences are properly set;
+//     the "addon-config-controller" is responsible for setting these values
+//   - false: process all addons without waiting for template configuration
+//
+// This prevents premature processing of template-based addons before their configurations
+// are fully ready, avoiding unnecessary errors and retries.
+// See https://github.com/open-cluster-management-io/ocm/issues/1181 for more context.
+func (a *BaseAddonManagerImpl) SetTemplateBasedAddOn(templateBasedAddOn bool) {
+	a.templateBasedAddOn = templateBasedAddOn
+}
+
 func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 	workClient workclientset.Interface,
 	workInformers workv1informers.ManifestWorkInformer,
@@ -78,11 +92,10 @@ func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 	addonInformers addoninformers.SharedInformerFactory,
 	clusterInformers clusterv1informers.SharedInformerFactory,
 	dynamicInformers dynamicinformer.DynamicSharedInformerFactory,
-	templateBasedAddOn bool,
 ) error {
-	// Determine the appropriate filter function based on templateBasedAddOn flag
+	// Determine the appropriate filter function based on templateBasedAddOn field
 	mcaFilterFunc := utils.AllowAllAddOns
-	if templateBasedAddOn {
+	if a.templateBasedAddOn {
 		mcaFilterFunc = utils.FilterTemplateBasedAddOns
 	}
 

@@ -22,16 +22,10 @@ type BaseAddonManager interface {
 	// only trigger the deploy controller.
 	Trigger(clusterName, addonName string)
 
+	// SetTemplateBasedAddOn configures whether the manager is handling template-based addons.
+	SetTemplateBasedAddOn(templateBasedAddOn bool)
+
 	// StartWithInformers starts all registered addon agent with the given informers.
-	//
-	// templateBasedAddOn controls whether the manager is handling template-based addons:
-	// - true: all ManagedClusterAddOn controllers except "addon-config-controller" will only process addons
-	//   when the referenced AddOnTemplate resources in their status.configReferences are properly set;
-	//   the "addon-config-controller" is responsible for setting these values
-	// - false: process all addons without waiting for template configuration
-	// This filtering prevents premature processing of template-based addons before their configurations
-	// are fully ready, avoiding unnecessary errors and retries.
-	// See https://github.com/open-cluster-management-io/ocm/issues/1181 for more context.
 	StartWithInformers(ctx context.Context,
 		workClient workclientset.Interface,
 		workInformers workv1informers.ManifestWorkInformer,
@@ -39,7 +33,6 @@ type BaseAddonManager interface {
 		addonInformers addoninformers.SharedInformerFactory,
 		clusterInformers clusterv1informers.SharedInformerFactory,
 		dynamicInformers dynamicinformer.DynamicSharedInformerFactory,
-		templateBasedAddOn bool,
 	) error
 }
 

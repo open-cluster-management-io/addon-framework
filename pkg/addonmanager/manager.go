@@ -123,7 +123,7 @@ func (a *addonManager) Start(ctx context.Context) error {
 	}
 
 	err = a.StartWithInformers(ctx, workClient, workInformers.Work().V1().ManifestWorks(), kubeInformers,
-		addonInformers, clusterInformers, dynamicInformers, false)
+		addonInformers, clusterInformers, dynamicInformers)
 	if err != nil {
 		return err
 	}
