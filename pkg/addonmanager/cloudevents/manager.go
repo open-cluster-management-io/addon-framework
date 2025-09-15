@@ -21,7 +21,6 @@ import (
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
 	"open-cluster-management.io/addon-framework/pkg/index"
-	"open-cluster-management.io/addon-framework/pkg/utils"
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/options"
 	cloudeventswork "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work"
@@ -178,7 +177,7 @@ func (a *cloudeventsAddonManager) Start(ctx context.Context) error {
 	}
 
 	err = a.StartWithInformers(ctx, workClient, workInformers, kubeInformers, addonInformers, clusterInformers,
-		dynamicInformers, utils.AllowAllAddOns)
+		dynamicInformers, false)
 	if err != nil {
 		return err
 	}

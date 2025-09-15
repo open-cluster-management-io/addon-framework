@@ -6,7 +6,6 @@ import (
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	kubeinformers "k8s.io/client-go/informers"
 	"open-cluster-management.io/addon-framework/pkg/agent"
-	"open-cluster-management.io/addon-framework/pkg/utils"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
@@ -24,10 +23,15 @@ type BaseAddonManager interface {
 	Trigger(clusterName, addonName string)
 
 	// StartWithInformers starts all registered addon agent with the given informers.
-	// mcaFilterFunc is a filter function that controls which ManagedClusterAddOn objects should be processed.
-	// It can be used to filter addons or wait until addons meet specific criteria before processing.
-	// For example:
-	// - Wait for addon.status.configReferences to contain templates before processing: utils.FilterTemplateBasedAddOns
+	//
+	// templateBasedAddOn controls whether the manager is handling template-based addons:
+	// - true: all ManagedClusterAddOn controllers except "addon-config-controller" will only process addons
+	//   when the referenced AddOnTemplate resources in their status.configReferences are properly set;
+	//   the "addon-config-controller" is responsible for setting these values
+	// - false: process all addons without waiting for template configuration
+	// This filtering prevents premature processing of template-based addons before their configurations
+	// are fully ready, avoiding unnecessary errors and retries.
+	// See https://github.com/open-cluster-management-io/ocm/issues/1181 for more context.
 	StartWithInformers(ctx context.Context,
 		workClient workclientset.Interface,
 		workInformers workv1informers.ManifestWorkInformer,
@@ -35,7 +39,7 @@ type BaseAddonManager interface {
 		addonInformers addoninformers.SharedInformerFactory,
 		clusterInformers clusterv1informers.SharedInformerFactory,
 		dynamicInformers dynamicinformer.DynamicSharedInformerFactory,
-		mcaFilterFunc utils.ManagedClusterAddOnFilterFunc,
+		templateBasedAddOn bool,
 	) error
 }
 

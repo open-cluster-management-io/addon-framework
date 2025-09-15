@@ -78,10 +78,12 @@ func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 	addonInformers addoninformers.SharedInformerFactory,
 	clusterInformers clusterv1informers.SharedInformerFactory,
 	dynamicInformers dynamicinformer.DynamicSharedInformerFactory,
-	mcaFilterFunc utils.ManagedClusterAddOnFilterFunc,
+	templateBasedAddOn bool,
 ) error {
-	if mcaFilterFunc == nil {
-		mcaFilterFunc = utils.AllowAllAddOns
+	// Determine the appropriate filter function based on templateBasedAddOn flag
+	mcaFilterFunc := utils.AllowAllAddOns
+	if templateBasedAddOn {
+		mcaFilterFunc = utils.FilterTemplateBasedAddOns
 	}
 
 	kubeClient, err := kubernetes.NewForConfig(a.config)
@@ -135,6 +137,13 @@ func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 
 	var addonConfigController, managementAddonConfigController factory.Controller
 	if len(a.addonConfigs) != 0 {
+		// ManagedClusterAddOn filter is intentionally disabled for the addon-config-controller.
+		// This is because template-based addons require this controller to set the specHash in
+		// managedclusteraddon.status.configReferences for addontemplates. Without this, all other
+		// ManagedClusterAddOn controllers would wait indefinitely for the template configurations
+		// to be applied.
+		// Consider moving the logic of setting managedclusteraddon.status.configReferences
+		// for addontemplates to the ocm addon-manager.
 		addonConfigController = addonconfig.NewAddonConfigController(
 			addonClient,
 			addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
@@ -142,7 +151,6 @@ func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 			dynamicInformers,
 			a.addonConfigs,
 			utils.FilterByAddonName(a.addonAgents),
-			mcaFilterFunc,
 		)
 		managementAddonConfigController = cmaconfig.NewCMAConfigController(
 			addonClient,
