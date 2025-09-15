@@ -142,3 +142,10 @@ func New(config *rest.Config) (AddonManager, error) {
 		NewBaseAddonManagerImpl(config),
 	}, nil
 }
+
+// NewWithOptions returns a new Manager for creating addon agents with configuration options.
+func NewWithOptions(config *rest.Config, opts ...Option) (AddonManager, error) {
+	return &addonManager{
+		NewBaseAddonManagerImpl(config, opts...),
+	}, nil
+}
