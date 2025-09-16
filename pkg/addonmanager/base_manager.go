@@ -26,21 +26,36 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 )
 
-// Option is a function that configures BaseAddonManagerImpl during construction.
-type Option func(*BaseAddonManagerImpl)
+// Option contains configuration options for BaseAddonManagerImpl.
+type Option struct {
+	// TemplateBasedAddOn configures whether the manager is handling template-based addons.
+	//   - true: all ManagedClusterAddOn controllers except "addon-config-controller" will only process addons
+	//     when the referenced AddOnTemplate resources in their status.configReferences are properly set;
+	//     the "addon-config-controller" is responsible for setting these values
+	//   - false: process all addons without waiting for template configuration
+	//
+	// This prevents premature processing of template-based addons before their configurations
+	// are fully ready, avoiding unnecessary errors and retries.
+	// See https://github.com/open-cluster-management-io/ocm/issues/1181 for more context.
+	TemplateBasedAddOn bool
+}
 
-// WithTemplateMode configures whether the manager is handling template-based addons.
-//   - true: all ManagedClusterAddOn controllers except "addon-config-controller" will only process addons
-//     when the referenced AddOnTemplate resources in their status.configReferences are properly set;
-//     the "addon-config-controller" is responsible for setting these values
-//   - false: process all addons without waiting for template configuration
-//
-// This prevents premature processing of template-based addons before their configurations
-// are fully ready, avoiding unnecessary errors and retries.
-// See https://github.com/open-cluster-management-io/ocm/issues/1181 for more context.
-func WithTemplateMode(enabled bool) Option {
-	return func(manager *BaseAddonManagerImpl) {
-		manager.templateBasedAddOn = enabled
+// OptionFunc is a function that modifies Option.
+type OptionFunc func(*Option)
+
+// WithTemplateMode returns an OptionFunc that sets the template mode.
+func WithTemplateMode(enabled bool) OptionFunc {
+	return func(option *Option) {
+		option.TemplateBasedAddOn = enabled
+	}
+}
+
+// WithOption returns an OptionFunc that applies the given Option struct.
+func WithOption(opt *Option) OptionFunc {
+	return func(option *Option) {
+		if opt != nil {
+			*option = *opt
+		}
 	}
 }
 
@@ -55,19 +70,22 @@ type BaseAddonManagerImpl struct {
 }
 
 // NewBaseAddonManagerImpl creates a new BaseAddonManagerImpl instance with the given config.
-func NewBaseAddonManagerImpl(config *rest.Config, opts ...Option) *BaseAddonManagerImpl {
-	manager := &BaseAddonManagerImpl{
+func NewBaseAddonManagerImpl(config *rest.Config) *BaseAddonManagerImpl {
+	return &BaseAddonManagerImpl{
 		config:       config,
 		syncContexts: []factory.SyncContext{},
 		addonConfigs: map[schema.GroupVersionResource]bool{},
 		addonAgents:  map[string]agent.AgentAddon{},
 	}
+}
 
-	for _, opt := range opts {
-		opt(manager)
+// ApplyOptionFuncs applies OptionFunc functions to create and configure options.
+func (a *BaseAddonManagerImpl) ApplyOptionFuncs(optionFuncs ...OptionFunc) {
+	option := &Option{}
+	for _, fn := range optionFuncs {
+		fn(option)
 	}
-
-	return manager
+	a.templateBasedAddOn = option.TemplateBasedAddOn
 }
 
 func (a *BaseAddonManagerImpl) GetConfig() *rest.Config {
