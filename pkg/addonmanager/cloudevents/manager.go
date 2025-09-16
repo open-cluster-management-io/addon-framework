@@ -176,7 +176,8 @@ func (a *cloudeventsAddonManager) Start(ctx context.Context) error {
 		return err
 	}
 
-	err = a.StartWithInformers(ctx, workClient, workInformers, kubeInformers, addonInformers, clusterInformers, dynamicInformers)
+	err = a.StartWithInformers(ctx, workClient, workInformers, kubeInformers, addonInformers, clusterInformers,
+		dynamicInformers)
 	if err != nil {
 		return err
 	}
