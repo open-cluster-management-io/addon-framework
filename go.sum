@@ -448,8 +448,8 @@ k8s.io/kube-openapi v0.0.0-20250318190949-c8a335a9a2ff h1:/usPimJzUKKu+m+TE36gUy
 k8s.io/kube-openapi v0.0.0-20250318190949-c8a335a9a2ff/go.mod h1:5jIi+8yX4RIb8wk3XwBo5Pq2ccx4FP10ohkbSKCZoK8=
 k8s.io/utils v0.0.0-20241210054802-24370beab758 h1:sdbE21q2nlQtFh65saZY+rRM6x6aJJI8IUa1AmH/qa0=
 k8s.io/utils v0.0.0-20241210054802-24370beab758/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
-open-cluster-management.io/api v1.0.1-0.20251009064814-48b723491429 h1:jU4r3zijNA+Ab17oF7lBck0YHc7f7wM8r2RqZJw6ZSs=
-open-cluster-management.io/api v1.0.1-0.20251009064814-48b723491429/go.mod h1:lEc5Wkc9ON5ym/qAtIqNgrE7NW7IEOCOC611iQMlnKM=
+open-cluster-management.io/api v1.0.1-0.20251016015403-f042545132a3 h1:PXT0zdNZ4T+3GwCjlY/0Xt5O2hxuEcBgRDvuxtkUy7c=
+open-cluster-management.io/api v1.0.1-0.20251016015403-f042545132a3/go.mod h1:lEc5Wkc9ON5ym/qAtIqNgrE7NW7IEOCOC611iQMlnKM=
 open-cluster-management.io/sdk-go v1.0.1-0.20250811075710-18b20e146feb h1:voE6JR6Xi8wNTSkhADHP19FpGICUpqt1/lEREQt7TVU=
 open-cluster-management.io/sdk-go v1.0.1-0.20250811075710-18b20e146feb/go.mod h1:sHOVhUgA286ceEq3IjFWqxobt9Lu+VBCAUZByFgN0oM=
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.2 h1:jpcvIRr3GLoUoEKRkHKSmGjxb6lWwrBlJsXc+eUYQHM=
