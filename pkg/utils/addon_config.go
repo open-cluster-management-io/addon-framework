@@ -34,6 +34,9 @@ func (g *defaultAddOnDeploymentConfigGetter) Get(
 // AgentInstallNamespaceFromDeploymentConfigFunc returns an agent install namespace helper function which will get the
 // namespace from the addon deployment config. If the addon does not support addon deployment config or there is no
 // matched addon deployment config, it will return an empty string.
+// Note: For backward compatibility, if the config exists but AgentInstallNamespace is empty, it returns the default
+// namespace "open-cluster-management-agent-addon". For template-type addons that need the raw value including
+// explicit empty strings, use AgentInstallNamespaceFromDeploymentConfigRawFunc instead.
 func AgentInstallNamespaceFromDeploymentConfigFunc(
 	adcgetter AddOnDeploymentConfigGetter,
 ) func(*addonapiv1alpha1.ManagedClusterAddOn) (string, error) {
@@ -58,6 +61,44 @@ func AgentInstallNamespaceFromDeploymentConfigFunc(
 			return "", nil
 		}
 
+		// For backward compatibility: if AgentInstallNamespace is empty, return the default namespace.
+		// This ensures existing addons continue to work as before.
+		// Template-type addons that want to use empty string should use AgentInstallNamespaceFromDeploymentConfigRawFunc.
+		if len(config.Spec.AgentInstallNamespace) == 0 {
+			return "open-cluster-management-agent-addon", nil
+		}
+
+		return config.Spec.AgentInstallNamespace, nil
+	}
+}
+
+// AgentInstallNamespaceFromDeploymentConfigRawFunc returns an agent install namespace helper function which will get the
+// raw namespace value from the addon deployment config, including empty string.
+// This function is useful for template-type addons where an empty string signals to use the namespace
+// defined in the template manifest itself, rather than applying a default namespace.
+// If the addon does not support addon deployment config or there is no matched addon deployment config,
+// it will return an empty string.
+func AgentInstallNamespaceFromDeploymentConfigRawFunc(
+	adcgetter AddOnDeploymentConfigGetter,
+) func(*addonapiv1alpha1.ManagedClusterAddOn) (string, error) {
+	return func(addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error) {
+		if addon == nil {
+			return "", fmt.Errorf("failed to get addon install namespace, addon is nil")
+		}
+
+		config, err := GetDesiredAddOnDeploymentConfig(addon, adcgetter)
+		if err != nil {
+			return "", fmt.Errorf("failed to get deployment config for addon %s: %v", addon.Name, err)
+		}
+
+		if config == nil {
+			klog.V(4).InfoS("Addon deployment config is nil, return an empty string for agent install namespace",
+				"addonNamespace", addon.Namespace, "addonName", addon.Name)
+			return "", nil
+		}
+
+		// Return the raw value including empty string - this allows template-type addons to
+		// signal "use template namespace" by setting agentInstallNamespace: ""
 		return config.Spec.AgentInstallNamespace, nil
 	}
 }
