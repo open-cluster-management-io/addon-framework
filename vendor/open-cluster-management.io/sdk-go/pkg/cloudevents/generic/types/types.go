@@ -9,6 +9,9 @@ import (
 	"github.com/google/uuid"
 )
 
+// HeartbeatCloudEventsType indicates the type of heartbeat cloud events.
+const HeartbeatCloudEventsType = "io.open-cluster-management.cloudevents.heartbeat"
+
 const (
 	// ClusterAll is the default argument to specify on a context when you want to list or filter resources across all
 	// managed clusters.
@@ -75,6 +78,9 @@ const (
 
 	// ExtensionStatusHash is the cloud event extension key of the status hash.
 	ExtensionStatusHash = "statushash"
+
+	// ExtensionWorkMeta is an extension attribute for work meta data.
+	ExtensionWorkMeta = "metadata"
 )
 
 // ResourceAction represents an action on a resource object on the source or agent.
