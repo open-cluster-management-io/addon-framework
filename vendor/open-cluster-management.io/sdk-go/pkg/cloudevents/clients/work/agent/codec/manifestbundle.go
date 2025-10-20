@@ -1,6 +1,7 @@
 package codec
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -74,6 +75,13 @@ func (c *ManifestBundleCodec) Encode(source string, eventType types.CloudEventsT
 
 	evt.SetExtension(types.ExtensionStatusHash, statusHash)
 
+	// set the work's meta data to its cloud event
+	metaJson, err := json.Marshal(work.ObjectMeta)
+	if err != nil {
+		return nil, err
+	}
+	evt.SetExtension(types.ExtensionWorkMeta, string(metaJson))
+
 	manifestBundleStatus := &payload.ManifestBundleStatus{
 		Conditions:     work.Status.Conditions,
 		ResourceStatus: work.Status.ResourceStatus.Manifests,
@@ -114,24 +122,43 @@ func (c *ManifestBundleCodec) Decode(evt *cloudevents.Event) (*workv1.ManifestWo
 		return nil, fmt.Errorf("failed to get clustername extension: %v", err)
 	}
 
+	metaObj := metav1.ObjectMeta{}
+	if workMetaExtension, ok := evtExtensions[types.ExtensionWorkMeta]; ok {
+		metaJson, err := cloudeventstypes.ToString(workMetaExtension)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := json.Unmarshal([]byte(metaJson), &metaObj); err != nil {
+			return nil, err
+		}
+	}
+
+	metaObj.UID = kubetypes.UID(resourceID)
+	if len(metaObj.Name) == 0 {
+		metaObj.Name = resourceID
+	}
+	metaObj.Namespace = clusterName
+	metaObj.ResourceVersion = fmt.Sprintf("%d", resourceVersion)
+	// if generation is not set, set it the same as resourceVersion
+	if metaObj.Generation == 0 {
+		metaObj.Generation = int64(resourceVersion)
+	}
+	if metaObj.Annotations == nil {
+		metaObj.Annotations = map[string]string{}
+	}
+	metaObj.Annotations[common.CloudEventsDataTypeAnnotationKey] = eventType.CloudEventsDataType.String()
+	if metaObj.Labels == nil {
+		metaObj.Labels = map[string]string{}
+	}
+	metaObj.Labels[common.CloudEventsOriginalSourceLabelKey] = evt.Source()
+
 	// Use the event's resource version as the current work's generation and resource version.
 	// In the event case, the event's resource version should correspond to its spec change.
 	// We can use the resource version to determine the spec of a work whether changed.
 	work := &workv1.ManifestWork{
-		TypeMeta: metav1.TypeMeta{},
-		ObjectMeta: metav1.ObjectMeta{
-			UID:             kubetypes.UID(resourceID),
-			Generation:      int64(resourceVersion),
-			ResourceVersion: fmt.Sprintf("%d", resourceVersion),
-			Name:            resourceID,
-			Namespace:       clusterName,
-			Labels: map[string]string{
-				common.CloudEventsOriginalSourceLabelKey: evt.Source(),
-			},
-			Annotations: map[string]string{
-				common.CloudEventsDataTypeAnnotationKey: eventType.CloudEventsDataType.String(),
-			},
-		},
+		TypeMeta:   metav1.TypeMeta{},
+		ObjectMeta: metaObj,
 	}
 
 	if _, ok := evtExtensions[types.ExtensionDeletionTimestamp]; ok {
@@ -158,6 +185,7 @@ func (c *ManifestBundleCodec) Decode(evt *cloudevents.Event) (*workv1.ManifestWo
 		},
 		DeleteOption:    manifests.DeleteOption,
 		ManifestConfigs: manifests.ManifestConfigs,
+		Executor:        manifests.Executer,
 	}
 
 	// validate the manifests
