@@ -173,7 +173,7 @@ func TestReconcile(t *testing.T) {
 					t.Errorf("Registration config is not updated")
 				}
 				if addOn.Status.Namespace != "default2" {
-					t.Errorf("Namespace in status is not correct")
+					t.Errorf("Namespace %s in status is not correct default2", addOn.Status.Namespace)
 				}
 			},
 			testaddon: &testAgent{name: "test", namespace: "default", registrations: []addonapiv1alpha1.RegistrationConfig{
@@ -207,7 +207,7 @@ func TestReconcile(t *testing.T) {
 					t.Errorf("Registration config is not updated")
 				}
 				if addOn.Status.Namespace != "default3" {
-					t.Errorf("Namespace in status is not correct")
+					t.Errorf("Namespace %s in status is not correct default3", addOn.Status.Namespace)
 				}
 			},
 			testaddon: &testAgent{name: "test", namespace: "default",
@@ -216,6 +216,39 @@ func TestReconcile(t *testing.T) {
 					return "default3", nil
 				},
 			},
+		},
+		{
+			name:    "default namespace when no namespace is specified",
+			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			addon: []runtime.Object{
+				func() *addonapiv1alpha1.ManagedClusterAddOn {
+					addon := addontesting.NewAddon("test", "cluster1", metav1.OwnerReference{
+						Kind: "ClusterManagementAddOn",
+						Name: "test",
+					})
+					return addon
+				}(),
+			},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch")
+				actual := actions[0].(clienttesting.PatchActionImpl).Patch
+				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				err := json.Unmarshal(actual, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if addOn.Status.Registrations[0].SignerName != "test" {
+					t.Errorf("Registration config is not updated")
+				}
+				if addOn.Status.Namespace != "open-cluster-management-agent-addon" {
+					t.Errorf("Namespace %s in status is not correct, expected open-cluster-management-agent-addon", addOn.Status.Namespace)
+				}
+			},
+			testaddon: &testAgent{name: "test", namespace: "", registrations: []addonapiv1alpha1.RegistrationConfig{
+				{
+					SignerName: "test",
+				},
+			}},
 		},
 	}
 
