@@ -188,28 +188,20 @@ func (s *healthCheckSyncer) probeAddonStatusByWorks(
 	}
 
 	var FieldResults []agent.FieldResult
+	var emptyProbeFields []workapiv1.ResourceIdentifier
 
 	for _, field := range probeFields {
 		results := findResultsByIdentifier(field.ResourceIdentifier, manifestConditions)
 		// if no results are returned. it is possible that work agent has not returned the feedback value.
-		// mark condition to unknown
+		// collect these fields and check if all probes are empty later
 		if len(results) == 0 {
-			meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-				Type:   addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
-				Status: metav1.ConditionUnknown,
-				Reason: addonapiv1alpha1.AddonAvailableReasonNoProbeResult,
-				Message: fmt.Sprintf("Probe results are not returned for %s/%s: %s/%s",
-					field.ResourceIdentifier.Group, field.ResourceIdentifier.Resource,
-					field.ResourceIdentifier.Namespace, field.ResourceIdentifier.Name),
-			})
-			return nil
+			emptyProbeFields = append(emptyProbeFields, field.ResourceIdentifier)
+			continue
 		}
 
 		// healthCheck will be ignored if healthChecker is set
 		if healthChecker != nil {
-			if len(results) != 0 {
-				FieldResults = append(FieldResults, results...)
-			}
+			FieldResults = append(FieldResults, results...)
 			continue
 		}
 
@@ -237,6 +229,28 @@ func (s *healthCheckSyncer) probeAddonStatusByWorks(
 		}
 
 	}
+
+	// If all probe fields have no results, mark condition to unknown
+	if len(emptyProbeFields) == len(probeFields) && len(probeFields) > 0 {
+		var msg string
+		if len(emptyProbeFields) == 1 {
+			msg = fmt.Sprintf("Probe results are not returned for %s/%s: %s/%s",
+				emptyProbeFields[0].Group, emptyProbeFields[0].Resource,
+				emptyProbeFields[0].Namespace, emptyProbeFields[0].Name)
+		} else {
+			msg = fmt.Sprintf("Probe results are not returned for %d probe fields", len(emptyProbeFields))
+		}
+		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
+			Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+			Status:  metav1.ConditionUnknown,
+			Reason:  addonapiv1alpha1.AddonAvailableReasonNoProbeResult,
+			Message: msg,
+		})
+		return nil
+	}
+
+	// If we have FieldResults but some probes are empty, still proceed with healthChecker
+	// This allows partial probe results to be considered valid
 
 	if healthChecker != nil {
 		if err := healthChecker(FieldResults, cluster, addon); err != nil {
