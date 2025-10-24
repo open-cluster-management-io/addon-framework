@@ -1259,6 +1259,74 @@ func TestHealthCheckReconcile(t *testing.T) {
 				Message: "test add-on is available.",
 			},
 		},
+		{
+			name: "Health check mode is work with multi probes where first probe has empty results but second has valid results",
+			testAddon: &healthCheckTestAgent{name: "test",
+				health: newDeploymentsCheckAllProber(
+					types.NamespacedName{Name: "test-deployment-nonexistent", Namespace: "default"},
+					types.NamespacedName{Name: "test-deployment1", Namespace: "default"}),
+			},
+			addon: addontesting.NewAddonWithConditions("test", "cluster1", manifestAppliedCondition),
+			existingWork: []runtime.Object{
+				&v1.ManifestWork{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "addon-test-deploy-01",
+						Namespace: "cluster1",
+						Labels: map[string]string{
+							"open-cluster-management.io/addon-name": "test",
+						},
+					},
+					Spec: v1.ManifestWorkSpec{},
+					Status: v1.ManifestWorkStatus{
+						ResourceStatus: v1.ManifestResourceStatus{
+							Manifests: []v1.ManifestCondition{
+								{
+									ResourceMeta: v1.ManifestResourceMeta{
+										Ordinal:   0,
+										Group:     "apps",
+										Version:   "",
+										Kind:      "",
+										Resource:  "deployments",
+										Name:      "test-deployment1",
+										Namespace: "default",
+									},
+									StatusFeedbacks: v1.StatusFeedbackResult{
+										Values: []v1.FeedbackValue{
+											{
+												Name: "Replicas",
+												Value: v1.FieldValue{
+													Integer: boolPtr(1),
+												},
+											},
+											{
+												Name: "ReadyReplicas",
+												Value: v1.FieldValue{
+													Integer: boolPtr(1),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+						Conditions: []metav1.Condition{
+							{
+								Type:   v1.WorkAvailable,
+								Status: metav1.ConditionTrue,
+							},
+						},
+					},
+				},
+			},
+			expectedErr:             nil,
+			expectedHealthCheckMode: addonapiv1alpha1.HealthCheckModeCustomized,
+			expectAvailableCondition: metav1.Condition{
+				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+				Status:  metav1.ConditionTrue,
+				Reason:  addonapiv1alpha1.AddonAvailableReasonProbeAvailable,
+				Message: "test add-on is available.",
+			},
+		},
 	}
 
 	for _, c := range cases {
