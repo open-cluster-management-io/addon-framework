@@ -187,21 +187,19 @@ func (s *healthCheckSyncer) probeAddonStatusByWorks(
 		return err
 	}
 
-	var FieldResults []agent.FieldResult
-	var emptyProbeFields []workapiv1.ResourceIdentifier
+	var fieldResults []agent.FieldResult
 
 	for _, field := range probeFields {
 		results := findResultsByIdentifier(field.ResourceIdentifier, manifestConditions)
 		// if no results are returned. it is possible that work agent has not returned the feedback value.
 		// collect these fields and check if all probes are empty later
 		if len(results) == 0 {
-			emptyProbeFields = append(emptyProbeFields, field.ResourceIdentifier)
 			continue
 		}
 
+		fieldResults = append(fieldResults, results...)
 		// healthCheck will be ignored if healthChecker is set
 		if healthChecker != nil {
-			FieldResults = append(FieldResults, results...)
 			continue
 		}
 
@@ -231,29 +229,21 @@ func (s *healthCheckSyncer) probeAddonStatusByWorks(
 	}
 
 	// If all probe fields have no results, mark condition to unknown
-	if len(emptyProbeFields) == len(probeFields) && len(probeFields) > 0 {
-		var msg string
-		if len(emptyProbeFields) == 1 {
-			msg = fmt.Sprintf("Probe results are not returned for %s/%s: %s/%s",
-				emptyProbeFields[0].Group, emptyProbeFields[0].Resource,
-				emptyProbeFields[0].Namespace, emptyProbeFields[0].Name)
-		} else {
-			msg = fmt.Sprintf("Probe results are not returned for %d probe fields", len(emptyProbeFields))
-		}
+	if len(probeFields) > 0 && len(fieldResults) == 0 {
 		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
 			Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
 			Status:  metav1.ConditionUnknown,
 			Reason:  addonapiv1alpha1.AddonAvailableReasonNoProbeResult,
-			Message: msg,
+			Message: "Probe results are not returned",
 		})
 		return nil
 	}
 
-	// If we have FieldResults but some probes are empty, still proceed with healthChecker
+	// If we have fieldResults but some probes are empty, still proceed with healthChecker
 	// This allows partial probe results to be considered valid
 
 	if healthChecker != nil {
-		if err := healthChecker(FieldResults, cluster, addon); err != nil {
+		if err := healthChecker(fieldResults, cluster, addon); err != nil {
 			meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
 				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
 				Status:  metav1.ConditionFalse,

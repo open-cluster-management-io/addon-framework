@@ -922,8 +922,8 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 				return err
 			}
 
-			// the daemonset is not probed, so the addon available condition is unknown
-			if !meta.IsStatusConditionPresentAndEqual(addon.Status.Conditions, "Available", metav1.ConditionUnknown) {
+			// the daemonset is not probed, so the addon available condition is false
+			if !meta.IsStatusConditionPresentAndEqual(addon.Status.Conditions, "Available", metav1.ConditionFalse) {
 				return fmt.Errorf("Unexpected addon available condition, %v", addon.Status.Conditions)
 			}
 			return nil
