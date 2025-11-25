@@ -294,11 +294,6 @@ func startWorkAgent(ctx context.Context, clusterName string) (*work.ClientHolder
 		workClient, 30*time.Minute, workinformers.WithNamespace(clusterName))
 	workInformers := factory.Work().V1().ManifestWorks()
 
-	// For cloudevents work client, we use the informer store as the client store
-	if watcherStore != nil {
-		watcherStore.SetInformer(workInformers.Informer())
-	}
-
 	go workInformers.Informer().Run(ctx.Done())
 
 	return clientHolder, workInformers, nil
