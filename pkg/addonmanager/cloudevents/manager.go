@@ -27,7 +27,7 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/source/codec"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/store"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/constants"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/builder"
 )
 
 // cloudeventsAddonManager is the implementation of AddonManager with
@@ -62,7 +62,7 @@ func (a *cloudeventsAddonManager) Start(ctx context.Context) error {
 	case constants.ConfigTypeGRPC, constants.ConfigTypeMQTT:
 		watcherStore = store.NewSourceInformerWatcherStore(ctx)
 
-		_, clientConfig, err := generic.NewConfigLoader(a.options.WorkDriver, a.options.WorkDriverConfig).
+		_, clientConfig, err := builder.NewConfigLoader(a.options.WorkDriver, a.options.WorkDriverConfig).
 			LoadConfig()
 		if err != nil {
 			return err
