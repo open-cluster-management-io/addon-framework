@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -747,7 +748,11 @@ func createManagedClusterAddOnwithOwnerRefs(namespace string, addon *addonapiv1a
 	addonCopy := addon.DeepCopy()
 
 	// This is to assume that addon-manager has already added the OwnerReferences.
-	owner := metav1.NewControllerRef(cma, addonapiv1alpha1.GroupVersion.WithKind("ClusterManagementAddOn"))
+	owner := metav1.NewControllerRef(cma, schema.GroupVersionKind{
+		Group:   addonapiv1alpha1.GroupName,
+		Version: addonapiv1alpha1.GroupVersion.Version,
+		Kind:    "ClusterManagementAddOn",
+	})
 	modified := utils.MergeOwnerRefs(&addonCopy.OwnerReferences, *owner, false)
 	if modified {
 		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(addonCopy.Namespace).Update(context.Background(), addonCopy, metav1.UpdateOptions{})
