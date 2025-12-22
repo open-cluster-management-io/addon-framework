@@ -22,7 +22,7 @@ require (
 	k8s.io/component-base v0.34.1
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/utils v0.0.0-20250604170112-4c0f3b243397
-	open-cluster-management.io/api v1.1.1-0.20251124092621-2337d27c3b7f
+	open-cluster-management.io/api v1.1.1-0.20251222023835-510285203ee6
 	open-cluster-management.io/sdk-go v1.1.1-0.20251125014036-c7d6056a7936
 	sigs.k8s.io/controller-runtime v0.22.3
 )
