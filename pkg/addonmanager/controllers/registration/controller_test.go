@@ -14,7 +14,7 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/agent"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	fakecluster "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
@@ -25,11 +25,11 @@ import (
 type testAgent struct {
 	name                  string
 	namespace             string
-	registrations         []addonapiv1alpha1.RegistrationConfig
-	agentInstallNamespace func(addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error)
+	registrations         []addonapiv1beta1.RegistrationConfig
+	agentInstallNamespace func(addon *addonapiv1beta1.ManagedClusterAddOn) (string, error)
 }
 
-func (t *testAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
+func (t *testAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error) {
 	return []runtime.Object{}, nil
 }
 
@@ -42,10 +42,10 @@ func (t *testAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
 	agentOption := agent.AgentAddonOptions{
 		AddonName: t.name,
 		Registration: &agent.RegistrationOption{
-			CSRConfigurations: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]addonapiv1alpha1.RegistrationConfig, error) {
+			CSRConfigurations: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) ([]addonapiv1beta1.RegistrationConfig, error) {
 				return t.registrations, nil
 			},
-			PermissionConfig: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+			PermissionConfig: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 				return nil
 			},
 			Namespace: t.namespace,
@@ -71,13 +71,13 @@ func TestReconcile(t *testing.T) {
 			addon:                []runtime.Object{addontesting.NewAddon("test", "cluster1")},
 			cluster:              []runtime.Object{},
 			validateAddonActions: addontesting.AssertNoActions,
-			testaddon:            &testAgent{name: "test", registrations: []addonapiv1alpha1.RegistrationConfig{}},
+			testaddon:            &testAgent{name: "test", registrations: []addonapiv1beta1.RegistrationConfig{}},
 		},
 		{
 			name:                 "no addon",
 			cluster:              []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			validateAddonActions: addontesting.AssertNoActions,
-			testaddon:            &testAgent{name: "test", registrations: []addonapiv1alpha1.RegistrationConfig{}},
+			testaddon:            &testAgent{name: "test", registrations: []addonapiv1beta1.RegistrationConfig{}},
 		},
 		{
 			name:    "no registrations",
@@ -88,29 +88,32 @@ func TestReconcile(t *testing.T) {
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "patch")
 				actual := actions[0].(clienttesting.PatchActionImpl).Patch
-				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
 				err := json.Unmarshal(actual, addOn)
 				if err != nil {
 					t.Fatal(err)
 				}
-				if !meta.IsStatusConditionTrue(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnRegistrationApplied) {
+				if !meta.IsStatusConditionTrue(addOn.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnRegistrationApplied) {
 					t.Errorf("Unexpected status condition patch, got %s", string(actual))
 				}
 			},
-			testaddon: &testAgent{name: "test", registrations: []addonapiv1alpha1.RegistrationConfig{}},
+			testaddon: &testAgent{name: "test", registrations: []addonapiv1beta1.RegistrationConfig{}},
 		},
 		{
 			name:    "no owner",
 			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			addon: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1")
 					return addon
 				}(),
 			},
-			testaddon: &testAgent{name: "test", namespace: "default", registrations: []addonapiv1alpha1.RegistrationConfig{
+			testaddon: &testAgent{name: "test", namespace: "default", registrations: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: "test",
+					Type: addonapiv1beta1.CSR,
+					CSR: &addonapiv1beta1.CSRConfig{
+						SignerName: "test",
+					},
 				},
 			}},
 			validateAddonActions: addontesting.AssertNoActions,
@@ -119,7 +122,7 @@ func TestReconcile(t *testing.T) {
 			name:    "with registrations",
 			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			addon: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1", metav1.OwnerReference{
 						Kind: "ClusterManagementAddOn",
 						Name: "test",
@@ -130,21 +133,24 @@ func TestReconcile(t *testing.T) {
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "patch")
 				actual := actions[0].(clienttesting.PatchActionImpl).Patch
-				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
 				err := json.Unmarshal(actual, addOn)
 				if err != nil {
 					t.Fatal(err)
 				}
-				if addOn.Status.Registrations[0].SignerName != "test" {
+				if addOn.Status.Registrations[0].CSR.SignerName != "test" {
 					t.Errorf("Registration config is not updated")
 				}
 				if addOn.Status.Namespace != "default" {
 					t.Errorf("Namespace in status is not correct")
 				}
 			},
-			testaddon: &testAgent{name: "test", namespace: "default", registrations: []addonapiv1alpha1.RegistrationConfig{
+			testaddon: &testAgent{name: "test", namespace: "default", registrations: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: "test",
+					Type: addonapiv1beta1.CSR,
+					CSR: &addonapiv1beta1.CSRConfig{
+						SignerName: "test",
+					},
 				},
 			}},
 		},
@@ -152,58 +158,64 @@ func TestReconcile(t *testing.T) {
 			name:    "with registrations and override namespace",
 			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			addon: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1", metav1.OwnerReference{
 						Kind: "ClusterManagementAddOn",
 						Name: "test",
 					})
-					addon.Spec.InstallNamespace = "default2"
 					return addon
 				}(),
 			},
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "patch")
 				actual := actions[0].(clienttesting.PatchActionImpl).Patch
-				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
 				err := json.Unmarshal(actual, addOn)
 				if err != nil {
 					t.Fatal(err)
 				}
-				if addOn.Status.Registrations[0].SignerName != "test" {
+				if addOn.Status.Registrations[0].CSR.SignerName != "test" {
 					t.Errorf("Registration config is not updated")
 				}
 				if addOn.Status.Namespace != "default2" {
 					t.Errorf("Namespace %s in status is not correct default2", addOn.Status.Namespace)
 				}
 			},
-			testaddon: &testAgent{name: "test", namespace: "default", registrations: []addonapiv1alpha1.RegistrationConfig{
-				{
-					SignerName: "test",
+			testaddon: &testAgent{name: "test", namespace: "default",
+				registrations: []addonapiv1beta1.RegistrationConfig{
+					{
+						Type: addonapiv1beta1.CSR,
+						CSR: &addonapiv1beta1.CSRConfig{
+							SignerName: "test",
+						},
+					},
 				},
-			}},
+				agentInstallNamespace: func(addon *addonapiv1beta1.ManagedClusterAddOn) (string, error) {
+					return "default2", nil
+				},
+			},
 		},
 		{
 			name:    "with registrations and override namespace by agentInstallNamespace",
 			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			addon: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1", metav1.OwnerReference{
 						Kind: "ClusterManagementAddOn",
 						Name: "test",
 					})
-					addon.Spec.InstallNamespace = "default2"
 					return addon
 				}(),
 			},
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "patch")
 				actual := actions[0].(clienttesting.PatchActionImpl).Patch
-				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
 				err := json.Unmarshal(actual, addOn)
 				if err != nil {
 					t.Fatal(err)
 				}
-				if addOn.Status.Registrations[0].SignerName != "test" {
+				if addOn.Status.Registrations[0].CSR.SignerName != "test" {
 					t.Errorf("Registration config is not updated")
 				}
 				if addOn.Status.Namespace != "default3" {
@@ -211,8 +223,13 @@ func TestReconcile(t *testing.T) {
 				}
 			},
 			testaddon: &testAgent{name: "test", namespace: "default",
-				registrations: []addonapiv1alpha1.RegistrationConfig{{SignerName: "test"}},
-				agentInstallNamespace: func(addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error) {
+				registrations: []addonapiv1beta1.RegistrationConfig{{
+					Type: addonapiv1beta1.CSR,
+					CSR: &addonapiv1beta1.CSRConfig{
+						SignerName: "test",
+					},
+				}},
+				agentInstallNamespace: func(addon *addonapiv1beta1.ManagedClusterAddOn) (string, error) {
 					return "default3", nil
 				},
 			},
@@ -221,7 +238,7 @@ func TestReconcile(t *testing.T) {
 			name:    "default namespace when no namespace is specified",
 			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			addon: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1", metav1.OwnerReference{
 						Kind: "ClusterManagementAddOn",
 						Name: "test",
@@ -232,21 +249,24 @@ func TestReconcile(t *testing.T) {
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "patch")
 				actual := actions[0].(clienttesting.PatchActionImpl).Patch
-				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
 				err := json.Unmarshal(actual, addOn)
 				if err != nil {
 					t.Fatal(err)
 				}
-				if addOn.Status.Registrations[0].SignerName != "test" {
+				if addOn.Status.Registrations[0].CSR.SignerName != "test" {
 					t.Errorf("Registration config is not updated")
 				}
 				if addOn.Status.Namespace != "open-cluster-management-agent-addon" {
 					t.Errorf("Namespace %s in status is not correct, expected open-cluster-management-agent-addon", addOn.Status.Namespace)
 				}
 			},
-			testaddon: &testAgent{name: "test", namespace: "", registrations: []addonapiv1alpha1.RegistrationConfig{
+			testaddon: &testAgent{name: "test", namespace: "", registrations: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: "test",
+					Type: addonapiv1beta1.CSR,
+					CSR: &addonapiv1beta1.CSRConfig{
+						SignerName: "test",
+					},
 				},
 			}},
 		},
@@ -266,7 +286,7 @@ func TestReconcile(t *testing.T) {
 				}
 			}
 			for _, obj := range c.addon {
-				if err := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore().Add(obj); err != nil {
+				if err := addonInformers.Addon().V1beta1().ManagedClusterAddOns().Informer().GetStore().Add(obj); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -274,12 +294,12 @@ func TestReconcile(t *testing.T) {
 			controller := addonRegistrationController{
 				addonClient:               fakeAddonClient,
 				managedClusterLister:      clusterInformers.Cluster().V1().ManagedClusters().Lister(),
-				managedClusterAddonLister: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
+				managedClusterAddonLister: addonInformers.Addon().V1beta1().ManagedClusterAddOns().Lister(),
 				agentAddons:               map[string]agent.AgentAddon{c.testaddon.name: c.testaddon},
 			}
 
 			for _, obj := range c.addon {
-				addon := obj.(*addonapiv1alpha1.ManagedClusterAddOn)
+				addon := obj.(*addonapiv1beta1.ManagedClusterAddOn)
 				key := fmt.Sprintf("%s/%s", addon.Namespace, addon.Name)
 				syncContext := addontesting.NewFakeSyncContext(t)
 				err := controller.sync(context.TODO(), syncContext, key)

@@ -6,7 +6,7 @@ import (
 	certificatesv1 "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
@@ -28,7 +28,7 @@ type AgentAddon interface {
 	//   - the RBAC permission bond to the addon agents *in the managed cluster*. (the hub cluster's RBAC
 	//     setup shall be done at GetAgentAddonOptions below.)
 	// NB for dispatching namespaced resources, it's recommended to include the namespace in the list.
-	Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error)
+	Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error)
 
 	// GetAgentAddonOptions returns the agent options for advanced agent customization.
 	// A minimal option is merely setting a unique addon name in the AgentAddonOptions.
@@ -64,7 +64,7 @@ type AgentAddonOptions struct {
 	HostedModeEnabled bool
 
 	// HostedModeInfoFunc returns whether an addon is in hosted mode, and its hosting cluster.
-	HostedModeInfoFunc func(addon *addonapiv1alpha1.ManagedClusterAddOn, cluster *clusterv1.ManagedCluster) (string, string)
+	HostedModeInfoFunc func(addon *addonapiv1beta1.ManagedClusterAddOn, cluster *clusterv1.ManagedCluster) (string, string)
 
 	// SupportedConfigGVRs is a list of addon supported configuration GroupVersionResource
 	// each configuration GroupVersionResource should be unique
@@ -99,17 +99,17 @@ type AgentAddonOptions struct {
 }
 
 type CSRConfigurationsFunc func(cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) ([]addonapiv1alpha1.RegistrationConfig, error)
+	addon *addonapiv1beta1.ManagedClusterAddOn) ([]addonapiv1beta1.RegistrationConfig, error)
 
 type CSRSignerFunc func(cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) ([]byte, error)
+	addon *addonapiv1beta1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) ([]byte, error)
 
 type CSRApproveFunc func(cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool
+	addon *addonapiv1beta1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool
 
-type PermissionConfigFunc func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error
+type PermissionConfigFunc func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error
 
-type AgentInstallNamespaceFunc func(addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error)
+type AgentInstallNamespaceFunc func(addon *addonapiv1beta1.ManagedClusterAddOn) (string, error)
 
 // RegistrationOption defines how agent is registered to the hub cluster. It needs to define:
 // 1. csr with what subject/signer should be created
@@ -176,7 +176,7 @@ type HealthProber struct {
 }
 
 type AddonHealthCheckFunc func(workapiv1.ResourceIdentifier, workapiv1.StatusFeedbackResult) error
-type AddonHealthCheckerFunc func([]FieldResult, *clusterv1.ManagedCluster, *addonapiv1alpha1.ManagedClusterAddOn) error
+type AddonHealthCheckerFunc func([]FieldResult, *clusterv1.ManagedCluster, *addonapiv1beta1.ManagedClusterAddOn) error
 
 type WorkHealthProber struct {
 	// ProbeFields tells addon framework what field to probe
@@ -240,13 +240,17 @@ const (
 
 func KubeClientSignerConfigurations(addonName, agentName string) CSRConfigurationsFunc {
 	return func(cluster *clusterv1.ManagedCluster,
-		addon *addonapiv1alpha1.ManagedClusterAddOn) ([]addonapiv1alpha1.RegistrationConfig, error) {
-		return []addonapiv1alpha1.RegistrationConfig{
+		addon *addonapiv1beta1.ManagedClusterAddOn) ([]addonapiv1beta1.RegistrationConfig, error) {
+		return []addonapiv1beta1.RegistrationConfig{
 			{
-				SignerName: certificatesv1.KubeAPIServerClientSignerName,
-				Subject: addonapiv1alpha1.Subject{
-					User:   DefaultUser(cluster.Name, addonName, agentName),
-					Groups: DefaultGroups(cluster.Name, addonName),
+				Type: addonapiv1beta1.KubeClient,
+				KubeClient: &addonapiv1beta1.KubeClientConfig{
+					Subject: addonapiv1beta1.KubeClientSubject{
+						BaseSubject: addonapiv1beta1.BaseSubject{
+							User:   DefaultUser(cluster.Name, addonName, agentName),
+							Groups: DefaultGroups(cluster.Name, addonName),
+						},
+					},
 				},
 			},
 		}, nil
@@ -268,6 +272,6 @@ func DefaultGroups(clusterName, addonName string) []string {
 }
 
 // ApprovalAllCSRs returns true for all csrs.
-func ApprovalAllCSRs(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool {
+func ApprovalAllCSRs(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool {
 	return true
 }

@@ -20,16 +20,17 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	coreclientv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/klog/v2"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	addonv1beta1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 )
 
-func MergeRelatedObjects(modified *bool, objs *[]addonapiv1alpha1.ObjectReference, obj addonapiv1alpha1.ObjectReference) {
+func MergeRelatedObjects(modified *bool, objs *[]addonapiv1beta1.ObjectReference, obj addonapiv1beta1.ObjectReference) {
 	if *objs == nil {
-		*objs = []addonapiv1alpha1.ObjectReference{}
+		*objs = []addonapiv1beta1.ObjectReference{}
 	}
 
 	for _, o := range *objs {
@@ -251,13 +252,13 @@ func ownerRefMatched(existing, required metav1.OwnerReference) bool {
 	return true
 }
 
-func PatchAddonCondition(ctx context.Context, addonClient addonv1alpha1client.Interface, new, old *addonapiv1alpha1.ManagedClusterAddOn) error {
+func PatchAddonCondition(ctx context.Context, addonClient addonv1beta1client.Interface, new, old *addonapiv1beta1.ManagedClusterAddOn) error {
 	if equality.Semantic.DeepEqual(new.Status.Conditions, old.Status.Conditions) {
 		return nil
 	}
 
-	oldData, err := json.Marshal(&addonapiv1alpha1.ManagedClusterAddOn{
-		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
+	oldData, err := json.Marshal(&addonapiv1beta1.ManagedClusterAddOn{
+		Status: addonapiv1beta1.ManagedClusterAddOnStatus{
 			Conditions: old.Status.Conditions,
 		},
 	})
@@ -265,12 +266,12 @@ func PatchAddonCondition(ctx context.Context, addonClient addonv1alpha1client.In
 		return err
 	}
 
-	newData, err := json.Marshal(&addonapiv1alpha1.ManagedClusterAddOn{
+	newData, err := json.Marshal(&addonapiv1beta1.ManagedClusterAddOn{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:             new.UID,
 			ResourceVersion: new.ResourceVersion,
 		},
-		Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
+		Status: addonapiv1beta1.ManagedClusterAddOnStatus{
 			Conditions: new.Status.Conditions,
 		},
 	})
@@ -284,13 +285,13 @@ func PatchAddonCondition(ctx context.Context, addonClient addonv1alpha1client.In
 	}
 
 	klog.V(2).Infof("Patching addon %s/%s condition with %s", new.Namespace, new.Name, string(patchBytes))
-	_, err = addonClient.AddonV1alpha1().ManagedClusterAddOns(new.Namespace).Patch(
+	_, err = addonClient.AddonV1beta1().ManagedClusterAddOns(new.Namespace).Patch(
 		ctx, new.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 	return err
 }
 
 // AddonManagementFilterFunc is to check if the addon should be managed by addon manager or self-managed
-type AddonManagementFilterFunc func(cma *addonapiv1alpha1.ClusterManagementAddOn) bool
+type AddonManagementFilterFunc func(cma *addonapiv1beta1.ClusterManagementAddOn) bool
 
 func ManagedByAddonManager(obj interface{}) bool {
 	accessor, _ := meta.Accessor(obj)
@@ -299,12 +300,12 @@ func ManagedByAddonManager(obj interface{}) bool {
 		return true
 	}
 
-	value, ok := annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey]
+	value, ok := annotations[constants.AddonLifecycleAnnotationKey]
 	if !ok {
 		return true
 	}
 
-	return value == addonapiv1alpha1.AddonLifecycleAddonManagerAnnotationValue
+	return value == constants.AddonLifecycleAddonManagerAnnotationValue
 }
 
 func FilterByAddonName(agentAddons map[string]agent.AgentAddon) func(obj interface{}) bool {
@@ -315,7 +316,7 @@ func FilterByAddonName(agentAddons map[string]agent.AgentAddon) func(obj interfa
 	}
 }
 
-func IsOwnedByCMA(addon *addonapiv1alpha1.ManagedClusterAddOn) bool {
+func IsOwnedByCMA(addon *addonapiv1beta1.ManagedClusterAddOn) bool {
 	for _, owner := range addon.OwnerReferences {
 		if owner.Kind != "ClusterManagementAddOn" {
 			continue

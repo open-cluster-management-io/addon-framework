@@ -14,6 +14,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1apha1 "open-cluster-management.io/api/cluster/v1alpha1"
@@ -38,7 +39,7 @@ type global struct {
 }
 
 func getValues(cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
+	addon *addonapiv1beta1.ManagedClusterAddOn) (Values, error) {
 	userConfig := config{
 		OverrideName: addon.Name,
 		Global: global{
@@ -145,7 +146,7 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 			addonName:        "helloworld",
 			installNamespace: "myNs",
 			annotationValues: `{"global": {"nodeSelector":{"host":"ssd"},"imageOverrides":{"testImage":"quay.io/helloworld:2.4"}}}`,
-			getValuesFunc: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
+			getValuesFunc: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) (Values, error) {
 				return Values{
 					"hubKubeConfigSecret":     "external-hub-kubeconfig",
 					"managedKubeConfigSecret": "external-managed-kubeconfig",
@@ -193,7 +194,7 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 			addonName:        "helloworld",
 			installNamespace: "myNs",
 			annotationValues: `{"global": {"nodeSelector":{"host":"ssd"},"imageOverrides":{"testImage":"quay.io/helloworld:2.4"}}}`,
-			getValuesFunc: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
+			getValuesFunc: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) (Values, error) {
 				return ToAddOnResourceRequirementsValues(addonapiv1alpha1.AddOnDeploymentConfig{
 					Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
 						ResourceRequirements: []addonapiv1alpha1.ContainerResourceRequirements{
@@ -239,7 +240,7 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 			if c.getHostingClusterWithClient && c.hostingCluster != nil {
 				clusterClient := clusterclientset.NewSimpleClientset(c.hostingCluster)
 				factory = factory.WithManagedClusterClient(clusterClient)
-				clusterAddon.Annotations[addonapiv1alpha1.HostingClusterNameAnnotationKey] = c.hostingCluster.Name
+				clusterAddon.Annotations[addonapiv1beta1.HostingClusterNameAnnotationKey] = c.hostingCluster.Name
 			}
 			if !c.getHostingClusterWithClient && c.hostingCluster != nil {
 				factory = factory.WithHostingCluster(c.hostingCluster)

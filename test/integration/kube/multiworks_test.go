@@ -17,7 +17,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
@@ -93,7 +93,7 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 	var managedClusterName string
 	var err error
 	var manifestWorkName0, manifestWorkName1 string
-	var cma *addonapiv1alpha1.ClusterManagementAddOn
+	var cma *addonapiv1beta1.ClusterManagementAddOn
 	ginkgo.BeforeEach(func() {
 		suffix := rand.String(5)
 		managedClusterName = fmt.Sprintf("managedcluster-%s", suffix)
@@ -115,7 +115,7 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		cma = newClusterManagementAddon(testMultiWorksAddonImpl.name)
-		cma, err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Create(context.Background(),
+		cma, err = hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Create(context.Background(),
 			cma, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
@@ -126,7 +126,7 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 		err = hubClusterClient.ClusterV1().ManagedClusters().Delete(context.Background(), managedClusterName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-		err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Delete(context.Background(),
+		err = hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Delete(context.Background(),
 			testMultiWorksAddonImpl.name, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
@@ -150,19 +150,30 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 		}
 
 		// case 1: apply 2 works for the addon
-		addon := &addonapiv1alpha1.ManagedClusterAddOn{
+		addon := &addonapiv1beta1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testMultiWorksAddonImpl.name,
 			},
-			Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
-				InstallNamespace: "default",
+			Spec: addonapiv1beta1.ManagedClusterAddOnSpec{
+				Configs: []addonapiv1beta1.AddOnConfig{
+					{
+						ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+							Group:    "addon.open-cluster-management.io",
+							Resource: "addondeploymentconfigs",
+						},
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Namespace: managedClusterName,
+							Name:      "test-deploy-config",
+						},
+					},
+				},
 			},
 		}
 		createManagedClusterAddOnwithOwnerRefs(managedClusterName, addon, cma)
 
 		gomega.Eventually(func() error {
 			works, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).List(context.Background(), metav1.ListOptions{
-				LabelSelector: fmt.Sprintf("%s=%s", addonapiv1alpha1.AddonLabelKey, testMultiWorksAddonImpl.name),
+				LabelSelector: fmt.Sprintf("%s=%s", addonapiv1beta1.AddonLabelKey, testMultiWorksAddonImpl.name),
 			})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			if len(works.Items) != 2 {
@@ -195,15 +206,15 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 		testMultiWorksAddonImpl.manifests[managedClusterName] = []runtime.Object{deploymentObj, mycrdObj, mycrObj, configmapObj}
 
 		// update addon to trigger reconcile
-		addon, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testMultiWorksAddonImpl.name, metav1.GetOptions{})
+		addon, err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testMultiWorksAddonImpl.name, metav1.GetOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		addon.SetLabels(map[string]string{"trigger": "2"})
-		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Update(context.Background(), addon, metav1.UpdateOptions{})
+		_, err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Update(context.Background(), addon, metav1.UpdateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
 			works, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).List(context.Background(), metav1.ListOptions{
-				LabelSelector: fmt.Sprintf("%s=%s", addonapiv1alpha1.AddonLabelKey, testMultiWorksAddonImpl.name),
+				LabelSelector: fmt.Sprintf("%s=%s", addonapiv1beta1.AddonLabelKey, testMultiWorksAddonImpl.name),
 			})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			if len(works.Items) != 2 {
@@ -232,15 +243,15 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 		testMultiWorksAddonImpl.manifests[managedClusterName] = []runtime.Object{mycrdObj, mycrObj, configmapObj}
 
 		// update addon to trigger reconcile
-		addon, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testMultiWorksAddonImpl.name, metav1.GetOptions{})
+		addon, err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testMultiWorksAddonImpl.name, metav1.GetOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		addon.SetLabels(map[string]string{"trigger": "3"})
-		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Update(context.Background(), addon, metav1.UpdateOptions{})
+		_, err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Update(context.Background(), addon, metav1.UpdateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
 			works, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).List(context.Background(), metav1.ListOptions{
-				LabelSelector: fmt.Sprintf("%s=%s", addonapiv1alpha1.AddonLabelKey, testMultiWorksAddonImpl.name),
+				LabelSelector: fmt.Sprintf("%s=%s", addonapiv1beta1.AddonLabelKey, testMultiWorksAddonImpl.name),
 			})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			if len(works.Items) != 2 {
@@ -279,7 +290,7 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
-			addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testMultiWorksAddonImpl.name, metav1.GetOptions{})
+			addon, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testMultiWorksAddonImpl.name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -303,7 +314,7 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 		_, err = hubWorkClient.WorkV1().ManifestWorks(managedClusterName).UpdateStatus(context.Background(), work, metav1.UpdateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		gomega.Eventually(func() error {
-			addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testMultiWorksAddonImpl.name, metav1.GetOptions{})
+			addon, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testMultiWorksAddonImpl.name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -339,19 +350,30 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 		testMultiWorksAddonImpl.prober = utils.NewDeploymentProber(types.NamespacedName{Name: "nginx-deployment-0", Namespace: "default"},
 			types.NamespacedName{Name: "nginx-deployment-1", Namespace: "default"})
 
-		addon := &addonapiv1alpha1.ManagedClusterAddOn{
+		addon := &addonapiv1beta1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testMultiWorksAddonImpl.name,
 			},
-			Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
-				InstallNamespace: "default",
+			Spec: addonapiv1beta1.ManagedClusterAddOnSpec{
+				Configs: []addonapiv1beta1.AddOnConfig{
+					{
+						ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+							Group:    "addon.open-cluster-management.io",
+							Resource: "addondeploymentconfigs",
+						},
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Namespace: managedClusterName,
+							Name:      "test-deploy-config",
+						},
+					},
+				},
 			},
 		}
 		createManagedClusterAddOnwithOwnerRefs(managedClusterName, addon, cma)
 
 		gomega.Eventually(func() error {
 			works, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).List(context.Background(), metav1.ListOptions{
-				LabelSelector: fmt.Sprintf("%s=%s", addonapiv1alpha1.AddonLabelKey, testMultiWorksAddonImpl.name),
+				LabelSelector: fmt.Sprintf("%s=%s", addonapiv1beta1.AddonLabelKey, testMultiWorksAddonImpl.name),
 			})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			if len(works.Items) != 2 {
@@ -423,7 +445,7 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 		}
 
 		gomega.Eventually(func() error {
-			addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testMultiWorksAddonImpl.name, metav1.GetOptions{})
+			addon, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testMultiWorksAddonImpl.name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -481,7 +503,7 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
-			addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testMultiWorksAddonImpl.name, metav1.GetOptions{})
+			addon, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testMultiWorksAddonImpl.name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -539,7 +561,7 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
-			addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testMultiWorksAddonImpl.name, metav1.GetOptions{})
+			addon, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testMultiWorksAddonImpl.name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}

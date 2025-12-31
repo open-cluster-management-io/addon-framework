@@ -9,7 +9,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	addonv1beta1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	"open-cluster-management.io/addon-framework/pkg/utils"
@@ -191,7 +192,7 @@ type AddOnDeploymentConfigToValuesFunc func(config addonapiv1alpha1.AddOnDeploym
 
 // NewAddOnDeploymentConfigGetter returns a AddOnDeploymentConfigGetter with addon client
 // Deprecated: use NewAddOnDeploymentConfigGetter in pkg/utils package instead.
-func NewAddOnDeploymentConfigGetter(addonClient addonv1alpha1client.Interface) utils.AddOnDeploymentConfigGetter {
+func NewAddOnDeploymentConfigGetter(addonClient addonv1beta1client.Interface) utils.AddOnDeploymentConfigGetter {
 	return utils.NewAddOnDeploymentConfigGetter(addonClient)
 }
 
@@ -201,7 +202,7 @@ func NewAddOnDeploymentConfigGetter(addonClient addonv1alpha1client.Interface) u
 // override the one from small index
 func GetAddOnDeploymentConfigValues(
 	getter utils.AddOnDeploymentConfigGetter, toValuesFuncs ...AddOnDeploymentConfigToValuesFunc) GetValuesFunc {
-	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
+	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) (Values, error) {
 		var lastValues = Values{}
 		addOnDeploymentConfig, err := utils.GetDesiredAddOnDeploymentConfig(addon, getter)
 		if err != nil {
@@ -382,7 +383,7 @@ func getRegistriesFromClusterAnnotation(
 //     will be: {"global": {"imageOverrides": {"helloWorldImage": "quay.io/ocm/addon-agent:v1"}}}
 //   - Image registries configured in the addonDeploymentConfig will take precedence over the managed cluster annotation
 func GetAgentImageValues(getter utils.AddOnDeploymentConfigGetter, imageKey, image string) GetValuesFunc {
-	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
+	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) (Values, error) {
 		addOnDeploymentConfig, err := utils.GetDesiredAddOnDeploymentConfig(addon, getter)
 		if err != nil {
 			return nil, err

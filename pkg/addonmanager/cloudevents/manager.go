@@ -12,8 +12,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1beta1"
+	addonv1beta1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
@@ -109,7 +109,7 @@ func (a *cloudeventsAddonManager) Start(ctx context.Context) error {
 		return err
 	}
 
-	addonClient, err := addonv1alpha1client.NewForConfig(config)
+	addonClient, err := addonv1beta1client.NewForConfig(config)
 	if err != nil {
 		return err
 	}
@@ -158,7 +158,7 @@ func (a *cloudeventsAddonManager) Start(ctx context.Context) error {
 		return err
 	}
 
-	err = addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().AddIndexers(
+	err = addonInformers.Addon().V1beta1().ManagedClusterAddOns().Informer().AddIndexers(
 		cache.Indexers{
 			index.ManagedClusterAddonByNamespace: index.IndexManagedClusterAddonByNamespace, // agentDeployController
 			index.AddonByConfig:                  index.IndexAddonByConfig,                  // addonConfigController
@@ -168,7 +168,7 @@ func (a *cloudeventsAddonManager) Start(ctx context.Context) error {
 		return err
 	}
 
-	err = addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Informer().AddIndexers(
+	err = addonInformers.Addon().V1beta1().ClusterManagementAddOns().Informer().AddIndexers(
 		cache.Indexers{
 			index.ClusterManagementAddonByConfig: index.IndexClusterManagementAddonByConfig, // cmaConfigController
 		})

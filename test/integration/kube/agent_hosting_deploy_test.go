@@ -19,7 +19,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
@@ -72,7 +72,7 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 	var managedClusterName, hostingClusterName string
 	var err error
 	var hostingManifestWorkName string
-	var cma *addonapiv1alpha1.ClusterManagementAddOn
+	var cma *addonapiv1beta1.ClusterManagementAddOn
 	ginkgo.BeforeEach(func() {
 		suffix := rand.String(5)
 		managedClusterName = fmt.Sprintf("managedcluster-%s", suffix)
@@ -112,7 +112,7 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		cma = newClusterManagementAddon(testHostedAddonImpl.name)
-		cma, err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Create(context.Background(),
+		cma, err = hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Create(context.Background(),
 			cma, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
@@ -132,7 +132,7 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 			context.Background(), hostingClusterName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-		err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Delete(context.Background(),
+		err = hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Delete(context.Background(),
 			testHostedAddonImpl.name, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
@@ -146,15 +146,26 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 			Type: agent.HealthProberTypeWork,
 		}
 
-		addon := &addonapiv1alpha1.ManagedClusterAddOn{
+		addon := &addonapiv1beta1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testHostedAddonImpl.name,
 				Annotations: map[string]string{
-					addonapiv1alpha1.HostingClusterNameAnnotationKey: hostingClusterName,
+					addonapiv1beta1.HostingClusterNameAnnotationKey: hostingClusterName,
 				},
 			},
-			Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
-				InstallNamespace: "default",
+			Spec: addonapiv1beta1.ManagedClusterAddOnSpec{
+				Configs: []addonapiv1beta1.AddOnConfig{
+					{
+						ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+							Group:    "addon.open-cluster-management.io",
+							Resource: "addondeploymentconfigs",
+						},
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Namespace: managedClusterName,
+							Name:      "test-deploy-config",
+						},
+					},
+				},
 			},
 		}
 		createManagedClusterAddOnwithOwnerRefs(managedClusterName, addon, cma)
@@ -188,13 +199,13 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
-			addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(
+			addon, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(
 				context.Background(), testHostedAddonImpl.name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 
-			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHostingManifestApplied) {
+			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnHostingManifestApplied) {
 				return fmt.Errorf("Unexpected addon applied condition, %v", addon.Status.Conditions)
 			}
 			return nil
@@ -211,7 +222,7 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
-			addon, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(
+			addon, err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(
 				context.Background(), testHostedAddonImpl.name, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -242,7 +253,7 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		// delete managedclusteraddon
-		err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Delete(
+		err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Delete(
 			context.Background(), testHostedAddonImpl.name, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		gomega.Eventually(func() bool {
@@ -251,7 +262,7 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 			return errors.IsNotFound(err)
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
-		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(
+		_, err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(
 			context.Background(), testHostedAddonImpl.name, metav1.GetOptions{})
 		if err != nil {
 			gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
@@ -266,15 +277,26 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 		testHostedAddonImpl.prober = utils.NewDeploymentProber(
 			types.NamespacedName{Name: "nginx-deployment", Namespace: "default"})
 
-		addon := &addonapiv1alpha1.ManagedClusterAddOn{
+		addon := &addonapiv1beta1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testHostedAddonImpl.name,
 				Annotations: map[string]string{
-					addonapiv1alpha1.HostingClusterNameAnnotationKey: hostingClusterName,
+					addonapiv1beta1.HostingClusterNameAnnotationKey: hostingClusterName,
 				},
 			},
-			Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
-				InstallNamespace: "default",
+			Spec: addonapiv1beta1.ManagedClusterAddOnSpec{
+				Configs: []addonapiv1beta1.AddOnConfig{
+					{
+						ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+							Group:    "addon.open-cluster-management.io",
+							Resource: "addondeploymentconfigs",
+						},
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Namespace: managedClusterName,
+							Name:      "test-deploy-config",
+						},
+					},
+				},
 			},
 		}
 		createManagedClusterAddOnwithOwnerRefs(managedClusterName, addon, cma)
@@ -348,7 +370,7 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
-			addon, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(
+			addon, err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(
 				context.Background(), testHostedAddonImpl.name, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -404,7 +426,7 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
-			addon, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(
+			addon, err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(
 				context.Background(), testHostedAddonImpl.name, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -427,17 +449,28 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 		testHostedAddonImpl.prober = &agent.HealthProber{
 			Type: agent.HealthProberTypeWork,
 		}
-		testHostedAddonImpl.hostInfoFn = func(addon *addonapiv1alpha1.ManagedClusterAddOn, cluster *clusterv1.ManagedCluster) (string, string) {
+		testHostedAddonImpl.hostInfoFn = func(addon *addonapiv1beta1.ManagedClusterAddOn, cluster *clusterv1.ManagedCluster) (string, string) {
 			return constants.InstallModeHosted, hostingClusterName
 		}
 
-		addon := &addonapiv1alpha1.ManagedClusterAddOn{
+		addon := &addonapiv1beta1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      testHostedAddonImpl.name,
 				Namespace: managedClusterName,
 			},
-			Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
-				InstallNamespace: "default",
+			Spec: addonapiv1beta1.ManagedClusterAddOnSpec{
+				Configs: []addonapiv1beta1.AddOnConfig{
+					{
+						ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+							Group:    "addon.open-cluster-management.io",
+							Resource: "addondeploymentconfigs",
+						},
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
+							Namespace: managedClusterName,
+							Name:      "test-deploy-config",
+						},
+					},
+				},
 			},
 		}
 		createManagedClusterAddOnwithOwnerRefs(managedClusterName, addon, cma)
@@ -461,7 +494,7 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		// delete managedclusteraddon
-		err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Delete(
+		err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Delete(
 			context.Background(), testHostedAddonImpl.name, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		gomega.Eventually(func() bool {
@@ -470,7 +503,7 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 			return errors.IsNotFound(err)
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 
-		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(
+		_, err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(
 			context.Background(), testHostedAddonImpl.name, metav1.GetOptions{})
 		if err != nil {
 			gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())

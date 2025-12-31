@@ -18,7 +18,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/index"
 	"open-cluster-management.io/addon-framework/pkg/utils"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	fakework "open-cluster-management.io/api/client/work/clientset/versioned/fake"
 	workinformers "open-cluster-management.io/api/client/work/informers/externalversions"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -26,9 +26,9 @@ import (
 )
 
 var manifestAppliedCondition = metav1.Condition{
-	Type:   addonapiv1alpha1.ManagedClusterAddOnManifestApplied,
+	Type:   addonapiv1beta1.ManagedClusterAddOnManifestApplied,
 	Status: metav1.ConditionTrue,
-	Reason: addonapiv1alpha1.AddonManifestAppliedReasonManifestsApplied,
+	Reason: addonapiv1beta1.AddonManifestAppliedReasonManifestsApplied,
 }
 
 func boolPtr(n int64) *int64 {
@@ -41,7 +41,7 @@ type healthCheckTestAgent struct {
 }
 
 func (t *healthCheckTestAgent) Manifests(cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
+	addon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error) {
 
 	return []runtime.Object{
 		NewFakeDeployment("test-deployment", "default"),
@@ -191,11 +191,11 @@ func TestHealthCheckReconcile(t *testing.T) {
 	cases := []struct {
 		name                     string
 		existingWork             []runtime.Object
-		addon                    *addonapiv1alpha1.ManagedClusterAddOn
+		addon                    *addonapiv1beta1.ManagedClusterAddOn
 		testAddon                *healthCheckTestAgent
 		cluster                  *clusterv1.ManagedCluster
 		expectedErr              error
-		expectedHealthCheckMode  addonapiv1alpha1.HealthCheckMode
+		expectedHealthCheckMode  addonapiv1beta1.HealthCheckMode
 		expectAvailableCondition metav1.Condition
 	}{
 		{
@@ -212,7 +212,7 @@ func TestHealthCheckReconcile(t *testing.T) {
 			}},
 			addon:                   addontesting.NewAddon("test", "cluster1"),
 			expectedErr:             nil,
-			expectedHealthCheckMode: addonapiv1alpha1.HealthCheckModeCustomized,
+			expectedHealthCheckMode: addonapiv1beta1.HealthCheckModeCustomized,
 		},
 		{
 			name: "Health check mode is lease",
@@ -221,7 +221,7 @@ func TestHealthCheckReconcile(t *testing.T) {
 			}},
 			addon:                   addontesting.NewAddon("test", "cluster1"),
 			expectedErr:             nil,
-			expectedHealthCheckMode: addonapiv1alpha1.HealthCheckModeLease,
+			expectedHealthCheckMode: addonapiv1beta1.HealthCheckModeLease,
 		},
 		{
 			name: "Health check mode is work but WorkProber is nil",
@@ -230,11 +230,11 @@ func TestHealthCheckReconcile(t *testing.T) {
 			}},
 			addon:                   addontesting.NewAddon("test", "cluster1"),
 			expectedErr:             nil,
-			expectedHealthCheckMode: addonapiv1alpha1.HealthCheckModeCustomized,
+			expectedHealthCheckMode: addonapiv1beta1.HealthCheckModeCustomized,
 			expectAvailableCondition: metav1.Condition{
-				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+				Type:    addonapiv1beta1.ManagedClusterAddOnConditionAvailable,
 				Status:  metav1.ConditionTrue,
-				Reason:  addonapiv1alpha1.AddonAvailableReasonWorkApply,
+				Reason:  addonapiv1beta1.AddonAvailableReasonWorkApply,
 				Message: "Addon work is applied",
 			},
 		},
@@ -244,7 +244,7 @@ func TestHealthCheckReconcile(t *testing.T) {
 				health: utils.NewDeploymentProber(types.NamespacedName{Name: "test-deployment", Namespace: "default"})},
 			addon:                    addontesting.NewAddon("test", "cluster1"),
 			expectedErr:              nil,
-			expectedHealthCheckMode:  addonapiv1alpha1.HealthCheckModeCustomized,
+			expectedHealthCheckMode:  addonapiv1beta1.HealthCheckModeCustomized,
 			expectAvailableCondition: metav1.Condition{},
 		},
 		{
@@ -253,11 +253,11 @@ func TestHealthCheckReconcile(t *testing.T) {
 				health: utils.NewDeploymentProber(types.NamespacedName{Name: "test-deployment", Namespace: "default"})},
 			addon:                   addontesting.NewAddonWithConditions("test", "cluster1", manifestAppliedCondition),
 			expectedErr:             nil,
-			expectedHealthCheckMode: addonapiv1alpha1.HealthCheckModeCustomized,
+			expectedHealthCheckMode: addonapiv1beta1.HealthCheckModeCustomized,
 			expectAvailableCondition: metav1.Condition{
-				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+				Type:    addonapiv1beta1.ManagedClusterAddOnConditionAvailable,
 				Status:  metav1.ConditionUnknown,
-				Reason:  addonapiv1alpha1.AddonAvailableReasonWorkNotFound,
+				Reason:  addonapiv1beta1.AddonAvailableReasonWorkNotFound,
 				Message: "Work for addon is not found",
 			},
 		},
@@ -288,11 +288,11 @@ func TestHealthCheckReconcile(t *testing.T) {
 				},
 			},
 			expectedErr:             nil,
-			expectedHealthCheckMode: addonapiv1alpha1.HealthCheckModeCustomized,
+			expectedHealthCheckMode: addonapiv1beta1.HealthCheckModeCustomized,
 			expectAvailableCondition: metav1.Condition{
-				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+				Type:    addonapiv1beta1.ManagedClusterAddOnConditionAvailable,
 				Status:  metav1.ConditionFalse,
-				Reason:  addonapiv1alpha1.AddonAvailableReasonWorkNotApply,
+				Reason:  addonapiv1beta1.AddonAvailableReasonWorkNotApply,
 				Message: "failed to apply",
 			},
 		},
@@ -322,11 +322,11 @@ func TestHealthCheckReconcile(t *testing.T) {
 				},
 			},
 			expectedErr:             nil,
-			expectedHealthCheckMode: addonapiv1alpha1.HealthCheckModeCustomized,
+			expectedHealthCheckMode: addonapiv1beta1.HealthCheckModeCustomized,
 			expectAvailableCondition: metav1.Condition{
-				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+				Type:    addonapiv1beta1.ManagedClusterAddOnConditionAvailable,
 				Status:  metav1.ConditionUnknown,
-				Reason:  addonapiv1alpha1.AddonAvailableReasonNoProbeResult,
+				Reason:  addonapiv1beta1.AddonAvailableReasonNoProbeResult,
 				Message: "Probe results are not returned",
 			},
 		},
@@ -388,11 +388,11 @@ func TestHealthCheckReconcile(t *testing.T) {
 				},
 			},
 			expectedErr:             nil,
-			expectedHealthCheckMode: addonapiv1alpha1.HealthCheckModeCustomized,
+			expectedHealthCheckMode: addonapiv1beta1.HealthCheckModeCustomized,
 			expectAvailableCondition: metav1.Condition{
-				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+				Type:    addonapiv1beta1.ManagedClusterAddOnConditionAvailable,
 				Status:  metav1.ConditionTrue,
-				Reason:  addonapiv1alpha1.AddonAvailableReasonProbeAvailable,
+				Reason:  addonapiv1beta1.AddonAvailableReasonProbeAvailable,
 				Message: "test add-on is available.",
 			},
 		},
@@ -482,11 +482,11 @@ func TestHealthCheckReconcile(t *testing.T) {
 				},
 			},
 			expectedErr:             nil,
-			expectedHealthCheckMode: addonapiv1alpha1.HealthCheckModeCustomized,
+			expectedHealthCheckMode: addonapiv1beta1.HealthCheckModeCustomized,
 			expectAvailableCondition: metav1.Condition{
-				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+				Type:    addonapiv1beta1.ManagedClusterAddOnConditionAvailable,
 				Status:  metav1.ConditionTrue,
-				Reason:  addonapiv1alpha1.AddonAvailableReasonProbeAvailable,
+				Reason:  addonapiv1beta1.AddonAvailableReasonProbeAvailable,
 				Message: "test add-on is available.",
 			},
 		},
@@ -575,11 +575,11 @@ func TestHealthCheckReconcile(t *testing.T) {
 				},
 			},
 			expectedErr:             nil,
-			expectedHealthCheckMode: addonapiv1alpha1.HealthCheckModeCustomized,
+			expectedHealthCheckMode: addonapiv1beta1.HealthCheckModeCustomized,
 			expectAvailableCondition: metav1.Condition{
-				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+				Type:    addonapiv1beta1.ManagedClusterAddOnConditionAvailable,
 				Status:  metav1.ConditionTrue,
-				Reason:  addonapiv1alpha1.AddonAvailableReasonProbeAvailable,
+				Reason:  addonapiv1beta1.AddonAvailableReasonProbeAvailable,
 				Message: "test add-on is available.",
 			},
 		},
@@ -590,7 +590,7 @@ func TestHealthCheckReconcile(t *testing.T) {
 			},
 			addon:                    addontesting.NewAddon("test", "cluster1"),
 			expectedErr:              nil,
-			expectedHealthCheckMode:  addonapiv1alpha1.HealthCheckModeCustomized,
+			expectedHealthCheckMode:  addonapiv1beta1.HealthCheckModeCustomized,
 			expectAvailableCondition: metav1.Condition{},
 		},
 		{
@@ -600,11 +600,11 @@ func TestHealthCheckReconcile(t *testing.T) {
 			},
 			addon:                   addontesting.NewAddonWithConditions("test", "cluster1", manifestAppliedCondition),
 			expectedErr:             nil,
-			expectedHealthCheckMode: addonapiv1alpha1.HealthCheckModeCustomized,
+			expectedHealthCheckMode: addonapiv1beta1.HealthCheckModeCustomized,
 			expectAvailableCondition: metav1.Condition{
-				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+				Type:    addonapiv1beta1.ManagedClusterAddOnConditionAvailable,
 				Status:  metav1.ConditionUnknown,
-				Reason:  addonapiv1alpha1.AddonAvailableReasonWorkNotFound,
+				Reason:  addonapiv1beta1.AddonAvailableReasonWorkNotFound,
 				Message: "Work for addon is not found",
 			},
 		},
@@ -636,11 +636,11 @@ func TestHealthCheckReconcile(t *testing.T) {
 				},
 			},
 			expectedErr:             nil,
-			expectedHealthCheckMode: addonapiv1alpha1.HealthCheckModeCustomized,
+			expectedHealthCheckMode: addonapiv1beta1.HealthCheckModeCustomized,
 			expectAvailableCondition: metav1.Condition{
-				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+				Type:    addonapiv1beta1.ManagedClusterAddOnConditionAvailable,
 				Status:  metav1.ConditionFalse,
-				Reason:  addonapiv1alpha1.AddonAvailableReasonWorkNotApply,
+				Reason:  addonapiv1beta1.AddonAvailableReasonWorkNotApply,
 				Message: "failed to apply",
 			},
 		},
@@ -671,11 +671,11 @@ func TestHealthCheckReconcile(t *testing.T) {
 				},
 			},
 			expectedErr:             nil,
-			expectedHealthCheckMode: addonapiv1alpha1.HealthCheckModeCustomized,
+			expectedHealthCheckMode: addonapiv1beta1.HealthCheckModeCustomized,
 			expectAvailableCondition: metav1.Condition{
-				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+				Type:    addonapiv1beta1.ManagedClusterAddOnConditionAvailable,
 				Status:  metav1.ConditionUnknown,
-				Reason:  addonapiv1alpha1.AddonAvailableReasonNoProbeResult,
+				Reason:  addonapiv1beta1.AddonAvailableReasonNoProbeResult,
 				Message: "Probe results are not returned",
 			},
 		},
@@ -750,7 +750,7 @@ func TestHealthCheckReconcile(t *testing.T) {
 				},
 			},
 			expectedErr:              nil,
-			expectedHealthCheckMode:  addonapiv1alpha1.HealthCheckModeCustomized,
+			expectedHealthCheckMode:  addonapiv1beta1.HealthCheckModeCustomized,
 			expectAvailableCondition: metav1.Condition{},
 		},
 		{
@@ -838,11 +838,11 @@ func TestHealthCheckReconcile(t *testing.T) {
 				},
 			},
 			expectedErr:             nil,
-			expectedHealthCheckMode: addonapiv1alpha1.HealthCheckModeCustomized,
+			expectedHealthCheckMode: addonapiv1beta1.HealthCheckModeCustomized,
 			expectAvailableCondition: metav1.Condition{
-				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+				Type:    addonapiv1beta1.ManagedClusterAddOnConditionAvailable,
 				Status:  metav1.ConditionTrue,
-				Reason:  addonapiv1alpha1.AddonAvailableReasonProbeAvailable,
+				Reason:  addonapiv1beta1.AddonAvailableReasonProbeAvailable,
 				Message: "test add-on is available.",
 			},
 		},
@@ -854,7 +854,7 @@ func TestHealthCheckReconcile(t *testing.T) {
 			},
 			addon:                    addontesting.NewAddon("test", "cluster1"),
 			expectedErr:              nil,
-			expectedHealthCheckMode:  addonapiv1alpha1.HealthCheckModeCustomized,
+			expectedHealthCheckMode:  addonapiv1beta1.HealthCheckModeCustomized,
 			expectAvailableCondition: metav1.Condition{},
 		},
 		{
@@ -864,11 +864,11 @@ func TestHealthCheckReconcile(t *testing.T) {
 			},
 			addon:                   addontesting.NewAddonWithConditions("test", "cluster1", manifestAppliedCondition),
 			expectedErr:             nil,
-			expectedHealthCheckMode: addonapiv1alpha1.HealthCheckModeCustomized,
+			expectedHealthCheckMode: addonapiv1beta1.HealthCheckModeCustomized,
 			expectAvailableCondition: metav1.Condition{
-				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+				Type:    addonapiv1beta1.ManagedClusterAddOnConditionAvailable,
 				Status:  metav1.ConditionUnknown,
-				Reason:  addonapiv1alpha1.AddonAvailableReasonWorkNotFound,
+				Reason:  addonapiv1beta1.AddonAvailableReasonWorkNotFound,
 				Message: "Work for addon is not found",
 			},
 		},
@@ -900,11 +900,11 @@ func TestHealthCheckReconcile(t *testing.T) {
 				},
 			},
 			expectedErr:             nil,
-			expectedHealthCheckMode: addonapiv1alpha1.HealthCheckModeCustomized,
+			expectedHealthCheckMode: addonapiv1beta1.HealthCheckModeCustomized,
 			expectAvailableCondition: metav1.Condition{
-				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+				Type:    addonapiv1beta1.ManagedClusterAddOnConditionAvailable,
 				Status:  metav1.ConditionFalse,
-				Reason:  addonapiv1alpha1.AddonAvailableReasonWorkNotApply,
+				Reason:  addonapiv1beta1.AddonAvailableReasonWorkNotApply,
 				Message: "failed to apply",
 			},
 		},
@@ -935,11 +935,11 @@ func TestHealthCheckReconcile(t *testing.T) {
 				},
 			},
 			expectedErr:             nil,
-			expectedHealthCheckMode: addonapiv1alpha1.HealthCheckModeCustomized,
+			expectedHealthCheckMode: addonapiv1beta1.HealthCheckModeCustomized,
 			expectAvailableCondition: metav1.Condition{
-				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+				Type:    addonapiv1beta1.ManagedClusterAddOnConditionAvailable,
 				Status:  metav1.ConditionUnknown,
-				Reason:  addonapiv1alpha1.AddonAvailableReasonNoProbeResult,
+				Reason:  addonapiv1beta1.AddonAvailableReasonNoProbeResult,
 				Message: "Probe results are not returned",
 			},
 		},
@@ -1014,7 +1014,7 @@ func TestHealthCheckReconcile(t *testing.T) {
 				},
 			},
 			expectedErr:              nil,
-			expectedHealthCheckMode:  addonapiv1alpha1.HealthCheckModeCustomized,
+			expectedHealthCheckMode:  addonapiv1beta1.HealthCheckModeCustomized,
 			expectAvailableCondition: metav1.Condition{},
 		},
 		{
@@ -1129,11 +1129,11 @@ func TestHealthCheckReconcile(t *testing.T) {
 				},
 			},
 			expectedErr:             nil,
-			expectedHealthCheckMode: addonapiv1alpha1.HealthCheckModeCustomized,
+			expectedHealthCheckMode: addonapiv1beta1.HealthCheckModeCustomized,
 			expectAvailableCondition: metav1.Condition{
-				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+				Type:    addonapiv1beta1.ManagedClusterAddOnConditionAvailable,
 				Status:  metav1.ConditionTrue,
-				Reason:  addonapiv1alpha1.AddonAvailableReasonProbeAvailable,
+				Reason:  addonapiv1beta1.AddonAvailableReasonProbeAvailable,
 				Message: "test add-on is available.",
 			},
 		},
@@ -1251,11 +1251,11 @@ func TestHealthCheckReconcile(t *testing.T) {
 				},
 			},
 			expectedErr:             nil,
-			expectedHealthCheckMode: addonapiv1alpha1.HealthCheckModeCustomized,
+			expectedHealthCheckMode: addonapiv1beta1.HealthCheckModeCustomized,
 			expectAvailableCondition: metav1.Condition{
-				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+				Type:    addonapiv1beta1.ManagedClusterAddOnConditionAvailable,
 				Status:  metav1.ConditionTrue,
-				Reason:  addonapiv1alpha1.AddonAvailableReasonProbeAvailable,
+				Reason:  addonapiv1beta1.AddonAvailableReasonProbeAvailable,
 				Message: "test add-on is available.",
 			},
 		},
@@ -1319,11 +1319,11 @@ func TestHealthCheckReconcile(t *testing.T) {
 				},
 			},
 			expectedErr:             nil,
-			expectedHealthCheckMode: addonapiv1alpha1.HealthCheckModeCustomized,
+			expectedHealthCheckMode: addonapiv1beta1.HealthCheckModeCustomized,
 			expectAvailableCondition: metav1.Condition{
-				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+				Type:    addonapiv1beta1.ManagedClusterAddOnConditionAvailable,
 				Status:  metav1.ConditionTrue,
-				Reason:  addonapiv1alpha1.AddonAvailableReasonProbeAvailable,
+				Reason:  addonapiv1beta1.AddonAvailableReasonProbeAvailable,
 				Message: "test add-on is available.",
 			},
 		},
@@ -1387,7 +1387,7 @@ func TestHealthCheckReconcile(t *testing.T) {
 				}
 			} else {
 				if meta.FindStatusCondition(addon.Status.Conditions,
-					addonapiv1alpha1.ManagedClusterAddOnConditionAvailable) != nil {
+					addonapiv1beta1.ManagedClusterAddOnConditionAvailable) != nil {
 					t.Errorf("name %s, expected condition not found", c.name)
 				}
 			}

@@ -19,7 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/klog/v2"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
@@ -55,7 +55,7 @@ type HelmAgentAddon struct {
 	// Deprecated: use clusterClient to get the hosting cluster.
 	hostingCluster        *clusterv1.ManagedCluster
 	clusterClient         clusterclientset.Interface
-	agentInstallNamespace func(addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error)
+	agentInstallNamespace func(addon *addonapiv1beta1.ManagedClusterAddOn) (string, error)
 	helmEngineStrict      bool
 }
 
@@ -75,7 +75,7 @@ func newHelmAgentAddon(factory *AgentAddonFactory, chart *chart.Chart) *HelmAgen
 
 func (a *HelmAgentAddon) Manifests(
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
+	addon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error) {
 	objects, err := a.renderManifests(cluster, addon)
 	if err != nil {
 		return nil, err
@@ -102,7 +102,7 @@ func (a *HelmAgentAddon) Manifests(
 
 func (a *HelmAgentAddon) renderManifests(
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
+	addon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error) {
 	var objects []runtime.Object
 
 	values, err := a.getValues(cluster, addon)
@@ -173,7 +173,7 @@ func (a *HelmAgentAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 
 func (a *HelmAgentAddon) getValues(
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) (chartutil.Values, error) {
+	addon *addonapiv1beta1.ManagedClusterAddOn) (chartutil.Values, error) {
 	overrideValues := map[string]interface{}{}
 
 	defaultValues, err := a.getDefaultValues(cluster, addon)
@@ -219,11 +219,10 @@ func (a *HelmAgentAddon) getValues(
 	return values, nil
 }
 
-func (a *HelmAgentAddon) getValueAgentInstallNamespace(addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error) {
-	installNamespace := addon.Spec.InstallNamespace
-	if len(installNamespace) == 0 {
-		installNamespace = AddonDefaultInstallNamespace
-	}
+func (a *HelmAgentAddon) getValueAgentInstallNamespace(addon *addonapiv1beta1.ManagedClusterAddOn) (string, error) {
+	// In v1beta1, InstallNamespace was removed from Spec
+	// Use default or agentInstallNamespace function
+	installNamespace := AddonDefaultInstallNamespace
 	if a.agentInstallNamespace != nil {
 		ns, err := a.agentInstallNamespace(addon)
 		if err != nil {
@@ -239,7 +238,7 @@ func (a *HelmAgentAddon) getValueAgentInstallNamespace(addon *addonapiv1alpha1.M
 
 func (a *HelmAgentAddon) getBuiltinValues(
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
+	addon *addonapiv1beta1.ManagedClusterAddOn) (Values, error) {
 	builtinValues := helmBuiltinValues{}
 	builtinValues.ClusterName = cluster.GetName()
 
@@ -267,7 +266,7 @@ func (a *HelmAgentAddon) SetHostingCluster(hostingCluster *clusterv1.ManagedClus
 
 func (a *HelmAgentAddon) getDefaultValues(
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
+	addon *addonapiv1beta1.ManagedClusterAddOn) (Values, error) {
 	defaultValues := helmDefaultValues{}
 
 	// TODO: hubKubeConfigSecret depends on the signer configuration in registration, and the registration is an array.
@@ -307,7 +306,7 @@ func (a *HelmAgentAddon) getDefaultValues(
 // only support Capabilities.KubeVersion
 func (a *HelmAgentAddon) capabilities(
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) *chartutil.Capabilities {
+	addon *addonapiv1beta1.ManagedClusterAddOn) *chartutil.Capabilities {
 	return &chartutil.Capabilities{
 		KubeVersion: chartutil.KubeVersion{Version: cluster.Status.Version.Kubernetes},
 	}
@@ -315,7 +314,7 @@ func (a *HelmAgentAddon) capabilities(
 
 // only support Release.Name, Release.Namespace
 func (a *HelmAgentAddon) releaseOptions(
-	addon *addonapiv1alpha1.ManagedClusterAddOn) (chartutil.ReleaseOptions, error) {
+	addon *addonapiv1beta1.ManagedClusterAddOn) (chartutil.ReleaseOptions, error) {
 	releaseOptions := chartutil.ReleaseOptions{
 		Name: a.agentAddonOptions.AddonName,
 	}

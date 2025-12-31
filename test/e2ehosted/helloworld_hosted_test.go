@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 )
 
 const (
@@ -43,26 +44,54 @@ var _ = ginkgo.Describe("install/uninstall helloworld hosted addons in Hosted mo
 		_, err = hubKubeClient.CoreV1().Namespaces().Get(
 			context.Background(), hostingClusterName, metav1.GetOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		deployConfig := &addonapiv1alpha1.AddOnDeploymentConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "helloworld-hosted-deploy-config",
+				Namespace: hostedManagedClusterName,
+			},
+			Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+				AgentInstallNamespace: addonAgentNamespace,
+			},
+		}
+		_, err = hubAddOnClient.AddonV1alpha1().AddOnDeploymentConfigs(hostedManagedClusterName).Get(
+			context.Background(), deployConfig.Name, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			_, err = hubAddOnClient.AddonV1alpha1().AddOnDeploymentConfigs(hostedManagedClusterName).Create(
+				context.Background(), deployConfig, metav1.CreateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		}
 	})
 
 	ginkgo.It("Install/uninstall addon in hosted mode and make sure it is available", func() {
 		gomega.Eventually(func() error {
-			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(hostedManagedClusterName).Get(
+			addon, err := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(hostedManagedClusterName).Get(
 				context.Background(), helloWorldHostedAddonName, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
-					_, cerr := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(hostedManagedClusterName).Create(
+					_, cerr := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(hostedManagedClusterName).Create(
 						context.Background(),
-						&addonapiv1alpha1.ManagedClusterAddOn{
+						&addonapiv1beta1.ManagedClusterAddOn{
 							ObjectMeta: metav1.ObjectMeta{
 								Namespace: hostedManagedClusterName,
 								Name:      helloWorldHostedAddonName,
 								Annotations: map[string]string{
-									addonapiv1alpha1.HostingClusterNameAnnotationKey: hostingClusterName,
+									addonapiv1beta1.HostingClusterNameAnnotationKey: hostingClusterName,
 								},
 							},
-							Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
-								InstallNamespace: addonAgentNamespace,
+							Spec: addonapiv1beta1.ManagedClusterAddOnSpec{
+								Configs: []addonapiv1beta1.AddOnConfig{
+									{
+										ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+											Group:    "addon.open-cluster-management.io",
+											Resource: "addondeploymentconfigs",
+										},
+										ConfigReferent: addonapiv1beta1.ConfigReferent{
+											Namespace: hostedManagedClusterName,
+											Name:      "helloworld-hosted-deploy-config",
+										},
+									},
+								},
 							},
 						},
 						metav1.CreateOptions{})
@@ -73,7 +102,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld hosted addons in Hosted mo
 				return err
 			}
 
-			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHostingClusterValidity) {
+			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnHostingClusterValidity) {
 				return fmt.Errorf("addon hosting cluster should be valid, but get condition %v",
 					addon.Status.Conditions)
 			}
@@ -105,12 +134,12 @@ var _ = ginkgo.Describe("install/uninstall helloworld hosted addons in Hosted mo
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
-			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(hostedManagedClusterName).Get(
+			addon, err := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(hostedManagedClusterName).Get(
 				context.Background(), helloWorldHostedAddonName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
-			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHostingManifestApplied) {
+			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnHostingManifestApplied) {
 				return fmt.Errorf("addon should be applied to hosting cluster, but get condition %v",
 					addon.Status.Conditions)
 			}
@@ -153,7 +182,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld hosted addons in Hosted mo
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		// remove addon
-		err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(hostedManagedClusterName).Delete(
+		err = hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(hostedManagedClusterName).Delete(
 			context.Background(), helloWorldHostedAddonName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -171,7 +200,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld hosted addons in Hosted mo
 			return fmt.Errorf("the configmap should be deleted")
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 		gomega.Eventually(func() bool {
-			_, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(hostedManagedClusterName).Get(
+			_, err := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(hostedManagedClusterName).Get(
 				context.Background(), helloWorldHostedAddonName, metav1.GetOptions{})
 			return errors.IsNotFound(err)
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())

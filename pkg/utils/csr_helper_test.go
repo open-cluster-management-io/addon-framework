@@ -14,7 +14,7 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
 	"open-cluster-management.io/addon-framework/pkg/agent"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	operatorapiv1 "open-cluster-management.io/api/operator/v1"
 )
@@ -47,8 +47,8 @@ func newCluster(name string) *clusterv1.ManagedCluster {
 	}
 }
 
-func newAddon(name, namespace string) *addonapiv1alpha1.ManagedClusterAddOn {
-	return &addonapiv1alpha1.ManagedClusterAddOn{
+func newAddon(name, namespace string) *addonapiv1beta1.ManagedClusterAddOn {
+	return &addonapiv1beta1.ManagedClusterAddOn{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
@@ -91,7 +91,7 @@ func TestDefaultCSRApprover(t *testing.T) {
 		name     string
 		csr      *certificatesv1.CertificateSigningRequest
 		cluster  *clusterv1.ManagedCluster
-		addon    *addonapiv1alpha1.ManagedClusterAddOn
+		addon    *addonapiv1beta1.ManagedClusterAddOn
 		approved bool
 	}{
 		{
@@ -150,11 +150,11 @@ func TestDefaultCSRApprover(t *testing.T) {
 }
 
 func TestUnionApprover(t *testing.T) {
-	approveAll := func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool {
+	approveAll := func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool {
 		return true
 	}
 
-	approveNone := func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool {
+	approveNone := func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool {
 		return false
 	}
 

@@ -15,10 +15,10 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"open-cluster-management.io/addon-framework/pkg/index"
 	"open-cluster-management.io/addon-framework/pkg/utils"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
-	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
-	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	addonv1beta1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addoninformerv1beta1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1beta1"
+	addonlisterv1beta1 "open-cluster-management.io/api/client/addon/listers/addon/v1beta1"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 )
@@ -31,20 +31,20 @@ type enqueueFunc func(obj interface{})
 
 // addonConfigController reconciles all interested addon config types (GroupVersionResource) on the hub.
 type addonConfigController struct {
-	addonClient                  addonv1alpha1client.Interface
-	addonLister                  addonlisterv1alpha1.ManagedClusterAddOnLister
+	addonClient                  addonv1beta1client.Interface
+	addonLister                  addonlisterv1beta1.ManagedClusterAddOnLister
 	addonIndexer                 cache.Indexer
 	configListers                map[schema.GroupResource]dynamiclister.Lister
 	queue                        workqueue.TypedRateLimitingInterface[string]
 	cmaFilterFunc                factory.EventFilterFunc
 	configGVRs                   map[schema.GroupVersionResource]bool
-	clusterManagementAddonLister addonlisterv1alpha1.ClusterManagementAddOnLister
+	clusterManagementAddonLister addonlisterv1beta1.ClusterManagementAddOnLister
 }
 
 func NewAddonConfigController(
-	addonClient addonv1alpha1client.Interface,
-	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
-	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
+	addonClient addonv1beta1client.Interface,
+	addonInformers addoninformerv1beta1.ManagedClusterAddOnInformer,
+	clusterManagementAddonInformers addoninformerv1beta1.ClusterManagementAddOnInformer,
 	configInformerFactory dynamicinformer.DynamicSharedInformerFactory,
 	configGVRs map[schema.GroupVersionResource]bool,
 	cmaFilterFunc factory.EventFilterFunc,
@@ -163,15 +163,15 @@ func (c *addonConfigController) sync(ctx context.Context, syncCtx factory.SyncCo
 	}
 
 	addonPatcher := patcher.NewPatcher[
-		*addonapiv1alpha1.ManagedClusterAddOn,
-		addonapiv1alpha1.ManagedClusterAddOnSpec,
-		addonapiv1alpha1.ManagedClusterAddOnStatus](c.addonClient.AddonV1alpha1().ManagedClusterAddOns(addonNamespace))
+		*addonapiv1beta1.ManagedClusterAddOn,
+		addonapiv1beta1.ManagedClusterAddOnSpec,
+		addonapiv1beta1.ManagedClusterAddOnStatus](c.addonClient.AddonV1beta1().ManagedClusterAddOns(addonNamespace))
 
 	_, err = addonPatcher.PatchStatus(ctx, addonCopy, addonCopy.Status, addon.Status)
 	return err
 }
 
-func (c *addonConfigController) updateConfigSpecHashAndGenerations(addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+func (c *addonConfigController) updateConfigSpecHashAndGenerations(addon *addonapiv1beta1.ManagedClusterAddOn) error {
 	for index, configReference := range addon.Status.ConfigReferences {
 
 		// do not update for unsupported configs
@@ -189,10 +189,21 @@ func (c *addonConfigController) updateConfigSpecHashAndGenerations(addon *addona
 
 		var config *unstructured.Unstructured
 		var err error
-		if configReference.Namespace == "" {
-			config, err = lister.Get(configReference.Name)
+		// In v1beta1, namespace and name are in DesiredConfig or LastAppliedConfig
+		namespace := ""
+		name := ""
+		if configReference.DesiredConfig != nil {
+			namespace = configReference.DesiredConfig.Namespace
+			name = configReference.DesiredConfig.Name
+		} else if configReference.LastAppliedConfig != nil {
+			namespace = configReference.LastAppliedConfig.Namespace
+			name = configReference.LastAppliedConfig.Name
+		}
+
+		if namespace == "" {
+			config, err = lister.Get(name)
 		} else {
-			config, err = lister.Namespace(configReference.Namespace).Get(configReference.Name)
+			config, err = lister.Namespace(namespace).Get(name)
 		}
 
 		if errors.IsNotFound(err) {

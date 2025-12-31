@@ -8,7 +8,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
-	"open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	v1 "open-cluster-management.io/api/cluster/v1"
 )
 
@@ -16,7 +16,7 @@ func TestPermissionBuilder(t *testing.T) {
 	testCluster := &v1.ManagedCluster{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-cluster"},
 	}
-	testAddon := &v1alpha1.ManagedClusterAddOn{
+	testAddon := &addonapiv1beta1.ManagedClusterAddOn{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-addon"},
 	}
 	creatingClusterRole1 := &rbacv1.ClusterRole{

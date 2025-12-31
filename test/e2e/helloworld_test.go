@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 )
 
 const (
@@ -109,7 +110,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 	ginkgo.It("addon should be worked", func() {
 		ginkgo.By("Make sure addon is available")
 		gomega.Eventually(func() error {
-			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addonName, metav1.GetOptions{})
+			addon, err := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addonName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -160,24 +161,24 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 
 		ginkgo.By("Add the configs to ManagedClusterAddOn")
 		gomega.Eventually(func() error {
-			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addonName, metav1.GetOptions{})
+			addon, err := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addonName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 			newAddon := addon.DeepCopy()
-			newAddon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+			newAddon.Spec.Configs = []addonapiv1beta1.AddOnConfig{
 				{
-					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 						Group:    "addon.open-cluster-management.io",
 						Resource: "addondeploymentconfigs",
 					},
-					ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					ConfigReferent: addonapiv1beta1.ConfigReferent{
 						Namespace: managedClusterName,
 						Name:      deployConfigName,
 					},
 				},
 			}
-			_, err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Update(context.Background(), newAddon, metav1.UpdateOptions{})
+			_, err = hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Update(context.Background(), newAddon, metav1.UpdateOptions{})
 			if err != nil {
 				return err
 			}
@@ -203,14 +204,14 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Remove addon")
-		err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Delete(context.Background(), addonName, metav1.DeleteOptions{})
+		err = hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Delete(context.Background(), addonName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 
 	ginkgo.It("addon should be worked with proxy settings", func() {
 		ginkgo.By("Make sure addon is available")
 		gomega.Eventually(func() error {
-			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addonName, metav1.GetOptions{})
+			addon, err := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addonName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -261,24 +262,24 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 
 		ginkgo.By("Add the configs to ManagedClusterAddOn")
 		gomega.Eventually(func() error {
-			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addonName, metav1.GetOptions{})
+			addon, err := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addonName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 			newAddon := addon.DeepCopy()
-			newAddon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+			newAddon.Spec.Configs = []addonapiv1beta1.AddOnConfig{
 				{
-					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 						Group:    "addon.open-cluster-management.io",
 						Resource: "addondeploymentconfigs",
 					},
-					ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					ConfigReferent: addonapiv1beta1.ConfigReferent{
 						Namespace: managedClusterName,
 						Name:      deployProxyConfigName,
 					},
 				},
 			}
-			_, err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Update(context.Background(), newAddon, metav1.UpdateOptions{})
+			_, err = hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Update(context.Background(), newAddon, metav1.UpdateOptions{})
 			if err != nil {
 				return err
 			}
@@ -321,14 +322,14 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Remove addon")
-		err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Delete(context.Background(), addonName, metav1.DeleteOptions{})
+		err = hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Delete(context.Background(), addonName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 
 	ginkgo.It("addon should be worked with resource requirements settings", func() {
 		ginkgo.By("Make sure addon is available")
 		gomega.Eventually(func() error {
-			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addonName, metav1.GetOptions{})
+			addon, err := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addonName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -379,24 +380,24 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 
 		ginkgo.By("Add the configs to ManagedClusterAddOn")
 		gomega.Eventually(func() error {
-			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addonName, metav1.GetOptions{})
+			addon, err := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addonName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 			newAddon := addon.DeepCopy()
-			newAddon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+			newAddon.Spec.Configs = []addonapiv1beta1.AddOnConfig{
 				{
-					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 						Group:    "addon.open-cluster-management.io",
 						Resource: "addondeploymentconfigs",
 					},
-					ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					ConfigReferent: addonapiv1beta1.ConfigReferent{
 						Namespace: managedClusterName,
 						Name:      deployResourceRequirementConfigName,
 					},
 				},
 			}
-			_, err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Update(context.Background(), newAddon, metav1.UpdateOptions{})
+			_, err = hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Update(context.Background(), newAddon, metav1.UpdateOptions{})
 			if err != nil {
 				return err
 			}
@@ -430,14 +431,14 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Remove addon")
-		err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Delete(context.Background(), addonName, metav1.DeleteOptions{})
+		err = hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Delete(context.Background(), addonName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 
 	ginkgo.It("addon registraion agent install namespace should work", func() {
 		ginkgo.By("Make sure addon is available")
 		gomega.Eventually(func() error {
-			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addonName, metav1.GetOptions{})
+			addon, err := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addonName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -488,25 +489,25 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 
 		ginkgo.By("Add the configs to ManagedClusterAddOn")
 		gomega.Eventually(func() error {
-			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(
+			addon, err := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(
 				context.Background(), addonName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 			newAddon := addon.DeepCopy()
-			newAddon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+			newAddon.Spec.Configs = []addonapiv1beta1.AddOnConfig{
 				{
-					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 						Group:    "addon.open-cluster-management.io",
 						Resource: "addondeploymentconfigs",
 					},
-					ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					ConfigReferent: addonapiv1beta1.ConfigReferent{
 						Namespace: managedClusterName,
 						Name:      deployAgentInstallNamespaceConfigName,
 					},
 				},
 			}
-			_, err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Update(
+			_, err = hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Update(
 				context.Background(), newAddon, metav1.UpdateOptions{})
 			if err != nil {
 				return err
@@ -522,7 +523,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Remove addon")
-		err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Delete(context.Background(), addonName, metav1.DeleteOptions{})
+		err = hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Delete(context.Background(), addonName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 })
@@ -681,7 +682,7 @@ func prepareAgentInstallNamespaceAddOnDeploymentConfig(namespace string) error {
 func cleanupCSR(hubKubeClient kubernetes.Interface, addonName string) error {
 	csrs, err := hubKubeClient.CertificatesV1().CertificateSigningRequests().List(
 		context.Background(), metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("%s=%s", addonapiv1alpha1.AddonLabelKey, addonName),
+			LabelSelector: fmt.Sprintf("%s=%s", addonapiv1beta1.AddonLabelKey, addonName),
 		})
 	if err != nil {
 		return err

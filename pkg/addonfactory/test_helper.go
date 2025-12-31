@@ -2,7 +2,7 @@ package addonfactory
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
@@ -16,8 +16,8 @@ func NewFakeManagedCluster(name string, k8sVersion string) *clusterv1.ManagedClu
 	}
 }
 
-func NewFakeManagedClusterAddon(name, clusterName, installNamespace, values string) *addonapiv1alpha1.ManagedClusterAddOn {
-	return &addonapiv1alpha1.ManagedClusterAddOn{
+func NewFakeManagedClusterAddon(name, clusterName, installNamespace, values string) *addonapiv1beta1.ManagedClusterAddOn {
+	return &addonapiv1beta1.ManagedClusterAddOn{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -26,6 +26,7 @@ func NewFakeManagedClusterAddon(name, clusterName, installNamespace, values stri
 				AnnotationValuesName: values,
 			},
 		},
-		Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{InstallNamespace: installNamespace},
+		// In v1beta1, InstallNamespace was removed from Spec
+		Spec: addonapiv1beta1.ManagedClusterAddOnSpec{},
 	}
 }

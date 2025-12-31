@@ -17,7 +17,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/index"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 )
@@ -58,33 +58,29 @@ func TestSync(t *testing.T) {
 			name:    "supported Configs",
 			syncKey: "cluster1/test",
 			managedClusteraddon: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1")
-					addon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+					addon.Spec.Configs = []addonapiv1beta1.AddOnConfig{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    fakeGVR.Group,
 								Resource: fakeGVR.Resource,
 							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							ConfigReferent: addonapiv1beta1.ConfigReferent{
 								Namespace: "cluster1",
 								Name:      "test",
 							},
 						},
 					}
-					addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+					addon.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    fakeGVR.Group,
 								Resource: fakeGVR.Resource,
 							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
-								Namespace: "cluster1",
-								Name:      "test",
-							},
 							LastObservedGeneration: 1,
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
 									Namespace: "cluster1",
 									Name:      "test",
 								},
@@ -97,7 +93,7 @@ func TestSync(t *testing.T) {
 			configs: []runtime.Object{newTestConfing("test", "cluster1", 2)},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				patch := actions[0].(clienttesting.PatchActionImpl).Patch
-				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
 				err := json.Unmarshal(patch, addOn)
 				if err != nil {
 					t.Fatal(err)
@@ -116,33 +112,29 @@ func TestSync(t *testing.T) {
 			name:    "unsupported configs",
 			syncKey: "cluster1/test",
 			managedClusteraddon: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1")
-					addon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+					addon.Spec.Configs = []addonapiv1beta1.AddOnConfig{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    fakeGVR.Group,
 								Resource: fakeGVR.Resource + "-unsupported",
 							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							ConfigReferent: addonapiv1beta1.ConfigReferent{
 								Namespace: "cluster1",
 								Name:      "test",
 							},
 						},
 					}
-					addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+					addon.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    fakeGVR.Group,
 								Resource: fakeGVR.Resource + "-unsupported",
 							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
-								Namespace: "cluster1",
-								Name:      "test",
-							},
 							LastObservedGeneration: 0,
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
 									Namespace: "cluster1",
 									Name:      "test",
 								},
@@ -161,21 +153,17 @@ func TestSync(t *testing.T) {
 			name:    "update generation for all the configs in status",
 			syncKey: "cluster1/test",
 			managedClusteraddon: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1")
-					addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+					addon.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    fakeGVR.Group,
 								Resource: fakeGVR.Resource,
 							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
-								Namespace: "cluster1",
-								Name:      "test",
-							},
 							LastObservedGeneration: 1,
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
 									Namespace: "cluster1",
 									Name:      "test",
 								},
@@ -188,7 +176,7 @@ func TestSync(t *testing.T) {
 			configs: []runtime.Object{newTestConfing("test", "cluster1", 2)},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				patch := actions[0].(clienttesting.PatchActionImpl).Patch
-				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
 				err := json.Unmarshal(patch, addOn)
 				if err != nil {
 					t.Fatal(err)
@@ -207,15 +195,15 @@ func TestSync(t *testing.T) {
 			name:    "no status",
 			syncKey: "cluster1/test",
 			managedClusteraddon: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1")
-					addon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+					addon.Spec.Configs = []addonapiv1beta1.AddOnConfig{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    fakeGVR.Group,
 								Resource: fakeGVR.Resource,
 							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							ConfigReferent: addonapiv1beta1.ConfigReferent{
 								Namespace: "cluster1",
 								Name:      "test",
 							},
@@ -233,33 +221,29 @@ func TestSync(t *testing.T) {
 			name:    "no configs",
 			syncKey: "cluster1/test",
 			managedClusteraddon: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1")
-					addon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+					addon.Spec.Configs = []addonapiv1beta1.AddOnConfig{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    fakeGVR.Group,
 								Resource: fakeGVR.Resource,
 							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							ConfigReferent: addonapiv1beta1.ConfigReferent{
 								Namespace: "cluster1",
 								Name:      "test",
 							},
 						},
 					}
-					addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+					addon.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    fakeGVR.Group,
 								Resource: fakeGVR.Resource,
 							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
-								Namespace: "cluster1",
-								Name:      "test",
-							},
 							LastObservedGeneration: 1,
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
 									Namespace: "cluster1",
 									Name:      "test",
 								},
@@ -278,37 +262,34 @@ func TestSync(t *testing.T) {
 			name:    "cluster scope config",
 			syncKey: "cluster1/test",
 			managedClusteraddon: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1")
-					addon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+					addon.Spec.Configs = []addonapiv1beta1.AddOnConfig{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    fakeGVR.Group,
 								Resource: fakeGVR.Resource,
 							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							ConfigReferent: addonapiv1beta1.ConfigReferent{
 								Name: "test",
 							},
 						},
 					}
-					addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+					addon.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    fakeGVR.Group,
 								Resource: fakeGVR.Resource,
 							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
-								Name: "test",
-							},
 							LastObservedGeneration: 2,
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
 									Name: "test",
 								},
 							},
 						},
 					}
-					addon.Status.SupportedConfigs = []addonapiv1alpha1.ConfigGroupResource{
+					addon.Status.SupportedConfigs = []addonapiv1beta1.ConfigGroupResource{
 						{
 							Group:    fakeGVR.Group,
 							Resource: fakeGVR.Resource,
@@ -320,7 +301,7 @@ func TestSync(t *testing.T) {
 			configs: []runtime.Object{newTestConfing("test", "", 3)},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				patch := actions[0].(clienttesting.PatchActionImpl).Patch
-				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
 				err := json.Unmarshal(patch, addOn)
 				if err != nil {
 					t.Fatal(err)
@@ -339,15 +320,15 @@ func TestSync(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			fakeAddonClient := fakeaddon.NewSimpleClientset(c.managedClusteraddon...)
 			addonInformers := addoninformers.NewSharedInformerFactory(fakeAddonClient, 10*time.Minute)
-			addonStore := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore()
+			addonStore := addonInformers.Addon().V1beta1().ManagedClusterAddOns().Informer().GetStore()
 			for _, addon := range c.managedClusteraddon {
 				if err := addonStore.Add(addon); err != nil {
 					t.Fatal(err)
 				}
 			}
 
-			cmaStore := addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Informer().GetStore()
-			if err := cmaStore.Add(&addonapiv1alpha1.ClusterManagementAddOn{
+			cmaStore := addonInformers.Addon().V1beta1().ClusterManagementAddOns().Informer().GetStore()
+			if err := cmaStore.Add(&addonapiv1beta1.ClusterManagementAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
 				},
@@ -368,8 +349,8 @@ func TestSync(t *testing.T) {
 
 			ctrl := &addonConfigController{
 				addonClient:                  fakeAddonClient,
-				addonLister:                  addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
-				clusterManagementAddonLister: addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
+				addonLister:                  addonInformers.Addon().V1beta1().ManagedClusterAddOns().Lister(),
+				clusterManagementAddonLister: addonInformers.Addon().V1beta1().ClusterManagementAddOns().Lister(),
 				configListers:                map[schema.GroupResource]dynamiclister.Lister{},
 				cmaFilterFunc:                func(obj interface{}) bool { return true },
 				configGVRs:                   map[schema.GroupVersionResource]bool{fakeGVR: true},
@@ -403,39 +384,39 @@ func TestEnqueue(t *testing.T) {
 		{
 			name: "configs in spec",
 			addons: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1")
-					addon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+					addon.Spec.Configs = []addonapiv1beta1.AddOnConfig{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    fakeGVR.Group,
 								Resource: fakeGVR.Resource,
 							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							ConfigReferent: addonapiv1beta1.ConfigReferent{
 								Name: "test",
 							},
 						},
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    "other",
 								Resource: "other",
 							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							ConfigReferent: addonapiv1beta1.ConfigReferent{
 								Name: "other",
 							},
 						},
 					}
 					return addon
 				}(),
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster2")
-					addon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+					addon.Spec.Configs = []addonapiv1beta1.AddOnConfig{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    fakeGVR.Group,
 								Resource: fakeGVR.Resource,
 							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							ConfigReferent: addonapiv1beta1.ConfigReferent{
 								Name: "test",
 							},
 						},
@@ -449,40 +430,46 @@ func TestEnqueue(t *testing.T) {
 		{
 			name: "configs in status",
 			addons: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1")
-					addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+					addon.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    fakeGVR.Group,
 								Resource: fakeGVR.Resource,
 							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
-								Name: "test",
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
+									Name: "test",
+								},
 							},
 						},
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    "other",
 								Resource: "other",
 							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
-								Name: "other",
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
+									Name: "other",
+								},
 							},
 						},
 					}
 					return addon
 				}(),
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster2")
-					addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+					addon.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    fakeGVR.Group,
 								Resource: fakeGVR.Resource,
 							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
-								Name: "test",
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
+									Name: "test",
+								},
 							},
 						},
 					}
@@ -495,35 +482,39 @@ func TestEnqueue(t *testing.T) {
 		{
 			name: "owned configs",
 			addons: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test1", "cluster1")
-					addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+					addon.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    fakeGVR.Group,
 								Resource: fakeGVR.Resource,
 							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
-								Namespace: "cluster1",
-								Name:      "test",
-							},
 							LastObservedGeneration: 1,
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
+									Namespace: "cluster1",
+									Name:      "test",
+								},
+							},
 						},
 					}
 					return addon
 				}(),
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test2", "cluster1")
-					addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+					addon.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    "otherconfigs.test",
 								Resource: "otherconfigs",
 							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
-								Name: "other",
-							},
 							LastObservedGeneration: 1,
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
+									Name: "other",
+								},
+							},
 						},
 					}
 					return addon
@@ -538,7 +529,7 @@ func TestEnqueue(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			fakeAddonClient := fakeaddon.NewSimpleClientset(c.addons...)
 			addonInformers := addoninformers.NewSharedInformerFactory(fakeAddonClient, 10*time.Minute)
-			addonInformer := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer()
+			addonInformer := addonInformers.Addon().V1beta1().ManagedClusterAddOns().Informer()
 
 			ctrl := &addonConfigController{
 				addonIndexer: addonInformer.GetIndexer(),

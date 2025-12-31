@@ -9,7 +9,7 @@ import (
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addonv1beta1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
@@ -133,7 +133,7 @@ func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 		return err
 	}
 
-	addonClient, err := addonv1alpha1client.NewForConfig(a.config)
+	addonClient, err := addonv1beta1client.NewForConfig(a.config)
 	if err != nil {
 		return err
 	}
@@ -153,7 +153,7 @@ func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 		workClient,
 		addonClient,
 		clusterInformers.Cluster().V1().ManagedClusters(),
-		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+		addonInformers.Addon().V1beta1().ManagedClusterAddOns(),
 		workInformers,
 		a.addonAgents,
 		mcaFilterFunc,
@@ -162,7 +162,7 @@ func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 	registrationController := registration.NewAddonRegistrationController(
 		addonClient,
 		clusterInformers.Cluster().V1().ManagedClusters(),
-		addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+		addonInformers.Addon().V1beta1().ManagedClusterAddOns(),
 		a.addonAgents,
 		mcaFilterFunc,
 	)
@@ -172,7 +172,7 @@ func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 	// The migration plan refer to https://github.com/open-cluster-management-io/ocm/issues/355.
 	managementAddonController := cmamanagedby.NewCMAManagedByController(
 		addonClient,
-		addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
+		addonInformers.Addon().V1beta1().ClusterManagementAddOns(),
 		a.addonAgents,
 		utils.FilterByAddonName(a.addonAgents),
 	)
@@ -188,15 +188,15 @@ func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 		// for addontemplates to the ocm addon-manager.
 		addonConfigController = addonconfig.NewAddonConfigController(
 			addonClient,
-			addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
-			addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
+			addonInformers.Addon().V1beta1().ManagedClusterAddOns(),
+			addonInformers.Addon().V1beta1().ClusterManagementAddOns(),
 			dynamicInformers,
 			a.addonConfigs,
 			utils.FilterByAddonName(a.addonAgents),
 		)
 		managementAddonConfigController = cmaconfig.NewCMAConfigController(
 			addonClient,
-			addonInformers.Addon().V1alpha1().ClusterManagementAddOns(),
+			addonInformers.Addon().V1beta1().ClusterManagementAddOns(),
 			dynamicInformers,
 			a.addonConfigs,
 			utils.FilterByAddonName(a.addonAgents),
@@ -215,7 +215,7 @@ func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 			clusterInformers.Cluster().V1().ManagedClusters(),
 			kubeInformers.Certificates().V1().CertificateSigningRequests(),
 			nil,
-			addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+			addonInformers.Addon().V1beta1().ManagedClusterAddOns(),
 			a.addonAgents,
 			mcaFilterFunc,
 		)
@@ -223,7 +223,7 @@ func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 			kubeClient,
 			clusterInformers.Cluster().V1().ManagedClusters(),
 			kubeInformers.Certificates().V1().CertificateSigningRequests(),
-			addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+			addonInformers.Addon().V1beta1().ManagedClusterAddOns(),
 			a.addonAgents,
 			mcaFilterFunc,
 		)
@@ -233,7 +233,7 @@ func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 			clusterInformers.Cluster().V1().ManagedClusters(),
 			nil,
 			kubeInformers.Certificates().V1beta1().CertificateSigningRequests(),
-			addonInformers.Addon().V1alpha1().ManagedClusterAddOns(),
+			addonInformers.Addon().V1beta1().ManagedClusterAddOns(),
 			a.addonAgents,
 			mcaFilterFunc,
 		)

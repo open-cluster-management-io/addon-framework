@@ -12,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	fakecluster "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
@@ -30,21 +30,21 @@ import (
 )
 
 var registrationAppliedCondition = metav1.Condition{
-	Type:    addonapiv1alpha1.ManagedClusterAddOnRegistrationApplied,
+	Type:    addonapiv1beta1.ManagedClusterAddOnRegistrationApplied,
 	Status:  metav1.ConditionTrue,
-	Reason:  addonapiv1alpha1.RegistrationAppliedSetPermissionApplied,
+	Reason:  addonapiv1beta1.RegistrationAppliedSetPermissionApplied,
 	Message: "Registration of the addon agent is configured",
 }
 
 var mainfestWorkAppliedCondition = metav1.Condition{
-	Type:    addonapiv1alpha1.ManagedClusterAddOnManifestApplied,
+	Type:    addonapiv1beta1.ManagedClusterAddOnManifestApplied,
 	Status:  metav1.ConditionTrue,
-	Reason:  addonapiv1alpha1.AddonManifestAppliedReasonManifestsApplied,
+	Reason:  addonapiv1beta1.AddonManifestAppliedReasonManifestsApplied,
 	Message: "Registration of the addon agent is configured",
 }
 
 var configuredCondition = metav1.Condition{
-	Type:    addonapiv1alpha1.ManagedClusterAddOnConditionConfigured,
+	Type:    addonapiv1beta1.ManagedClusterAddOnConditionConfigured,
 	Status:  metav1.ConditionTrue,
 	Reason:  "ConfigurationsConfigured",
 	Message: "Configurations configured",
@@ -60,7 +60,7 @@ type testAgent struct {
 	ConfigCheckEnabled bool
 }
 
-func (t *testAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
+func (t *testAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error) {
 	return t.objects, t.err
 }
 
@@ -138,7 +138,7 @@ func TestDefaultReconcile(t *testing.T) {
 					addontesting.NewUnstructured("v1", "Deployment", "default", "test1"),
 				)
 				work.SetLabels(map[string]string{
-					addonapiv1alpha1.AddonLabelKey: "test",
+					addonapiv1beta1.AddonLabelKey: "test",
 				})
 				work.Status.Conditions = []metav1.Condition{
 					{
@@ -154,12 +154,12 @@ func TestDefaultReconcile(t *testing.T) {
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "patch")
 				patch := actions[0].(clienttesting.PatchActionImpl).Patch
-				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
 				err := json.Unmarshal(patch, addOn)
 				if err != nil {
 					t.Fatal(err)
 				}
-				if meta.IsStatusConditionFalse(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnManifestApplied) {
+				if meta.IsStatusConditionFalse(addOn.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnManifestApplied) {
 					t.Errorf("Condition Reason is not correct: %v", addOn.Status.Conditions)
 				}
 			},
@@ -181,7 +181,7 @@ func TestDefaultReconcile(t *testing.T) {
 					addontesting.NewUnstructured("v1", "Deployment", "default", "test"),
 				)
 				work.SetLabels(map[string]string{
-					addonapiv1alpha1.AddonLabelKey: "test",
+					addonapiv1beta1.AddonLabelKey: "test",
 				})
 				pTrue := true
 				work.SetOwnerReferences([]metav1.OwnerReference{
@@ -206,12 +206,12 @@ func TestDefaultReconcile(t *testing.T) {
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "patch")
 				patch := actions[0].(clienttesting.PatchActionImpl).Patch
-				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
 				err := json.Unmarshal(patch, addOn)
 				if err != nil {
 					t.Fatal(err)
 				}
-				if meta.IsStatusConditionFalse(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnManifestApplied) {
+				if meta.IsStatusConditionFalse(addOn.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnManifestApplied) {
 					t.Errorf("Condition Reason is not correct: %v", addOn.Status.Conditions)
 				}
 			},
@@ -247,12 +247,12 @@ func TestDefaultReconcile(t *testing.T) {
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "patch")
 				patch := actions[0].(clienttesting.PatchActionImpl).Patch
-				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
 				err := json.Unmarshal(patch, addOn)
 				if err != nil {
 					t.Fatal(err)
 				}
-				if !meta.IsStatusConditionFalse(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnManifestApplied) {
+				if !meta.IsStatusConditionFalse(addOn.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnManifestApplied) {
 					t.Errorf("Condition Reason is not correct: %v", addOn.Status.Conditions)
 				}
 			},
@@ -311,7 +311,7 @@ func TestDefaultReconcile(t *testing.T) {
 				}
 			}
 			for _, obj := range c.addon {
-				if err := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore().Add(obj); err != nil {
+				if err := addonInformers.Addon().V1beta1().ManagedClusterAddOns().Informer().GetStore().Add(obj); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -326,7 +326,7 @@ func TestDefaultReconcile(t *testing.T) {
 				workBuilder:               workbuilder.NewWorkBuilder(),
 				addonClient:               fakeAddonClient,
 				managedClusterLister:      clusterInformers.Cluster().V1().ManagedClusters().Lister(),
-				managedClusterAddonLister: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
+				managedClusterAddonLister: addonInformers.Addon().V1beta1().ManagedClusterAddOns().Lister(),
 				workIndexer:               workInformerFactory.Work().V1().ManifestWorks().Informer().GetIndexer(),
 				agentAddons:               map[string]agent.AgentAddon{c.testaddon.name: c.testaddon},
 			}

@@ -72,7 +72,7 @@ var _ = ginkgo.Describe("Create addon on a deleted Managed Cluster", func() {
 		gomega.Expect(err).To(gomega.BeNil())
 
 		time.Sleep(time.Minute) // wait 1 minute for controller to sync
-		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testInstallByLableAddonImpl.name, metav1.GetOptions{})
+		_, err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testInstallByLableAddonImpl.name, metav1.GetOptions{})
 		gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
 	})
 })

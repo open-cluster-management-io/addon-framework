@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
@@ -16,7 +16,7 @@ const (
 )
 
 func IndexManagedClusterAddonByNamespace(obj interface{}) ([]string, error) {
-	mca, ok := obj.(*addonv1alpha1.ManagedClusterAddOn)
+	mca, ok := obj.(*addonv1beta1.ManagedClusterAddOn)
 
 	if !ok {
 		return []string{}, fmt.Errorf("obj %T is not a ManagedClusterAddon", obj)
@@ -81,12 +81,12 @@ func extractAddonFromWork(work *workapiv1.ManifestWork) (string, string, bool) {
 		return "", "", false
 	}
 
-	addonName, ok := work.Labels[addonv1alpha1.AddonLabelKey]
+	addonName, ok := work.Labels[addonv1beta1.AddonLabelKey]
 	if !ok {
 		return "", "", false
 	}
 
-	addonNamespace := work.Labels[addonv1alpha1.AddonNamespaceLabelKey]
+	addonNamespace := work.Labels[addonv1beta1.AddonNamespaceLabelKey]
 
 	isHook := false
 	if strings.HasPrefix(work.Name, constants.PreDeleteHookWorkName(addonName)) {
@@ -101,22 +101,36 @@ const (
 )
 
 func IndexAddonByConfig(obj interface{}) ([]string, error) {
-	addon, ok := obj.(*addonv1alpha1.ManagedClusterAddOn)
+	addon, ok := obj.(*addonv1beta1.ManagedClusterAddOn)
 	if !ok {
 		return nil, fmt.Errorf("obj is supposed to be a ManagedClusterAddOn, but is %T", obj)
 	}
 
-	getIndex := func(config addonv1alpha1.ConfigReference) string {
-		if config.Namespace != "" {
-			return fmt.Sprintf("%s/%s/%s/%s", config.Group, config.Resource, config.Namespace, config.Name)
+	getIndex := func(config addonv1beta1.ConfigReference) string {
+		// In v1beta1, namespace and name are in DesiredConfig or LastAppliedConfig
+		namespace := ""
+		name := ""
+		if config.DesiredConfig != nil {
+			namespace = config.DesiredConfig.Namespace
+			name = config.DesiredConfig.Name
+		} else if config.LastAppliedConfig != nil {
+			namespace = config.LastAppliedConfig.Namespace
+			name = config.LastAppliedConfig.Name
 		}
 
-		return fmt.Sprintf("%s/%s/%s", config.Group, config.Resource, config.Name)
+		if namespace != "" {
+			return fmt.Sprintf("%s/%s/%s/%s", config.Group, config.Resource, namespace, name)
+		}
+
+		return fmt.Sprintf("%s/%s/%s", config.Group, config.Resource, name)
 	}
 
 	configNames := []string{}
 	for _, configReference := range addon.Status.ConfigReferences {
-		if configReference.Name == "" {
+		// Check if we have a valid config reference
+		hasConfig := (configReference.DesiredConfig != nil && configReference.DesiredConfig.Name != "") ||
+			(configReference.LastAppliedConfig != nil && configReference.LastAppliedConfig.Name != "")
+		if !hasConfig {
 			// bad config reference, ignore
 			continue
 		}
@@ -132,12 +146,12 @@ const (
 )
 
 func IndexClusterManagementAddonByConfig(obj interface{}) ([]string, error) {
-	cma, ok := obj.(*addonv1alpha1.ClusterManagementAddOn)
+	cma, ok := obj.(*addonv1beta1.ClusterManagementAddOn)
 	if !ok {
 		return nil, fmt.Errorf("obj is supposed to be a ClusterManagementAddOn, but is %T", obj)
 	}
 
-	getIndex := func(gr addonv1alpha1.ConfigGroupResource, configSpecHash addonv1alpha1.ConfigSpecHash) string {
+	getIndex := func(gr addonv1beta1.ConfigGroupResource, configSpecHash addonv1beta1.ConfigSpecHash) string {
 		if configSpecHash.Namespace != "" {
 			return fmt.Sprintf("%s/%s/%s/%s", gr.Group, gr.Resource, configSpecHash.Namespace, configSpecHash.Name)
 		}

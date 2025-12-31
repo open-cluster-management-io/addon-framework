@@ -6,12 +6,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
-	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
-	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	addonv1beta1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addoninformerv1beta1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1beta1"
+	addonlisterv1beta1 "open-cluster-management.io/api/client/addon/listers/addon/v1beta1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
 
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 )
@@ -26,18 +27,18 @@ const (
 // the installation and upgrade of addon will no longer be managed by addon itself.
 // Once removed, the value will be set to "addon-manager" by the general addon manager.
 type cmaManagedByController struct {
-	addonClient                  addonv1alpha1client.Interface
-	clusterManagementAddonLister addonlisterv1alpha1.ClusterManagementAddOnLister
+	addonClient                  addonv1beta1client.Interface
+	clusterManagementAddonLister addonlisterv1beta1.ClusterManagementAddOnLister
 	agentAddons                  map[string]agent.AgentAddon
 	cmaFilterFunc                factory.EventFilterFunc
-	addonPatcher                 patcher.Patcher[*addonapiv1alpha1.ClusterManagementAddOn,
-		addonapiv1alpha1.ClusterManagementAddOnSpec,
-		addonapiv1alpha1.ClusterManagementAddOnStatus]
+	addonPatcher                 patcher.Patcher[*addonapiv1beta1.ClusterManagementAddOn,
+		addonapiv1beta1.ClusterManagementAddOnSpec,
+		addonapiv1beta1.ClusterManagementAddOnStatus]
 }
 
 func NewCMAManagedByController(
-	addonClient addonv1alpha1client.Interface,
-	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
+	addonClient addonv1beta1client.Interface,
+	clusterManagementAddonInformers addoninformerv1beta1.ClusterManagementAddOnInformer,
 	agentAddons map[string]agent.AgentAddon,
 	cmaFilterFunc factory.EventFilterFunc,
 ) factory.Controller {
@@ -48,9 +49,9 @@ func NewCMAManagedByController(
 		clusterManagementAddonLister: clusterManagementAddonInformers.Lister(),
 		agentAddons:                  agentAddons,
 		cmaFilterFunc:                cmaFilterFunc,
-		addonPatcher: patcher.NewPatcher[*addonapiv1alpha1.ClusterManagementAddOn,
-			addonapiv1alpha1.ClusterManagementAddOnSpec,
-			addonapiv1alpha1.ClusterManagementAddOnStatus](addonClient.AddonV1alpha1().ClusterManagementAddOns()),
+		addonPatcher: patcher.NewPatcher[*addonapiv1beta1.ClusterManagementAddOn,
+			addonapiv1beta1.ClusterManagementAddOnSpec,
+			addonapiv1beta1.ClusterManagementAddOnStatus](addonClient.AddonV1beta1().ClusterManagementAddOns()),
 	}
 
 	return factory.New().
@@ -84,10 +85,10 @@ func (c *cmaManagedByController) sync(ctx context.Context, syncCtx factory.SyncC
 	// The migration plan refer to https://github.com/open-cluster-management-io/ocm/issues/355.
 	cmaCopy := cma.DeepCopy()
 	if cmaCopy.Annotations == nil ||
-		cmaCopy.Annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey] != addonapiv1alpha1.AddonLifecycleSelfManageAnnotationValue {
+		cmaCopy.Annotations[constants.AddonLifecycleAnnotationKey] != constants.AddonLifecycleSelfManageAnnotationValue {
 		return nil
 	}
-	cmaCopy.Annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey] = ""
+	cmaCopy.Annotations[constants.AddonLifecycleAnnotationKey] = ""
 
 	_, err = c.addonPatcher.PatchLabelAnnotations(ctx, cmaCopy, cmaCopy.ObjectMeta, cma.ObjectMeta)
 	return err

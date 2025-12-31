@@ -16,7 +16,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/index"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	fakecluster "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
@@ -36,7 +36,7 @@ type testHostedAgent struct {
 	ConfigCheckEnabled bool
 }
 
-func (t *testHostedAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (
+func (t *testHostedAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) (
 	[]runtime.Object, error) {
 	return t.objects, t.err
 }
@@ -98,16 +98,16 @@ func TestHostingReconcile(t *testing.T) {
 				// Update addon condition
 				addontesting.AssertActions(t, actions, "patch")
 				patch := actions[0].(clienttesting.PatchActionImpl).Patch
-				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
 				err := json.Unmarshal(patch, addOn)
 				if err != nil {
 					t.Fatal(err)
 				}
-				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHostingClusterValidity)
+				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnHostingClusterValidity)
 				if addOnCond == nil {
 					t.Fatal("condition should not be nil")
 				}
-				if addOnCond.Reason != addonapiv1alpha1.HostingClusterValidityReasonInvalid {
+				if addOnCond.Reason != addonapiv1beta1.HostingClusterValidityReasonInvalid {
 					t.Errorf("Condition Reason is not correct: %v", addOnCond.Reason)
 				}
 			},
@@ -139,11 +139,11 @@ func TestHostingReconcile(t *testing.T) {
 				// Update finalizer
 				addontesting.AssertActions(t, actions, "update")
 				update := actions[0].(clienttesting.UpdateActionImpl).Object
-				addOn := update.(*addonapiv1alpha1.ManagedClusterAddOn)
+				addOn := update.(*addonapiv1beta1.ManagedClusterAddOn)
 				if len(addOn.Finalizers) != 1 {
 					t.Errorf("expected 1 finalizer, but got %v", len(addOn.Finalizers))
 				}
-				if !addonHasFinalizer(addOn, addonapiv1alpha1.AddonHostingManifestFinalizer) {
+				if !addonHasFinalizer(addOn, addonapiv1beta1.AddonHostingManifestFinalizer) {
 					t.Errorf("expected hosting manifest finalizer")
 				}
 			},
@@ -170,16 +170,16 @@ func TestHostingReconcile(t *testing.T) {
 				assertHostingClusterValid(t, actions[0])
 
 				patch := actions[0].(clienttesting.PatchActionImpl).Patch
-				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
 				err := json.Unmarshal(patch, addOn)
 				if err != nil {
 					t.Fatal(err)
 				}
-				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHostingClusterValidity)
+				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnHostingClusterValidity)
 				if addOnCond == nil {
 					t.Fatal("condition should not be nil")
 				}
-				if addOnCond.Reason != addonapiv1alpha1.HostingClusterValidityReasonValid {
+				if addOnCond.Reason != addonapiv1beta1.HostingClusterValidityReasonValid {
 					t.Errorf("Condition Reason is not correct: %v", addOnCond.Reason)
 				}
 			},
@@ -210,8 +210,8 @@ func TestHostingReconcile(t *testing.T) {
 					addontesting.NewHostingUnstructured("v1", "Deployment", "default", "test1"),
 				)
 				work.SetLabels(map[string]string{
-					addonapiv1alpha1.AddonLabelKey:          "test",
-					addonapiv1alpha1.AddonNamespaceLabelKey: "cluster1",
+					addonapiv1beta1.AddonLabelKey:          "test",
+					addonapiv1beta1.AddonNamespaceLabelKey: "cluster1",
 				})
 				work.Status.Conditions = []metav1.Condition{
 					{
@@ -231,20 +231,20 @@ func TestHostingReconcile(t *testing.T) {
 				assertHostingClusterValid(t, actions[0])
 
 				patch := actions[0].(clienttesting.PatchActionImpl).Patch
-				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
 				err := json.Unmarshal(patch, addOn)
 				if err != nil {
 					t.Fatal(err)
 				}
-				if meta.IsStatusConditionFalse(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHostingManifestApplied) {
+				if meta.IsStatusConditionFalse(addOn.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnHostingManifestApplied) {
 					t.Errorf("Condition Reason is not correct: %v", addOn.Status.Conditions)
 				}
 
-				manifestAppliyedCondition := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnManifestApplied)
+				manifestAppliyedCondition := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnManifestApplied)
 				if manifestAppliyedCondition == nil {
 					t.Fatal("manifestapplied condition should not be nil")
 				}
-				if manifestAppliyedCondition.Reason != addonapiv1alpha1.AddonManifestAppliedReasonManifestsApplied {
+				if manifestAppliyedCondition.Reason != addonapiv1beta1.AddonManifestAppliedReasonManifestsApplied {
 					t.Errorf("Condition Reason is not correct: %v", manifestAppliyedCondition.Reason)
 				}
 				if manifestAppliyedCondition.Message != "no manifest need to apply" {
@@ -276,8 +276,8 @@ func TestHostingReconcile(t *testing.T) {
 					addontesting.NewHostingUnstructured("v1", "Deployment", "default", "test"),
 				)
 				work.SetLabels(map[string]string{
-					addonapiv1alpha1.AddonLabelKey:          "test",
-					addonapiv1alpha1.AddonNamespaceLabelKey: "cluster1",
+					addonapiv1beta1.AddonLabelKey:          "test",
+					addonapiv1beta1.AddonNamespaceLabelKey: "cluster1",
 				})
 				work.Status.Conditions = []metav1.Condition{
 					{
@@ -294,12 +294,12 @@ func TestHostingReconcile(t *testing.T) {
 				assertHostingClusterValid(t, actions[0])
 
 				patch := actions[0].(clienttesting.PatchActionImpl).Patch
-				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
 				err := json.Unmarshal(patch, addOn)
 				if err != nil {
 					t.Fatal(err)
 				}
-				if meta.IsStatusConditionFalse(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHostingManifestApplied) {
+				if meta.IsStatusConditionFalse(addOn.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnHostingManifestApplied) {
 					t.Errorf("Condition Reason is not correct: %v", addOn.Status.Conditions)
 				}
 			},
@@ -342,12 +342,12 @@ func TestHostingReconcile(t *testing.T) {
 				assertHostingClusterValid(t, actions[0])
 
 				patch := actions[0].(clienttesting.PatchActionImpl).Patch
-				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
 				err := json.Unmarshal(patch, addOn)
 				if err != nil {
 					t.Fatal(err)
 				}
-				if !meta.IsStatusConditionFalse(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHostingManifestApplied) {
+				if !meta.IsStatusConditionFalse(addOn.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnHostingManifestApplied) {
 					t.Errorf("Condition Reason is not correct: %v", addOn.Status.Conditions)
 				}
 			},
@@ -376,8 +376,8 @@ func TestHostingReconcile(t *testing.T) {
 					addontesting.NewHostingUnstructured("v1", "Deployment", "default", "test"),
 				)
 				work.Labels = map[string]string{
-					addonapiv1alpha1.AddonLabelKey:          "test",
-					addonapiv1alpha1.AddonNamespaceLabelKey: "cluster1",
+					addonapiv1beta1.AddonLabelKey:          "test",
+					addonapiv1beta1.AddonNamespaceLabelKey: "cluster1",
 				}
 				work.Status.Conditions = []metav1.Condition{
 					{
@@ -394,8 +394,8 @@ func TestHostingReconcile(t *testing.T) {
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "update")
 				update := actions[0].(clienttesting.UpdateActionImpl).Object
-				addOn := update.(*addonapiv1alpha1.ManagedClusterAddOn)
-				if addonHasFinalizer(addOn, addonapiv1alpha1.AddonHostingManifestFinalizer) {
+				addOn := update.(*addonapiv1beta1.ManagedClusterAddOn)
+				if addonHasFinalizer(addOn, addonapiv1beta1.AddonHostingManifestFinalizer) {
 					t.Errorf("expected hosting manifest finalizer")
 				}
 			},
@@ -417,16 +417,16 @@ func TestHostingReconcile(t *testing.T) {
 				assertHostingClusterValid(t, actions[0])
 
 				patch := actions[0].(clienttesting.PatchActionImpl).Patch
-				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
 				err := json.Unmarshal(patch, addOn)
 				if err != nil {
 					t.Fatal(err)
 				}
-				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHostingClusterValidity)
+				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnHostingClusterValidity)
 				if addOnCond == nil {
 					t.Fatal("condition should not be nil")
 				}
-				if addOnCond.Reason != addonapiv1alpha1.HostingClusterValidityReasonValid {
+				if addOnCond.Reason != addonapiv1beta1.HostingClusterValidityReasonValid {
 					t.Errorf("Condition Reason is not correct: %v", addOnCond.Reason)
 				}
 			},
@@ -451,16 +451,16 @@ func TestHostingReconcile(t *testing.T) {
 				assertHostingClusterValid(t, actions[0])
 
 				patch := actions[0].(clienttesting.PatchActionImpl).Patch
-				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
 				err := json.Unmarshal(patch, addOn)
 				if err != nil {
 					t.Fatal(err)
 				}
-				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHostingClusterValidity)
+				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnHostingClusterValidity)
 				if addOnCond == nil {
 					t.Fatal("condition should not be nil")
 				}
-				if addOnCond.Reason != addonapiv1alpha1.HostingClusterValidityReasonValid {
+				if addOnCond.Reason != addonapiv1beta1.HostingClusterValidityReasonValid {
 					t.Errorf("Condition Reason is not correct: %v", addOnCond.Reason)
 				}
 			},
@@ -496,7 +496,7 @@ func TestHostingReconcile(t *testing.T) {
 				}
 			}
 			for _, obj := range c.addon {
-				if err := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore().Add(obj); err != nil {
+				if err := addonInformers.Addon().V1beta1().ManagedClusterAddOns().Informer().GetStore().Add(obj); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -511,7 +511,7 @@ func TestHostingReconcile(t *testing.T) {
 				workBuilder:               workbuilder.NewWorkBuilder(),
 				addonClient:               fakeAddonClient,
 				managedClusterLister:      clusterInformers.Cluster().V1().ManagedClusters().Lister(),
-				managedClusterAddonLister: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
+				managedClusterAddonLister: addonInformers.Addon().V1beta1().ManagedClusterAddOns().Lister(),
 				workIndexer:               workInformerFactory.Work().V1().ManifestWorks().Informer().GetIndexer(),
 				agentAddons:               map[string]agent.AgentAddon{c.testaddon.name: c.testaddon},
 			}
@@ -532,16 +532,16 @@ func TestHostingReconcile(t *testing.T) {
 
 func assertHostingClusterValid(t *testing.T, actions clienttesting.Action) {
 	patch := actions.(clienttesting.PatchActionImpl).Patch
-	addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+	addOn := &addonapiv1beta1.ManagedClusterAddOn{}
 	err := json.Unmarshal(patch, addOn)
 	if err != nil {
 		t.Fatal(err)
 	}
-	addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHostingClusterValidity)
+	addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnHostingClusterValidity)
 	if addOnCond == nil {
 		t.Fatal("condition should not be nil")
 	}
-	if addOnCond.Reason != addonapiv1alpha1.HostingClusterValidityReasonValid {
+	if addOnCond.Reason != addonapiv1beta1.HostingClusterValidityReasonValid {
 		t.Errorf("Condition Reason is not correct: %v", addOnCond.Reason)
 	}
 }

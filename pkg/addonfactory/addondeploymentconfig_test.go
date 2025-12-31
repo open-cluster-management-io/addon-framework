@@ -14,6 +14,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
@@ -33,16 +34,16 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 		{
 			name: "no addon Deployment configs",
 			addOnObjs: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1")
-					addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+					addon.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    "config.test",
 								Resource: "testconfigs",
 							},
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
 									Namespace: "cluster1",
 									Name:      "testConfig",
 								},
@@ -59,16 +60,16 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 			name:          "to addon node placement",
 			toValuesFuncs: []AddOnDeploymentConfigToValuesFunc{ToAddOnNodePlacementValues},
 			addOnObjs: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1")
-					addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+					addon.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    "addon.open-cluster-management.io",
 								Resource: "addondeploymentconfigs",
 							},
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
 									Namespace: "cluster1",
 									Name:      "config",
 								},
@@ -102,16 +103,16 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 			name:          "multiple toValuesFuncs",
 			toValuesFuncs: []AddOnDeploymentConfigToValuesFunc{ToAddOnNodePlacementValues, ToAddOnCustomizedVariableValues},
 			addOnObjs: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1")
-					addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+					addon.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    "addon.open-cluster-management.io",
 								Resource: "addondeploymentconfigs",
 							},
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
 									Namespace: "cluster1",
 									Name:      "config",
 								},
@@ -152,16 +153,16 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 			name:          "to addon proxy config",
 			toValuesFuncs: []AddOnDeploymentConfigToValuesFunc{ToAddOnDeploymentConfigValues},
 			addOnObjs: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1")
-					addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+					addon.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    "addon.open-cluster-management.io",
 								Resource: "addondeploymentconfigs",
 							},
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
 									Namespace: "cluster1",
 									Name:      "config",
 								},
@@ -197,16 +198,16 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 			name:          "to addon resource requirements",
 			toValuesFuncs: []AddOnDeploymentConfigToValuesFunc{ToAddOnDeploymentConfigValues},
 			addOnObjs: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1")
-					addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+					addon.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    "addon.open-cluster-management.io",
 								Resource: "addondeploymentconfigs",
 							},
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
 									Namespace: "cluster1",
 									Name:      "config",
 								},
@@ -320,16 +321,16 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 			name:          "to addon proxy config for helm chart",
 			toValuesFuncs: []AddOnDeploymentConfigToValuesFunc{ToAddOnProxyConfigValues},
 			addOnObjs: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1")
-					addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+					addon.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    "addon.open-cluster-management.io",
 								Resource: "addondeploymentconfigs",
 							},
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
 									Namespace: "cluster1",
 									Name:      "config",
 								},
@@ -373,7 +374,7 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 
 			getter := utils.NewAddOnDeploymentConfigGetter(fakeAddonClient)
 
-			addOn, ok := c.addOnObjs[0].(*addonapiv1alpha1.ManagedClusterAddOn)
+			addOn, ok := c.addOnObjs[0].(*addonapiv1beta1.ManagedClusterAddOn)
 			if !ok {
 				t.Errorf("expected addon object, but failed")
 			}
@@ -543,7 +544,7 @@ func TestGetAgentImageValues(t *testing.T) {
 		imageKey              string
 		imageValue            string
 		cluster               *clusterv1.ManagedCluster
-		addon                 *addonapiv1alpha1.ManagedClusterAddOn
+		addon                 *addonapiv1beta1.ManagedClusterAddOn
 		addonDeploymentConfig []runtime.Object
 		expectedValues        Values
 		expectedError         string
@@ -676,16 +677,16 @@ func TestGetAgentImageValues(t *testing.T) {
 					},
 				},
 			},
-			addon: func() *addonapiv1alpha1.ManagedClusterAddOn {
+			addon: func() *addonapiv1beta1.ManagedClusterAddOn {
 				addon := addontesting.NewAddon("test", "cluster1")
-				addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+				addon.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 					{
-						ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+						ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 							Group:    "addon.open-cluster-management.io",
 							Resource: "addondeploymentconfigs",
 						},
-						DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+						DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+							ConfigReferent: addonapiv1beta1.ConfigReferent{
 								Namespace: "cluster1",
 								Name:      "config2",
 							},
