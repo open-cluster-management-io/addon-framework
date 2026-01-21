@@ -68,8 +68,11 @@ var _ = ginkgo.Describe("Addon CSR", func() {
 				InstallNamespace: "test",
 			},
 		}
-		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(context.Background(), addon, metav1.CreateOptions{})
+		addon, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(context.Background(), addon, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		// Set kubeClientDriver to "csr" for CSR-based authentication
+		setKubeClientDriver(managedClusterName, testAddonImpl.name, "csr")
 	})
 
 	ginkgo.AfterEach(func() {
