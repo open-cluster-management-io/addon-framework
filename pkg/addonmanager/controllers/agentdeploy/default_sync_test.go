@@ -281,6 +281,109 @@ func TestDefaultReconcile(t *testing.T) {
 			validateAddonActions: addontesting.AssertNoActions,
 			validateWorkActions:  addontesting.AssertNoActions,
 		},
+		{
+			name: "clear stale False ManifestApplied condition when WorkApplied is nil",
+			key:  "cluster1/test",
+			addon: []runtime.Object{addontesting.NewAddonWithConditions("test", "cluster1",
+				registrationAppliedCondition,
+				metav1.Condition{
+					Type:    addonapiv1alpha1.ManagedClusterAddOnManifestApplied,
+					Status:  metav1.ConditionFalse,
+					Reason:  addonapiv1alpha1.AddonManifestAppliedReasonWorkApplyFailed,
+					Message: "failed to build manifestwork: some old error",
+				},
+			)},
+			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			testaddon: &testAgent{name: "test", objects: []runtime.Object{
+				addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
+			}},
+			existingWork: []runtime.Object{func() *workapiv1.ManifestWork {
+				work := addontesting.NewManifestWork(
+					"addon-test-deploy",
+					"cluster1",
+					addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
+				)
+				work.SetLabels(map[string]string{
+					addonapiv1alpha1.AddonLabelKey: "test",
+				})
+				pTrue := true
+				work.SetOwnerReferences([]metav1.OwnerReference{
+					{
+						APIVersion:         "addon.open-cluster-management.io/v1alpha1",
+						Kind:               "ManagedClusterAddOn",
+						Name:               "test",
+						UID:                "",
+						Controller:         &pTrue,
+						BlockOwnerDeletion: &pTrue,
+					},
+				})
+				// ManifestWork created but work-agent hasn't reported status yet (WorkApplied is nil)
+				work.Status.Conditions = []metav1.Condition{}
+				return work
+			}()},
+			validateWorkActions: addontesting.AssertNoActions,
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchActionImpl).Patch
+				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				err := json.Unmarshal(patch, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
+				// The stale False condition should be removed
+				manifestAppliedCond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnManifestApplied)
+				if manifestAppliedCond != nil {
+					t.Errorf("Expected ManifestApplied condition to be removed, but got: %v", manifestAppliedCond)
+				}
+			},
+		},
+		{
+			name: "keep True ManifestApplied condition when WorkApplied is nil",
+			key:  "cluster1/test",
+			addon: []runtime.Object{addontesting.NewAddonWithConditions("test", "cluster1",
+				registrationAppliedCondition,
+				metav1.Condition{
+					Type:    addonapiv1alpha1.ManagedClusterAddOnManifestApplied,
+					Status:  metav1.ConditionTrue,
+					Reason:  addonapiv1alpha1.AddonManifestAppliedReasonManifestsApplied,
+					Message: "manifests of addon are applied successfully",
+				},
+			)},
+			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			testaddon: &testAgent{name: "test", objects: []runtime.Object{
+				addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
+			}},
+			existingWork: []runtime.Object{func() *workapiv1.ManifestWork {
+				work := addontesting.NewManifestWork(
+					"addon-test-deploy",
+					"cluster1",
+					addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
+				)
+				work.SetLabels(map[string]string{
+					addonapiv1alpha1.AddonLabelKey: "test",
+				})
+				pTrue := true
+				work.SetOwnerReferences([]metav1.OwnerReference{
+					{
+						APIVersion:         "addon.open-cluster-management.io/v1alpha1",
+						Kind:               "ManagedClusterAddOn",
+						Name:               "test",
+						UID:                "",
+						Controller:         &pTrue,
+						BlockOwnerDeletion: &pTrue,
+					},
+				})
+				// ManifestWork exists but work-agent hasn't reported new status yet
+				work.Status.Conditions = []metav1.Condition{}
+				return work
+			}()},
+			validateWorkActions: addontesting.AssertNoActions,
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				// When ManifestApplied is already True and WorkApplied is nil,
+				// the condition should remain unchanged (no patch action)
+				addontesting.AssertNoActions(t, actions)
+			},
+		},
 	}
 
 	for _, c := range cases {
