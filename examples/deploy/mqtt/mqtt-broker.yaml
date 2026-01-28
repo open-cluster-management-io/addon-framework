@@ -39,7 +39,7 @@ spec:
     spec:
       containers:
       - name: mosquitto
-        image: eclipse-mosquitto:2.0.18
+        image: quay.io/maestro/eclipse-mosquitto:2.0.18
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 1883

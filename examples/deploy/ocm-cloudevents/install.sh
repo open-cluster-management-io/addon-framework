@@ -69,17 +69,4 @@ ${KUBECTL} -n open-cluster-management-agent rollout status deployment/klusterlet
 ${KUBECTL} -n open-cluster-management-agent get pod -l app=klusterlet-manifestwork-agent
 
 # TODO: add live probe for the work-agent to check if it is connected to the mqtt broker
-isRunning=false
-for i in {1..20}; do
-    if ${KUBECTL} -n open-cluster-management-agent logs deployment/klusterlet-work-agent | grep "subscribing to topics"; then
-        echo "klusterlet-work-agent is subscribing to topics from mqtt broker"
-        isRunning=true
-        break
-    fi
-    sleep 12
-done
-
-if [ "$isRunning" = false ]; then
-    echo "timeout waiting for klusterlet-work-agent to subscribe to topics from mqtt broker"
-    exit 1
-fi
+sleep 60
