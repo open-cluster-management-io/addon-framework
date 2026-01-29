@@ -12,7 +12,7 @@ import (
 )
 
 // ResourceHandler handles the received resource object.
-type ResourceHandler[T ResourceObject] func(ctx context.Context, action types.ResourceAction, obj T) error
+type ResourceHandler[T ResourceObject] func(ctx context.Context, obj T) error
 
 // StatusHashGetter gets the status hash of one resource object.
 type StatusHashGetter[T ResourceObject] func(obj T) (string, error)
@@ -39,7 +39,7 @@ type ResourceObject interface {
 
 type Lister[T ResourceObject] interface {
 	// List returns the list of resource objects that are maintained by source/agent.
-	List(options types.ListOptions) ([]T, error)
+	List(ctx context.Context, options types.ListOptions) ([]T, error)
 }
 
 type Codec[T ResourceObject] interface {
@@ -72,7 +72,7 @@ type CloudEventsClient[T ResourceObject] interface {
 	// ResourceHandler to handle them.
 	Subscribe(ctx context.Context, handlers ...ResourceHandler[T])
 
-	// ReconnectedChan returns a chan which indicates the source/agent client is reconnected.
+	// SubscribedChan returns a chan which indicates the source/agent client is subscribed.
 	// The source/agent client callers should consider sending a resync request when receiving this signal.
-	ReconnectedChan() <-chan struct{}
+	SubscribedChan() <-chan struct{}
 }

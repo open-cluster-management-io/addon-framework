@@ -15,7 +15,6 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/payload"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/utils"
 )
 
 // CloudEventAgentClient is a client for an agent to resync/send/receive its resources with cloud events.
@@ -45,13 +44,7 @@ func NewCloudEventAgentClient[T generic.ResourceObject](
 	statusHashGetter generic.StatusHashGetter[T],
 	codec generic.Codec[T],
 ) (generic.CloudEventsClient[T], error) {
-	baseClient := &baseClient{
-		clientID:               agentOptions.AgentID,
-		transport:              agentOptions.CloudEventsTransport,
-		cloudEventsRateLimiter: utils.NewRateLimiter(agentOptions.EventRateLimit),
-		reconnectedChan:        make(chan struct{}),
-	}
-
+	baseClient := newBaseClient(agentOptions.AgentID, agentOptions.CloudEventsTransport, agentOptions.EventRateLimit)
 	if err := baseClient.connect(ctx); err != nil {
 		return nil, err
 	}
@@ -66,17 +59,17 @@ func NewCloudEventAgentClient[T generic.ResourceObject](
 	}, nil
 }
 
-// ReconnectedChan returns a chan which indicates the source/agent client is reconnected.
-// The source/agent client callers should consider sending a resync request when receiving this signal.
-func (c *CloudEventAgentClient[T]) ReconnectedChan() <-chan struct{} {
-	return c.reconnectedChan
+// SubscribedChan returns a chan which indicates the agent client is subscribed.
+// The agent client callers should consider sending a resync request when receiving this signal.
+func (c *CloudEventAgentClient[T]) SubscribedChan() <-chan struct{} {
+	return c.subscribedChan
 }
 
 // Resync the resources spec by sending a spec resync request from the current to the given source.
 func (c *CloudEventAgentClient[T]) Resync(ctx context.Context, source string) error {
 	// list the resource objects that are maintained by the current agent with the given source
 	options := types.ListOptions{Source: source, ClusterName: c.clusterName, CloudEventsDataType: c.codec.EventDataType()}
-	objs, err := c.lister.List(options)
+	objs, err := c.lister.List(ctx, options)
 	if err != nil {
 		return err
 	}
@@ -198,20 +191,14 @@ func (c *CloudEventAgentClient[T]) receive(ctx context.Context, evt cloudevents.
 		return
 	}
 
-	action, err := c.specAction(evt.Source(), eventType.CloudEventsDataType, obj)
-	if err != nil {
-		logger.Error(err, "failed to generate spec action", "event", evt)
-		return
-	}
-
-	if len(action) == 0 {
-		// no action is required, ignore
-		return
-	}
-
 	for _, handler := range handlers {
-		if err := handler(ctx, action, obj); err != nil {
-			logger.Error(err, "failed to handle spec event", "event", evt)
+		if err := handler(ctx, obj); err != nil {
+			if logger.V(4).Enabled() {
+				evtData, _ := evt.MarshalJSON()
+				logger.Error(err, "failed to handle spec event", "event", string(evtData))
+			} else {
+				logger.Error(err, "failed to handle spec event")
+			}
 		}
 	}
 }
@@ -228,7 +215,7 @@ func (c *CloudEventAgentClient[T]) respondResyncStatusRequest(
 	logger := klog.FromContext(ctx).WithValues("eventDataType", eventDataType.String())
 
 	options := types.ListOptions{ClusterName: c.clusterName, Source: evt.Source(), CloudEventsDataType: eventDataType}
-	objs, err := c.lister.List(options)
+	objs, err := c.lister.List(ctx, options)
 	if err != nil {
 		return err
 	}
@@ -279,36 +266,6 @@ func (c *CloudEventAgentClient[T]) respondResyncStatusRequest(
 	}
 
 	return nil
-}
-
-func (c *CloudEventAgentClient[T]) specAction(
-	source string, eventDataType types.CloudEventsDataType, obj T) (evt types.ResourceAction, err error) {
-	options := types.ListOptions{ClusterName: c.clusterName, Source: source, CloudEventsDataType: eventDataType}
-	objs, err := c.lister.List(options)
-	if err != nil {
-		return evt, err
-	}
-
-	lastObj, exists := getObj(string(obj.GetUID()), objs)
-	if !exists {
-		return types.Added, nil
-	}
-
-	if !obj.GetDeletionTimestamp().IsZero() {
-		return types.Deleted, nil
-	}
-
-	// if both the current and the last object have the generation "0" or empty, then object
-	// is considered as modified, the message broker guarantees the order of the messages
-	if lastObj.GetGeneration() == 0 && obj.GetGeneration() == 0 {
-		return types.Modified, nil
-	}
-
-	if obj.GetGeneration() < lastObj.GetGeneration() {
-		return evt, nil
-	}
-
-	return types.Modified, nil
 }
 
 func getObj[T generic.ResourceObject](resourceID string, objs []T) (obj T, exists bool) {

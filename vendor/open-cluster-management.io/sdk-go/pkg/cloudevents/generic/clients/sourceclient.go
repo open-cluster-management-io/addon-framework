@@ -17,7 +17,6 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/payload"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/utils"
 )
 
 // CloudEventSourceClient is a client for a source to resync/send/receive its resources with cloud events.
@@ -46,13 +45,7 @@ func NewCloudEventSourceClient[T generic.ResourceObject](
 	statusHashGetter generic.StatusHashGetter[T],
 	codec generic.Codec[T],
 ) (*CloudEventSourceClient[T], error) {
-	baseClient := &baseClient{
-		clientID:               sourceOptions.SourceID,
-		transport:              sourceOptions.CloudEventsTransport,
-		cloudEventsRateLimiter: utils.NewRateLimiter(sourceOptions.EventRateLimit),
-		reconnectedChan:        make(chan struct{}),
-	}
-
+	baseClient := newBaseClient(sourceOptions.SourceID, sourceOptions.CloudEventsTransport, sourceOptions.EventRateLimit)
 	if err := baseClient.connect(ctx); err != nil {
 		return nil, err
 	}
@@ -66,15 +59,17 @@ func NewCloudEventSourceClient[T generic.ResourceObject](
 	}, nil
 }
 
-func (c *CloudEventSourceClient[T]) ReconnectedChan() <-chan struct{} {
-	return c.reconnectedChan
+// SubscribedChan returns a chan which indicates the source client is subscribed.
+// The source client callers should consider sending a resync request when receiving this signal.
+func (c *CloudEventSourceClient[T]) SubscribedChan() <-chan struct{} {
+	return c.subscribedChan
 }
 
 // Resync the resources status by sending a status resync request from the current source to a specified cluster.
 func (c *CloudEventSourceClient[T]) Resync(ctx context.Context, clusterName string) error {
 	// list the resource objects that are maintained by the current source with a specified cluster
 	options := types.ListOptions{Source: c.sourceID, ClusterName: clusterName, CloudEventsDataType: c.codec.EventDataType()}
-	objs, err := c.lister.List(options)
+	objs, err := c.lister.List(ctx, options)
 	if err != nil {
 		return err
 	}
@@ -203,8 +198,13 @@ func (c *CloudEventSourceClient[T]) receive(ctx context.Context, evt cloudevents
 	}
 
 	for _, handler := range handlers {
-		if err := handler(ctx, types.StatusModified, obj); err != nil {
-			logger.Error(err, "failed to handle status event", "event", evt)
+		if err := handler(ctx, obj); err != nil {
+			if logger.V(4).Enabled() {
+				evtData, _ := evt.MarshalJSON()
+				logger.Error(err, "failed to handle status event", "event", string(evtData))
+			} else {
+				logger.Error(err, "failed to handle status event")
+			}
 		}
 	}
 }
@@ -243,7 +243,7 @@ func (c *CloudEventSourceClient[T]) respondResyncSpecRequest(
 		Source:              c.sourceID,
 		CloudEventsDataType: evtDataType,
 	}
-	objs, err := c.lister.List(options)
+	objs, err := c.lister.List(ctx, options)
 	if err != nil {
 		return err
 	}

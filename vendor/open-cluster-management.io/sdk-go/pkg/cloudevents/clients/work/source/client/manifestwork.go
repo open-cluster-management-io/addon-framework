@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"open-cluster-management.io/sdk-go/pkg/logging"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
@@ -74,7 +76,7 @@ func (c *ManifestWorkSourceClient) Create(ctx context.Context, manifestWork *wor
 		return nil, returnErr
 	}
 
-	_, exists, err := c.watcherStore.Get(c.namespace, manifestWork.Name)
+	_, exists, err := c.watcherStore.Get(ctx, c.namespace, manifestWork.Name)
 	if err != nil {
 		returnErr = errors.NewInternalError(err)
 		return nil, returnErr
@@ -109,6 +111,9 @@ func (c *ManifestWorkSourceClient) Create(ctx context.Context, manifestWork *wor
 		return nil, returnErr
 	}
 
+	// Add logging tracing annotation
+	logging.SetLogTracingFromContext(ctx, newWork)
+
 	if errs := utils.ValidateWork(newWork); len(errs) != 0 {
 		returnErr = errors.NewInvalid(common.ManifestWorkGK, manifestWork.Name, errs)
 		return nil, returnErr
@@ -137,7 +142,7 @@ func (c *ManifestWorkSourceClient) UpdateStatus(ctx context.Context, manifestWor
 }
 
 func (c *ManifestWorkSourceClient) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
-	work, exists, err := c.watcherStore.Get(c.namespace, name)
+	work, exists, err := c.watcherStore.Get(ctx, c.namespace, name)
 	if err != nil {
 		returnErr := errors.NewInternalError(err)
 		metrics.IncreaseWorkProcessedCounter("delete", string(returnErr.ErrStatus.Reason))
@@ -158,6 +163,9 @@ func (c *ManifestWorkSourceClient) Delete(ctx context.Context, name string, opts
 	deletingWork := work.DeepCopy()
 	now := metav1.Now()
 	deletingWork.DeletionTimestamp = &now
+
+	// Add logging tracing annotation
+	logging.SetLogTracingFromContext(ctx, deletingWork)
 
 	if err := c.cloudEventsClient.Publish(ctx, eventType, deletingWork); err != nil {
 		returnErr := cloudeventserrors.ToStatusError(common.ManifestWorkGR, name, err)
@@ -197,7 +205,7 @@ func (c *ManifestWorkSourceClient) DeleteCollection(ctx context.Context, opts me
 func (c *ManifestWorkSourceClient) Get(ctx context.Context, name string, opts metav1.GetOptions) (*workv1.ManifestWork, error) {
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("getting manifestwork", "manifestWorkName", name)
-	work, exists, err := c.watcherStore.Get(c.namespace, name)
+	work, exists, err := c.watcherStore.Get(ctx, c.namespace, name)
 	if err != nil {
 		returnErr := errors.NewInternalError(err)
 		metrics.IncreaseWorkProcessedCounter("get", string(returnErr.ErrStatus.Reason))
@@ -216,7 +224,7 @@ func (c *ManifestWorkSourceClient) Get(ctx context.Context, name string, opts me
 func (c *ManifestWorkSourceClient) List(ctx context.Context, opts metav1.ListOptions) (*workv1.ManifestWorkList, error) {
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("list manifestworks")
-	works, err := c.watcherStore.List(c.namespace, opts)
+	works, err := c.watcherStore.List(ctx, c.namespace, opts)
 	if err != nil {
 		returnErr := errors.NewInternalError(err)
 		metrics.IncreaseWorkProcessedCounter("list", string(returnErr.ErrStatus.Reason))
@@ -233,7 +241,7 @@ func (c *ManifestWorkSourceClient) List(ctx context.Context, opts metav1.ListOpt
 }
 
 func (c *ManifestWorkSourceClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	watcher, err := c.watcherStore.GetWatcher(c.namespace, opts)
+	watcher, err := c.watcherStore.GetWatcher(ctx, c.namespace, opts)
 	if err != nil {
 		returnErr := errors.NewInternalError(err)
 		metrics.IncreaseWorkProcessedCounter("watch", string(returnErr.ErrStatus.Reason))
@@ -263,7 +271,7 @@ func (c *ManifestWorkSourceClient) Patch(ctx context.Context, name string, pt ku
 		return nil, returnErr
 	}
 
-	lastWork, exists, err := c.watcherStore.Get(c.namespace, name)
+	lastWork, exists, err := c.watcherStore.Get(ctx, c.namespace, name)
 	if err != nil {
 		returnErr = errors.NewInternalError(err)
 		return nil, returnErr
@@ -295,6 +303,9 @@ func (c *ManifestWorkSourceClient) Patch(ctx context.Context, name string, pt ku
 	}
 	newWork.Generation = generation
 	newWork.ResourceVersion = rv
+
+	// Add logging tracing annotation
+	logging.SetLogTracingFromContext(ctx, newWork)
 
 	if errs := utils.ValidateWork(newWork); len(errs) != 0 {
 		returnErr = errors.NewInvalid(common.ManifestWorkGK, name, errs)
