@@ -11,7 +11,6 @@ import (
 	"k8s.io/klog/v2"
 
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic"
-	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 )
 
 const syncedPollPeriod = 100 * time.Millisecond
@@ -31,10 +30,10 @@ type StoreInitiated func() bool
 // ClientWatcherStore provides a watcher with a resource store.
 type ClientWatcherStore[T generic.ResourceObject] interface {
 	// GetWatcher returns a watcher to receive resource changes.
-	GetWatcher(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+	GetWatcher(ctx context.Context, namespace string, opts metav1.ListOptions) (watch.Interface, error)
 
 	// HandleReceivedResource handles the client received resource events.
-	HandleReceivedResource(ctx context.Context, action types.ResourceAction, resource T) error
+	HandleReceivedResource(ctx context.Context, resource T) error
 
 	// Add will be called by resource client when adding resources. The implementation is based on the specific
 	// watcher store, in some case, it does not need to update a store, but just send a watch event.
@@ -49,13 +48,13 @@ type ClientWatcherStore[T generic.ResourceObject] interface {
 	Delete(resource runtime.Object) error
 
 	// List returns the resources from store for a given namespace with list options
-	List(namespace string, opts metav1.ListOptions) (*ResourceList[T], error)
+	List(ctx context.Context, namespace string, opts metav1.ListOptions) (*ResourceList[T], error)
 
 	// ListAll list all of the resources from store
-	ListAll() ([]T, error)
+	ListAll(ctx context.Context) ([]T, error)
 
 	// Get returns a resource from store with resource namespace and name
-	Get(namespace, name string) (T, bool, error)
+	Get(ctx context.Context, namespace, name string) (T, bool, error)
 
 	// HasInitiated marks the store has been initiated, A resync may be required after the store is initiated
 	// when building a resource client.

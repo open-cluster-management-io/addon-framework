@@ -3,9 +3,11 @@ package codec
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/bwmarrin/snowflake"
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	cloudeventstypes "github.com/cloudevents/sdk-go/v2/types"
+	"open-cluster-management.io/sdk-go/pkg/logging"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
@@ -67,6 +69,11 @@ func (c *ManifestBundleCodec) Encode(source string, eventType types.CloudEventsT
 	}
 
 	evt.SetExtension(types.ExtensionStatusHash, statusHash)
+
+	// Add log tracing extension
+	if err := logging.LogTracingFromObjectToEvent(work, &evt); err != nil {
+		return nil, err
+	}
 
 	// set the work's meta data to its cloud event
 	metaJson, err := json.Marshal(work.ObjectMeta)
@@ -136,9 +143,7 @@ func (c *ManifestBundleCodec) Decode(evt *cloudevents.Event) (*workv1.ManifestWo
 	metaObj.ResourceVersion = ""
 	// The resourceVersion in cloudevent actually sematically equals to generation, since it increments when
 	// spec changes
-	if metaObj.Generation == 0 {
-		metaObj.Generation = int64(resourceVersion)
-	}
+	metaObj.Generation = int64(resourceVersion)
 	if metaObj.Annotations == nil {
 		metaObj.Annotations = map[string]string{}
 	}
@@ -147,6 +152,11 @@ func (c *ManifestBundleCodec) Decode(evt *cloudevents.Event) (*workv1.ManifestWo
 		metaObj.Labels = map[string]string{}
 	}
 	metaObj.Labels[common.CloudEventsOriginalSourceLabelKey] = evt.Source()
+
+	// Add log tracing annotation
+	if err := logging.LogTracingFromEventToObject(evt, &metaObj); err != nil {
+		return nil, err
+	}
 
 	// Use the event's resource version as the current work's generation and resource version.
 	// In the event case, the event's resource version should correspond to its spec change.
