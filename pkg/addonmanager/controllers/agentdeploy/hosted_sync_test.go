@@ -466,6 +466,140 @@ func TestHostingReconcile(t *testing.T) {
 			},
 			validateWorkActions: addontesting.AssertNoActions,
 		},
+		{
+			name: "clear stale False HostingManifestApplied condition when WorkApplied is nil",
+			key:  "cluster1/test",
+			addon: []runtime.Object{addontesting.NewHostedModeAddonWithFinalizer("test", "cluster1", "cluster2",
+				registrationAppliedCondition,
+				metav1.Condition{
+					Type:    addonapiv1alpha1.ManagedClusterAddOnHostingManifestApplied,
+					Status:  metav1.ConditionFalse,
+					Reason:  addonapiv1alpha1.AddonManifestAppliedReasonWorkApplyFailed,
+					Message: "failed to build manifestwork: some old error",
+				},
+			)},
+			cluster: []runtime.Object{
+				addontesting.NewManagedCluster("cluster1"),
+				addontesting.NewManagedCluster("cluster2"),
+			},
+			testaddon: &testHostedAgent{name: "test", objects: []runtime.Object{
+				addontesting.NewHostingUnstructured("v1", "ConfigMap", "default", "test"),
+			}},
+			existingWork: []runtime.Object{func() *workapiv1.ManifestWork {
+				work := addontesting.NewManifestWork(
+					constants.DeployHostingWorkNamePrefix("cluster1", "test"),
+					"cluster2",
+					addontesting.NewHostingUnstructured("v1", "ConfigMap", "default", "test"),
+				)
+				work.SetLabels(map[string]string{
+					addonapiv1alpha1.AddonLabelKey:          "test",
+					addonapiv1alpha1.AddonNamespaceLabelKey: "cluster1",
+				})
+				pTrue := true
+				work.SetOwnerReferences([]metav1.OwnerReference{
+					{
+						APIVersion:         "addon.open-cluster-management.io/v1alpha1",
+						Kind:               "ManagedClusterAddOn",
+						Name:               "test",
+						UID:                "",
+						Controller:         &pTrue,
+						BlockOwnerDeletion: &pTrue,
+					},
+				})
+				// ManifestWork created but work-agent hasn't reported status yet (WorkApplied is nil)
+				work.Status.Conditions = []metav1.Condition{}
+				return work
+			}()},
+			validateWorkActions: func(t *testing.T, actions []clienttesting.Action) {
+				// May patch work to update ownerReferences
+				if len(actions) > 0 {
+					addontesting.AssertActions(t, actions, "patch")
+				}
+			},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch")
+				assertHostingClusterValid(t, actions[0])
+
+				patch := actions[0].(clienttesting.PatchActionImpl).Patch
+				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				err := json.Unmarshal(patch, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
+				// The stale False condition should be removed
+				manifestAppliedCond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHostingManifestApplied)
+				if manifestAppliedCond != nil {
+					t.Errorf("Expected HostingManifestApplied condition to be removed, but got: %v", manifestAppliedCond)
+				}
+			},
+		},
+		{
+			name: "keep True HostingManifestApplied condition when WorkApplied is nil",
+			key:  "cluster1/test",
+			addon: []runtime.Object{addontesting.NewHostedModeAddonWithFinalizer("test", "cluster1", "cluster2",
+				registrationAppliedCondition,
+				metav1.Condition{
+					Type:    addonapiv1alpha1.ManagedClusterAddOnHostingManifestApplied,
+					Status:  metav1.ConditionTrue,
+					Reason:  addonapiv1alpha1.AddonManifestAppliedReasonManifestsApplied,
+					Message: "manifests of addon are applied successfully",
+				},
+			)},
+			cluster: []runtime.Object{
+				addontesting.NewManagedCluster("cluster1"),
+				addontesting.NewManagedCluster("cluster2"),
+			},
+			testaddon: &testHostedAgent{name: "test", objects: []runtime.Object{
+				addontesting.NewHostingUnstructured("v1", "ConfigMap", "default", "test"),
+			}},
+			existingWork: []runtime.Object{func() *workapiv1.ManifestWork {
+				work := addontesting.NewManifestWork(
+					constants.DeployHostingWorkNamePrefix("cluster1", "test"),
+					"cluster2",
+					addontesting.NewHostingUnstructured("v1", "ConfigMap", "default", "test"),
+				)
+				work.SetLabels(map[string]string{
+					addonapiv1alpha1.AddonLabelKey:          "test",
+					addonapiv1alpha1.AddonNamespaceLabelKey: "cluster1",
+				})
+				pTrue := true
+				work.SetOwnerReferences([]metav1.OwnerReference{
+					{
+						APIVersion:         "addon.open-cluster-management.io/v1alpha1",
+						Kind:               "ManagedClusterAddOn",
+						Name:               "test",
+						UID:                "",
+						Controller:         &pTrue,
+						BlockOwnerDeletion: &pTrue,
+					},
+				})
+				// ManifestWork exists but work-agent hasn't reported new status yet
+				work.Status.Conditions = []metav1.Condition{}
+				return work
+			}()},
+			validateWorkActions: func(t *testing.T, actions []clienttesting.Action) {
+				// May patch work to update ownerReferences
+				if len(actions) > 0 {
+					addontesting.AssertActions(t, actions, "patch")
+				}
+			},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch")
+				assertHostingClusterValid(t, actions[0])
+
+				patch := actions[0].(clienttesting.PatchActionImpl).Patch
+				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				err := json.Unmarshal(patch, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
+				// The True condition should remain unchanged
+				manifestAppliedCond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHostingManifestApplied)
+				if manifestAppliedCond == nil || manifestAppliedCond.Status != metav1.ConditionTrue {
+					t.Errorf("Expected HostingManifestApplied condition to remain True, but got: %v", manifestAppliedCond)
+				}
+			},
+		},
 	}
 
 	for _, c := range cases {
