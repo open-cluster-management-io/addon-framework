@@ -56,6 +56,12 @@ verify: verify-gocilint
 deploy-ocm:
 	examples/deploy/ocm/install.sh
 
+deploy-ocm-csr-token:
+	examples/deploy/ocm-token/install-csr-token.sh
+
+deploy-ocm-grpc-token:
+	examples/deploy/ocm-token/install-grpc-token.sh
+
 deploy-ocm-cloudevents:
 	examples/deploy/ocm-cloudevents/install.sh
 
@@ -142,6 +148,15 @@ build-e2e:
 
 test-e2e: build-e2e deploy-ocm deploy-helloworld deploy-helloworld-helm
 	./e2e.test -test.v -ginkgo.v
+
+build-e2e-token:
+	go test -c ./test/e2etoken
+
+test-e2e-csr-token: build-e2e-token deploy-ocm-csr-token deploy-helloworld deploy-helloworld-helm
+	./e2etoken.test -test.v -ginkgo.v
+
+test-e2e-grpc-token: build-e2e-token deploy-ocm-grpc-token deploy-helloworld deploy-helloworld-helm
+	./e2etoken.test -test.v -ginkgo.v
 
 # TODO: enable cloudevent e2e after fix the mqtt image pull failure issue
 #test-e2e-cloudevents: build-e2e deploy-ocm-cloudevents deploy-helloworld-cloudevents

@@ -125,6 +125,18 @@ func createManagedClusterAddOnwithOwnerRefs(namespace string, addon *addonapiv1a
 	}
 }
 
+func setKubeClientDriver(namespace, addonName, driver string) {
+	gomega.Eventually(func() error {
+		addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(namespace).Get(context.Background(), addonName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		addon.Status.KubeClientDriver = driver
+		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(namespace).UpdateStatus(context.Background(), addon, metav1.UpdateOptions{})
+		return err
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+}
+
 func updateManagedClusterAddOnStatus(ctx context.Context, new *addonapiv1alpha1.ManagedClusterAddOn) {
 	gomega.Eventually(func() bool {
 		old, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(new.Namespace).Get(context.Background(), new.Name, metav1.GetOptions{})

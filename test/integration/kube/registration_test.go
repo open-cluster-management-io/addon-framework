@@ -69,6 +69,16 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 		testAddonImpl.registrations[managedClusterName] = []addonapiv1alpha1.RegistrationConfig{
 			{
 				SignerName: certificatesv1.KubeAPIServerClientSignerName,
+				Subject: addonapiv1alpha1.Subject{
+					User: fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s:agent:%s",
+						managedClusterName, testAddonImpl.name, testAddonImpl.name),
+					Groups: []string{
+						fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s",
+							managedClusterName, testAddonImpl.name),
+						fmt.Sprintf("system:open-cluster-management:addon:%s", testAddonImpl.name),
+						"system:authenticated",
+					},
+				},
 			},
 		}
 
@@ -81,6 +91,9 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 			},
 		}
 		createManagedClusterAddOnwithOwnerRefs(managedClusterName, addon, cma)
+
+		// Set kubeClientDriver to "csr" for CSR-based authentication
+		setKubeClientDriver(managedClusterName, testAddonImpl.name, "csr")
 
 		gomega.Eventually(func() error {
 			actual, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testAddonImpl.name, metav1.GetOptions{})
@@ -98,6 +111,16 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 		testAddonImpl.registrations[managedClusterName] = []addonapiv1alpha1.RegistrationConfig{
 			{
 				SignerName: certificatesv1.KubeAPIServerClientSignerName,
+				Subject: addonapiv1alpha1.Subject{
+					User: fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s:agent:%s",
+						managedClusterName, testAddonImpl.name, testAddonImpl.name),
+					Groups: []string{
+						fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s",
+							managedClusterName, testAddonImpl.name),
+						fmt.Sprintf("system:open-cluster-management:addon:%s", testAddonImpl.name),
+						"system:authenticated",
+					},
+				},
 			},
 			{
 				SignerName: "open-cluster-management.io/test-signer",
@@ -114,6 +137,9 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 		}
 		createManagedClusterAddOnwithOwnerRefs(managedClusterName, addon, cma)
 
+		// Set kubeClientDriver to "csr" for CSR-based authentication
+		setKubeClientDriver(managedClusterName, testAddonImpl.name, "csr")
+
 		gomega.Eventually(func() error {
 			actual, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testAddonImpl.name, metav1.GetOptions{})
 			if err != nil {
@@ -125,7 +151,8 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 						SignerName: certificatesv1.KubeAPIServerClientSignerName,
 					},
 				},
-				Conditions: []metav1.Condition{},
+				KubeClientDriver: "csr",
+				Conditions:       []metav1.Condition{},
 			}
 			_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).UpdateStatus(context.Background(), actual, metav1.UpdateOptions{})
 			return err
@@ -137,7 +164,7 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 				return err
 			}
 			if !apiequality.Semantic.DeepEqual(testAddonImpl.registrations[managedClusterName], actual.Status.Registrations) {
-				return fmt.Errorf("Exected registration is not correct, actual: %v", actual.Status.Registrations)
+				return fmt.Errorf("Expected registration is not correct, actual: %v", actual.Status.Registrations)
 			}
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())

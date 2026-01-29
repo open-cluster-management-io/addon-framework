@@ -81,6 +81,9 @@ var _ = ginkgo.Describe("ClusterManagementAddon", func() {
 		}
 		createManagedClusterAddOnwithOwnerRefs(managedClusterName, addon, cma)
 
+		// Set kubeClientDriver to "csr" for CSR-based authentication
+		setKubeClientDriver(managedClusterName, testAddonImpl.name, "csr")
+
 		gomega.Eventually(func() error {
 			actual, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testAddonImpl.name, metav1.GetOptions{})
 			if err != nil {
