@@ -274,7 +274,6 @@ func DefaultGroups(clusterName, addonName string) []string {
 	return []string{
 		fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s", clusterName, addonName),
 		fmt.Sprintf("system:open-cluster-management:addon:%s", addonName),
-		"system:authenticated",
 	}
 }
 

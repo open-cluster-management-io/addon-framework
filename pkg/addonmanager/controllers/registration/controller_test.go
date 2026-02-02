@@ -747,7 +747,7 @@ func TestBuildRegistrationConfigs(t *testing.T) {
 					SignerName: certificatesv1.KubeAPIServerClientSignerName,
 					Subject: addonapiv1alpha1.Subject{
 						User:   "system:open-cluster-management:cluster:cluster1:addon:test-addon:agent:test-addon",
-						Groups: []string{"system:open-cluster-management:cluster:cluster1:addon:test-addon", "system:open-cluster-management:addon:test-addon", "system:authenticated"},
+						Groups: []string{"system:open-cluster-management:cluster:cluster1:addon:test-addon", "system:open-cluster-management:addon:test-addon"},
 					}, // default subject set
 				},
 			},
