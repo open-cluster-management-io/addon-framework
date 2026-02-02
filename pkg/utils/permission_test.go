@@ -109,7 +109,7 @@ func TestBindKubeClientClusterRole_PendingError(t *testing.T) {
 							SignerName: certificatesv1.KubeAPIServerClientSignerName,
 							Subject: v1alpha1.Subject{
 								User:   "system:serviceaccount:test:test-sa",
-								Groups: []string{"system:authenticated"},
+								Groups: []string{"system:open-cluster-management:addon:test-addon"},
 							},
 						},
 					},
@@ -193,7 +193,7 @@ func TestBindKubeClientRole_PendingError(t *testing.T) {
 							SignerName: certificatesv1.KubeAPIServerClientSignerName,
 							Subject: v1alpha1.Subject{
 								User:   "system:serviceaccount:test:test-sa",
-								Groups: []string{"system:authenticated"},
+								Groups: []string{"system:open-cluster-management:addon:test-addon"},
 							},
 						},
 					},
@@ -228,6 +228,109 @@ func TestBindKubeClientRole_PendingError(t *testing.T) {
 				assert.NotNil(t, binding)
 				assert.Len(t, binding.Subjects, 2) // user + group
 			}
+		})
+	}
+}
+
+func TestBuildSubjectsFromRegistration_FilterSystemAuthenticated(t *testing.T) {
+	tests := []struct {
+		name             string
+		addon            *v1alpha1.ManagedClusterAddOn
+		expectedCount    int
+		shouldContain    string
+		shouldNotContain string
+	}{
+		{
+			name: "filters out system:authenticated group",
+			addon: &v1alpha1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-addon", Namespace: "test-cluster"},
+				Status: v1alpha1.ManagedClusterAddOnStatus{
+					Registrations: []v1alpha1.RegistrationConfig{
+						{
+							SignerName: certificatesv1.KubeAPIServerClientSignerName,
+							Subject: v1alpha1.Subject{
+								User: "system:serviceaccount:test:test-sa",
+								Groups: []string{
+									"system:open-cluster-management:addon:test-addon",
+									"system:authenticated", // This should be filtered out
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedCount:    2, // user + 1 group (system:authenticated filtered out)
+			shouldContain:    "system:open-cluster-management:addon:test-addon",
+			shouldNotContain: "system:authenticated",
+		},
+		{
+			name: "keeps other groups when filtering system:authenticated",
+			addon: &v1alpha1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-addon", Namespace: "test-cluster"},
+				Status: v1alpha1.ManagedClusterAddOnStatus{
+					Registrations: []v1alpha1.RegistrationConfig{
+						{
+							SignerName: certificatesv1.KubeAPIServerClientSignerName,
+							Subject: v1alpha1.Subject{
+								User: "system:serviceaccount:test:test-sa",
+								Groups: []string{
+									"system:open-cluster-management:cluster:cluster1:addon:test-addon",
+									"system:open-cluster-management:addon:test-addon",
+									"system:authenticated", // This should be filtered out
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedCount:    3, // user + 2 groups (system:authenticated filtered out)
+			shouldContain:    "system:open-cluster-management:addon:test-addon",
+			shouldNotContain: "system:authenticated",
+		},
+		{
+			name: "works when system:authenticated is not present",
+			addon: &v1alpha1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-addon", Namespace: "test-cluster"},
+				Status: v1alpha1.ManagedClusterAddOnStatus{
+					Registrations: []v1alpha1.RegistrationConfig{
+						{
+							SignerName: certificatesv1.KubeAPIServerClientSignerName,
+							Subject: v1alpha1.Subject{
+								User: "system:serviceaccount:test:test-sa",
+								Groups: []string{
+									"system:open-cluster-management:addon:test-addon",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedCount:    2, // user + 1 group
+			shouldContain:    "system:open-cluster-management:addon:test-addon",
+			shouldNotContain: "system:authenticated",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			subjects := BuildSubjectsFromRegistration(tt.addon, certificatesv1.KubeAPIServerClientSignerName)
+
+			assert.Len(t, subjects, tt.expectedCount, "unexpected number of subjects")
+
+			// Verify the expected group is present
+			foundExpected := false
+			foundFiltered := false
+			for _, subject := range subjects {
+				if subject.Kind == rbacv1.GroupKind && subject.Name == tt.shouldContain {
+					foundExpected = true
+				}
+				if subject.Kind == rbacv1.GroupKind && subject.Name == tt.shouldNotContain {
+					foundFiltered = true
+				}
+			}
+
+			assert.True(t, foundExpected, "expected group %s not found in subjects", tt.shouldContain)
+			assert.False(t, foundFiltered, "group %s should have been filtered out but was found", tt.shouldNotContain)
 		})
 	}
 }
