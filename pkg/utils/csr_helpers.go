@@ -178,11 +178,11 @@ func DefaultCSRApprover(agentName string) agent.CSRApproveFunc {
 		}
 
 		if strings.HasPrefix(username, "system:open-cluster-management:"+cluster.Name) {
-			klog.Info("CSR approved")
+			klog.Infof("CSR %q approved for cluster %q", csr.Name, cluster.Name)
 			return true
 		}
 
-		klog.Info("CSR not approved due to illegal requester", "requester", csr.Spec.Username)
+		klog.Infof("CSR %q for cluster %q not approved due to illegal requester %q", csr.Name, cluster.Name, csr.Spec.Username)
 		return false
 	}
 }
