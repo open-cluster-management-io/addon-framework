@@ -11,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"open-cluster-management.io/addon-framework/pkg/agent"
-	"open-cluster-management.io/api/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	v1 "open-cluster-management.io/api/cluster/v1"
 )
 
@@ -19,7 +19,7 @@ func TestPermissionBuilder(t *testing.T) {
 	testCluster := &v1.ManagedCluster{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-cluster"},
 	}
-	testAddon := &v1alpha1.ManagedClusterAddOn{
+	testAddon := &addonv1beta1.ManagedClusterAddOn{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-addon"},
 	}
 	creatingClusterRole1 := &rbacv1.ClusterRole{
@@ -71,28 +71,28 @@ func TestBindKubeClientClusterRole_PendingError(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		addon       *v1alpha1.ManagedClusterAddOn
+		addon       *addonv1beta1.ManagedClusterAddOn
 		expectError bool
 	}{
 		{
 			name: "no registrations - returns pending error",
-			addon: &v1alpha1.ManagedClusterAddOn{
+			addon: &addonv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-addon", Namespace: "test-cluster"},
-				Status: v1alpha1.ManagedClusterAddOnStatus{
-					Registrations: []v1alpha1.RegistrationConfig{},
+				Status: addonv1beta1.ManagedClusterAddOnStatus{
+					Registrations: []addonv1beta1.RegistrationConfig{},
 				},
 			},
 			expectError: true,
 		},
 		{
 			name: "empty subject - returns pending error",
-			addon: &v1alpha1.ManagedClusterAddOn{
+			addon: &addonv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-addon", Namespace: "test-cluster"},
-				Status: v1alpha1.ManagedClusterAddOnStatus{
-					Registrations: []v1alpha1.RegistrationConfig{
+				Status: addonv1beta1.ManagedClusterAddOnStatus{
+					Registrations: []addonv1beta1.RegistrationConfig{
 						{
 							SignerName: certificatesv1.KubeAPIServerClientSignerName,
-							Subject:    v1alpha1.Subject{}, // empty subject
+							Subject:    addonv1beta1.Subject{}, // empty subject
 						},
 					},
 				},
@@ -101,13 +101,13 @@ func TestBindKubeClientClusterRole_PendingError(t *testing.T) {
 		},
 		{
 			name: "valid subject - no error",
-			addon: &v1alpha1.ManagedClusterAddOn{
+			addon: &addonv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-addon", Namespace: "test-cluster"},
-				Status: v1alpha1.ManagedClusterAddOnStatus{
-					Registrations: []v1alpha1.RegistrationConfig{
+				Status: addonv1beta1.ManagedClusterAddOnStatus{
+					Registrations: []addonv1beta1.RegistrationConfig{
 						{
 							SignerName: certificatesv1.KubeAPIServerClientSignerName,
-							Subject: v1alpha1.Subject{
+							Subject: addonv1beta1.Subject{
 								User:   "system:serviceaccount:test:test-sa",
 								Groups: []string{"system:open-cluster-management:addon:test-addon"},
 							},
@@ -155,28 +155,28 @@ func TestBindKubeClientRole_PendingError(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		addon       *v1alpha1.ManagedClusterAddOn
+		addon       *addonv1beta1.ManagedClusterAddOn
 		expectError bool
 	}{
 		{
 			name: "no registrations - returns pending error",
-			addon: &v1alpha1.ManagedClusterAddOn{
+			addon: &addonv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-addon", Namespace: "test-cluster"},
-				Status: v1alpha1.ManagedClusterAddOnStatus{
-					Registrations: []v1alpha1.RegistrationConfig{},
+				Status: addonv1beta1.ManagedClusterAddOnStatus{
+					Registrations: []addonv1beta1.RegistrationConfig{},
 				},
 			},
 			expectError: true,
 		},
 		{
 			name: "empty subject - returns pending error",
-			addon: &v1alpha1.ManagedClusterAddOn{
+			addon: &addonv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-addon", Namespace: "test-cluster"},
-				Status: v1alpha1.ManagedClusterAddOnStatus{
-					Registrations: []v1alpha1.RegistrationConfig{
+				Status: addonv1beta1.ManagedClusterAddOnStatus{
+					Registrations: []addonv1beta1.RegistrationConfig{
 						{
 							SignerName: certificatesv1.KubeAPIServerClientSignerName,
-							Subject:    v1alpha1.Subject{}, // empty subject
+							Subject:    addonv1beta1.Subject{}, // empty subject
 						},
 					},
 				},
@@ -185,13 +185,13 @@ func TestBindKubeClientRole_PendingError(t *testing.T) {
 		},
 		{
 			name: "valid subject - no error",
-			addon: &v1alpha1.ManagedClusterAddOn{
+			addon: &addonv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-addon", Namespace: "test-cluster"},
-				Status: v1alpha1.ManagedClusterAddOnStatus{
-					Registrations: []v1alpha1.RegistrationConfig{
+				Status: addonv1beta1.ManagedClusterAddOnStatus{
+					Registrations: []addonv1beta1.RegistrationConfig{
 						{
 							SignerName: certificatesv1.KubeAPIServerClientSignerName,
-							Subject: v1alpha1.Subject{
+							Subject: addonv1beta1.Subject{
 								User:   "system:serviceaccount:test:test-sa",
 								Groups: []string{"system:open-cluster-management:addon:test-addon"},
 							},
@@ -235,20 +235,20 @@ func TestBindKubeClientRole_PendingError(t *testing.T) {
 func TestBuildSubjectsFromRegistration_FilterSystemAuthenticated(t *testing.T) {
 	tests := []struct {
 		name             string
-		addon            *v1alpha1.ManagedClusterAddOn
+		addon            *addonv1beta1.ManagedClusterAddOn
 		expectedCount    int
 		shouldContain    string
 		shouldNotContain string
 	}{
 		{
 			name: "filters out system:authenticated group",
-			addon: &v1alpha1.ManagedClusterAddOn{
+			addon: &addonv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-addon", Namespace: "test-cluster"},
-				Status: v1alpha1.ManagedClusterAddOnStatus{
-					Registrations: []v1alpha1.RegistrationConfig{
+				Status: addonv1beta1.ManagedClusterAddOnStatus{
+					Registrations: []addonv1beta1.RegistrationConfig{
 						{
 							SignerName: certificatesv1.KubeAPIServerClientSignerName,
-							Subject: v1alpha1.Subject{
+							Subject: addonv1beta1.Subject{
 								User: "system:serviceaccount:test:test-sa",
 								Groups: []string{
 									"system:open-cluster-management:addon:test-addon",
@@ -265,13 +265,13 @@ func TestBuildSubjectsFromRegistration_FilterSystemAuthenticated(t *testing.T) {
 		},
 		{
 			name: "keeps other groups when filtering system:authenticated",
-			addon: &v1alpha1.ManagedClusterAddOn{
+			addon: &addonv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-addon", Namespace: "test-cluster"},
-				Status: v1alpha1.ManagedClusterAddOnStatus{
-					Registrations: []v1alpha1.RegistrationConfig{
+				Status: addonv1beta1.ManagedClusterAddOnStatus{
+					Registrations: []addonv1beta1.RegistrationConfig{
 						{
 							SignerName: certificatesv1.KubeAPIServerClientSignerName,
-							Subject: v1alpha1.Subject{
+							Subject: addonv1beta1.Subject{
 								User: "system:serviceaccount:test:test-sa",
 								Groups: []string{
 									"system:open-cluster-management:cluster:cluster1:addon:test-addon",
@@ -289,13 +289,13 @@ func TestBuildSubjectsFromRegistration_FilterSystemAuthenticated(t *testing.T) {
 		},
 		{
 			name: "works when system:authenticated is not present",
-			addon: &v1alpha1.ManagedClusterAddOn{
+			addon: &addonv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-addon", Namespace: "test-cluster"},
-				Status: v1alpha1.ManagedClusterAddOnStatus{
-					Registrations: []v1alpha1.RegistrationConfig{
+				Status: addonv1beta1.ManagedClusterAddOnStatus{
+					Registrations: []addonv1beta1.RegistrationConfig{
 						{
 							SignerName: certificatesv1.KubeAPIServerClientSignerName,
-							Subject: v1alpha1.Subject{
+							Subject: addonv1beta1.Subject{
 								User: "system:serviceaccount:test:test-sa",
 								Groups: []string{
 									"system:open-cluster-management:addon:test-addon",

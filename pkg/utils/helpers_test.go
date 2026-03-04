@@ -7,44 +7,44 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
 func TestMergeRelatedObject(t *testing.T) {
 	cases := []struct {
 		name           string
-		existingObject []addonapiv1alpha1.ObjectReference
-		obj            addonapiv1alpha1.ObjectReference
+		existingObject []addonapiv1beta1.ObjectReference
+		obj            addonapiv1beta1.ObjectReference
 		modified       bool
-		expected       []addonapiv1alpha1.ObjectReference
+		expected       []addonapiv1beta1.ObjectReference
 	}{
 		{
 			name:           "existing is nil",
 			existingObject: nil,
 			obj:            relatedObject("test", "testns", "resources"),
 			modified:       true,
-			expected:       []addonapiv1alpha1.ObjectReference{relatedObject("test", "testns", "resources")},
+			expected:       []addonapiv1beta1.ObjectReference{relatedObject("test", "testns", "resources")},
 		},
 		{
 			name:           "append to existing",
-			existingObject: []addonapiv1alpha1.ObjectReference{relatedObject("test", "testns", "resources")},
+			existingObject: []addonapiv1beta1.ObjectReference{relatedObject("test", "testns", "resources")},
 			obj:            relatedObject("test", "testns", "resources1"),
 			modified:       true,
-			expected: []addonapiv1alpha1.ObjectReference{
+			expected: []addonapiv1beta1.ObjectReference{
 				relatedObject("test", "testns", "resources"),
 				relatedObject("test", "testns", "resources1"),
 			},
 		},
 		{
 			name: "no update",
-			existingObject: []addonapiv1alpha1.ObjectReference{
+			existingObject: []addonapiv1beta1.ObjectReference{
 				relatedObject("test", "testns", "resources"),
 				relatedObject("test", "testns", "resources1"),
 			},
 			obj:      relatedObject("test", "testns", "resources1"),
 			modified: false,
-			expected: []addonapiv1alpha1.ObjectReference{
+			expected: []addonapiv1beta1.ObjectReference{
 				relatedObject("test", "testns", "resources"),
 				relatedObject("test", "testns", "resources1"),
 			},
@@ -67,8 +67,8 @@ func TestMergeRelatedObject(t *testing.T) {
 	}
 }
 
-func relatedObject(name, namespace, resource string) addonapiv1alpha1.ObjectReference {
-	return addonapiv1alpha1.ObjectReference{
+func relatedObject(name, namespace, resource string) addonapiv1beta1.ObjectReference {
+	return addonapiv1beta1.ObjectReference{
 		Name:      name,
 		Namespace: namespace,
 		Resource:  resource,

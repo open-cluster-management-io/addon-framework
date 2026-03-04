@@ -8,7 +8,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
@@ -19,19 +19,19 @@ import (
 func TestConfigsToAnnotations(t *testing.T) {
 	cases := []struct {
 		name              string
-		configReference   []addonapiv1alpha1.ConfigReference
+		configReference   []addonapiv1beta1.ConfigReference
 		expectAnnotations map[string]string
 	}{
 		{
 			name: "generate annotaions",
-			configReference: []addonapiv1alpha1.ConfigReference{
+			configReference: []addonapiv1beta1.ConfigReference{
 				{
-					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 						Group:    "addon.open-cluster-management.io",
 						Resource: "addondeploymentconfigs",
 					},
-					DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-						ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
 							Name:      "test",
 							Namespace: "open-cluster-management",
 						},
@@ -39,11 +39,11 @@ func TestConfigsToAnnotations(t *testing.T) {
 					},
 				},
 				{
-					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 						Resource: "addonhubconfigs",
 					},
-					DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-						ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
 							Name: "test",
 						},
 						SpecHash: "hash2",
@@ -55,14 +55,14 @@ func TestConfigsToAnnotations(t *testing.T) {
 		},
 		{
 			name:              "generate annotaions without configReference",
-			configReference:   []addonapiv1alpha1.ConfigReference{},
+			configReference:   []addonapiv1beta1.ConfigReference{},
 			expectAnnotations: nil,
 		},
 		{
 			name: "generate annotaions without DesiredConfig",
-			configReference: []addonapiv1alpha1.ConfigReference{
+			configReference: []addonapiv1beta1.ConfigReference{
 				{
-					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 						Group:    "addon.open-cluster-management.io",
 						Resource: "addondeploymentconfigs",
 					},
@@ -102,19 +102,19 @@ func TestAddonRemoveFinalizer(t *testing.T) {
 		},
 		{
 			name:               "remove deprecated",
-			existingFinalizers: []string{addonapiv1alpha1.AddonDeprecatedHostingPreDeleteHookFinalizer, "test"},
+			existingFinalizers: []string{addonapiv1beta1.AddonDeprecatedHostingPreDeleteHookFinalizer, "test"},
 			finalizerToRemove:  "test1",
 			expectedFinalizers: []string{"test"},
 		},
 		{
 			name:               "remove deprecated and matched",
-			existingFinalizers: []string{addonapiv1alpha1.AddonDeprecatedHostingPreDeleteHookFinalizer, "test"},
+			existingFinalizers: []string{addonapiv1beta1.AddonDeprecatedHostingPreDeleteHookFinalizer, "test"},
 			finalizerToRemove:  "test",
 		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			addon := &addonapiv1alpha1.ManagedClusterAddOn{
+			addon := &addonapiv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{Finalizers: c.existingFinalizers},
 			}
 			addonRemoveFinalizer(addon, c.finalizerToRemove)
@@ -143,13 +143,13 @@ func TestAddonAddFinalizer(t *testing.T) {
 		},
 		{
 			name:               "remove deprecated",
-			existingFinalizers: []string{addonapiv1alpha1.AddonDeprecatedHostingPreDeleteHookFinalizer},
+			existingFinalizers: []string{addonapiv1beta1.AddonDeprecatedHostingPreDeleteHookFinalizer},
 			expectedFinalizers: []string{"test"},
 		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			addon := &addonapiv1alpha1.ManagedClusterAddOn{
+			addon := &addonapiv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{Finalizers: c.existingFinalizers},
 			}
 			addonAddFinalizer(addon, finalizerToAdd)
