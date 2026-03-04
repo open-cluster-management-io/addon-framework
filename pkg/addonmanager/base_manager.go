@@ -9,7 +9,7 @@ import (
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addonv1beta1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
@@ -133,7 +133,7 @@ func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 		return err
 	}
 
-	addonClient, err := addonv1alpha1client.NewForConfig(a.config)
+	addonClient, err := addonv1beta1client.NewForConfig(a.config)
 	if err != nil {
 		return err
 	}

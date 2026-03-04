@@ -4,13 +4,13 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 )
 
 func TestAllowAllAddOns(t *testing.T) {
 	tests := []struct {
 		name     string
-		mca      *addonapiv1alpha1.ManagedClusterAddOn
+		mca      *addonapiv1beta1.ManagedClusterAddOn
 		expected bool
 	}{
 		{
@@ -20,7 +20,7 @@ func TestAllowAllAddOns(t *testing.T) {
 		},
 		{
 			name: "empty addon",
-			mca: &addonapiv1alpha1.ManagedClusterAddOn{
+			mca: &addonapiv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-addon",
 					Namespace: "test-cluster",
@@ -30,19 +30,19 @@ func TestAllowAllAddOns(t *testing.T) {
 		},
 		{
 			name: "addon with config references",
-			mca: &addonapiv1alpha1.ManagedClusterAddOn{
+			mca: &addonapiv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-addon",
 					Namespace: "test-cluster",
 				},
-				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
-					ConfigReferences: []addonapiv1alpha1.ConfigReference{
+				Status: addonapiv1beta1.ManagedClusterAddOnStatus{
+					ConfigReferences: []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    "addon.open-cluster-management.io",
 								Resource: "addontemplates",
 							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							ConfigReferent: addonapiv1beta1.ConfigReferent{
 								Name: "test-template",
 							},
 						},
@@ -66,7 +66,7 @@ func TestAllowAllAddOns(t *testing.T) {
 func TestFilterTemplateBasedAddOns(t *testing.T) {
 	tests := []struct {
 		name     string
-		mca      *addonapiv1alpha1.ManagedClusterAddOn
+		mca      *addonapiv1beta1.ManagedClusterAddOn
 		expected bool
 	}{
 		{
@@ -76,7 +76,7 @@ func TestFilterTemplateBasedAddOns(t *testing.T) {
 		},
 		{
 			name: "addon without config references",
-			mca: &addonapiv1alpha1.ManagedClusterAddOn{
+			mca: &addonapiv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-addon",
 					Namespace: "test-cluster",
@@ -86,32 +86,32 @@ func TestFilterTemplateBasedAddOns(t *testing.T) {
 		},
 		{
 			name: "addon with empty config references",
-			mca: &addonapiv1alpha1.ManagedClusterAddOn{
+			mca: &addonapiv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-addon",
 					Namespace: "test-cluster",
 				},
-				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
-					ConfigReferences: []addonapiv1alpha1.ConfigReference{},
+				Status: addonapiv1beta1.ManagedClusterAddOnStatus{
+					ConfigReferences: []addonapiv1beta1.ConfigReference{},
 				},
 			},
 			expected: false,
 		},
 		{
 			name: "addon with non-template config reference",
-			mca: &addonapiv1alpha1.ManagedClusterAddOn{
+			mca: &addonapiv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-addon",
 					Namespace: "test-cluster",
 				},
-				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
-					ConfigReferences: []addonapiv1alpha1.ConfigReference{
+				Status: addonapiv1beta1.ManagedClusterAddOnStatus{
+					ConfigReferences: []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    "addon.open-cluster-management.io",
 								Resource: "addondeploymentconfigs",
 							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							ConfigReferent: addonapiv1beta1.ConfigReferent{
 								Name: "test-config",
 							},
 						},
@@ -122,22 +122,22 @@ func TestFilterTemplateBasedAddOns(t *testing.T) {
 		},
 		{
 			name: "addon with template config reference",
-			mca: &addonapiv1alpha1.ManagedClusterAddOn{
+			mca: &addonapiv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-addon",
 					Namespace: "test-cluster",
 				},
-				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
-					ConfigReferences: []addonapiv1alpha1.ConfigReference{
+				Status: addonapiv1beta1.ManagedClusterAddOnStatus{
+					ConfigReferences: []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    "addon.open-cluster-management.io",
 								Resource: "addontemplates",
 							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							ConfigReferent: addonapiv1beta1.ConfigReferent{
 								Name: "test-template",
 							},
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
 								SpecHash: "test-hash",
 							},
 						},
@@ -148,31 +148,31 @@ func TestFilterTemplateBasedAddOns(t *testing.T) {
 		},
 		{
 			name: "addon with mixed config references including template",
-			mca: &addonapiv1alpha1.ManagedClusterAddOn{
+			mca: &addonapiv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-addon",
 					Namespace: "test-cluster",
 				},
-				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
-					ConfigReferences: []addonapiv1alpha1.ConfigReference{
+				Status: addonapiv1beta1.ManagedClusterAddOnStatus{
+					ConfigReferences: []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    "addon.open-cluster-management.io",
 								Resource: "addondeploymentconfigs",
 							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							ConfigReferent: addonapiv1beta1.ConfigReferent{
 								Name: "test-config",
 							},
 						},
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    "addon.open-cluster-management.io",
 								Resource: "addontemplates",
 							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							ConfigReferent: addonapiv1beta1.ConfigReferent{
 								Name: "test-template",
 							},
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
 								SpecHash: "test-hash",
 							},
 						},
@@ -183,19 +183,19 @@ func TestFilterTemplateBasedAddOns(t *testing.T) {
 		},
 		{
 			name: "addon with template reference but different group",
-			mca: &addonapiv1alpha1.ManagedClusterAddOn{
+			mca: &addonapiv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-addon",
 					Namespace: "test-cluster",
 				},
-				Status: addonapiv1alpha1.ManagedClusterAddOnStatus{
-					ConfigReferences: []addonapiv1alpha1.ConfigReference{
+				Status: addonapiv1beta1.ManagedClusterAddOnStatus{
+					ConfigReferences: []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    "other.group",
 								Resource: "addontemplates",
 							},
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							ConfigReferent: addonapiv1beta1.ConfigReferent{
 								Name: "test-template",
 							},
 						},
