@@ -13,7 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/utils"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
@@ -33,16 +33,16 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 		{
 			name: "no addon Deployment configs",
 			addOnObjs: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1")
-					addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+					addon.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    "config.test",
 								Resource: "testconfigs",
 							},
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
 									Namespace: "cluster1",
 									Name:      "testConfig",
 								},
@@ -59,16 +59,16 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 			name:          "to addon node placement",
 			toValuesFuncs: []AddOnDeploymentConfigToValuesFunc{ToAddOnNodePlacementValues},
 			addOnObjs: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1")
-					addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+					addon.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    "addon.open-cluster-management.io",
 								Resource: "addondeploymentconfigs",
 							},
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
 									Namespace: "cluster1",
 									Name:      "config",
 								},
@@ -78,13 +78,13 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 					}
 					return addon
 				}(),
-				&addonapiv1alpha1.AddOnDeploymentConfig{
+				&addonapiv1beta1.AddOnDeploymentConfig{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "config",
 						Namespace: "cluster1",
 					},
-					Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-						NodePlacement: &addonapiv1alpha1.NodePlacement{
+					Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+						NodePlacement: &addonapiv1beta1.NodePlacement{
 							NodeSelector: nodeSelector,
 							Tolerations:  tolerations,
 						},
@@ -102,16 +102,16 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 			name:          "multiple toValuesFuncs",
 			toValuesFuncs: []AddOnDeploymentConfigToValuesFunc{ToAddOnNodePlacementValues, ToAddOnCustomizedVariableValues},
 			addOnObjs: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1")
-					addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+					addon.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    "addon.open-cluster-management.io",
 								Resource: "addondeploymentconfigs",
 							},
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
 									Namespace: "cluster1",
 									Name:      "config",
 								},
@@ -121,17 +121,17 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 					}
 					return addon
 				}(),
-				&addonapiv1alpha1.AddOnDeploymentConfig{
+				&addonapiv1beta1.AddOnDeploymentConfig{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "config",
 						Namespace: "cluster1",
 					},
-					Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-						NodePlacement: &addonapiv1alpha1.NodePlacement{
+					Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+						NodePlacement: &addonapiv1beta1.NodePlacement{
 							NodeSelector: nodeSelector,
 							Tolerations:  tolerations,
 						},
-						CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+						CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 							{
 								Name:  "managedKubeConfigSecret",
 								Value: "external-managed-kubeconfig",
@@ -152,16 +152,16 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 			name:          "to addon proxy config",
 			toValuesFuncs: []AddOnDeploymentConfigToValuesFunc{ToAddOnDeploymentConfigValues},
 			addOnObjs: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1")
-					addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+					addon.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    "addon.open-cluster-management.io",
 								Resource: "addondeploymentconfigs",
 							},
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
 									Namespace: "cluster1",
 									Name:      "config",
 								},
@@ -171,13 +171,13 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 					}
 					return addon
 				}(),
-				&addonapiv1alpha1.AddOnDeploymentConfig{
+				&addonapiv1beta1.AddOnDeploymentConfig{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "config",
 						Namespace: "cluster1",
 					},
-					Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-						ProxyConfig: addonapiv1alpha1.ProxyConfig{
+					Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+						ProxyConfig: addonapiv1beta1.ProxyConfig{
 							HTTPProxy:  "http://10.2.3.4:3128",
 							HTTPSProxy: "https://10.2.3.4.3129",
 							NoProxy:    "example.com",
@@ -197,16 +197,16 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 			name:          "to addon resource requirements",
 			toValuesFuncs: []AddOnDeploymentConfigToValuesFunc{ToAddOnDeploymentConfigValues},
 			addOnObjs: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1")
-					addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+					addon.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    "addon.open-cluster-management.io",
 								Resource: "addondeploymentconfigs",
 							},
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
 									Namespace: "cluster1",
 									Name:      "config",
 								},
@@ -216,13 +216,13 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 					}
 					return addon
 				}(),
-				&addonapiv1alpha1.AddOnDeploymentConfig{
+				&addonapiv1beta1.AddOnDeploymentConfig{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "config",
 						Namespace: "cluster1",
 					},
-					Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-						ResourceRequirements: []addonapiv1alpha1.ContainerResourceRequirements{
+					Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+						ResourceRequirements: []addonapiv1beta1.ContainerResourceRequirements{
 							{
 								ContainerID: "a:b:c",
 								Resources: corev1.ResourceRequirements{
@@ -320,16 +320,16 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 			name:          "to addon proxy config for helm chart",
 			toValuesFuncs: []AddOnDeploymentConfigToValuesFunc{ToAddOnProxyConfigValues},
 			addOnObjs: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1")
-					addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+					addon.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    "addon.open-cluster-management.io",
 								Resource: "addondeploymentconfigs",
 							},
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
 									Namespace: "cluster1",
 									Name:      "config",
 								},
@@ -339,13 +339,13 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 					}
 					return addon
 				}(),
-				&addonapiv1alpha1.AddOnDeploymentConfig{
+				&addonapiv1beta1.AddOnDeploymentConfig{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "config",
 						Namespace: "cluster1",
 					},
-					Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-						ProxyConfig: addonapiv1alpha1.ProxyConfig{
+					Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+						ProxyConfig: addonapiv1beta1.ProxyConfig{
 							HTTPProxy:  "http://10.2.3.4:3128",
 							HTTPSProxy: "https://10.2.3.4:3129",
 							NoProxy:    "example.com",
@@ -373,7 +373,7 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 
 			getter := utils.NewAddOnDeploymentConfigGetter(fakeAddonClient)
 
-			addOn, ok := c.addOnObjs[0].(*addonapiv1alpha1.ManagedClusterAddOn)
+			addOn, ok := c.addOnObjs[0].(*addonapiv1beta1.ManagedClusterAddOn)
 			if !ok {
 				t.Errorf("expected addon object, but failed")
 			}
@@ -395,7 +395,7 @@ func TestToImageOverrideValuesFunc(t *testing.T) {
 		name           string
 		imageKey       string
 		imageValue     string
-		config         addonapiv1alpha1.AddOnDeploymentConfig
+		config         addonapiv1beta1.AddOnDeploymentConfig
 		expectedValues Values
 		expectedErr    error
 	}{
@@ -403,9 +403,9 @@ func TestToImageOverrideValuesFunc(t *testing.T) {
 			name:       "no nested imagekey",
 			imageKey:   "image",
 			imageValue: "a/b/c:v1",
-			config: addonapiv1alpha1.AddOnDeploymentConfig{
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					Registries: []addonapiv1alpha1.ImageMirror{
+			config: addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					Registries: []addonapiv1beta1.ImageMirror{
 						{
 							Source: "a/b",
 							Mirror: "x/y",
@@ -421,9 +421,9 @@ func TestToImageOverrideValuesFunc(t *testing.T) {
 			name:       "nested imagekey",
 			imageKey:   "global.imageOverride.image",
 			imageValue: "a/b/c:v1",
-			config: addonapiv1alpha1.AddOnDeploymentConfig{
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					Registries: []addonapiv1alpha1.ImageMirror{
+			config: addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					Registries: []addonapiv1beta1.ImageMirror{
 						{
 							Source: "a",
 							Mirror: "x",
@@ -443,9 +443,9 @@ func TestToImageOverrideValuesFunc(t *testing.T) {
 			name:       "empty imagekey",
 			imageKey:   "",
 			imageValue: "a/b/c:v1",
-			config: addonapiv1alpha1.AddOnDeploymentConfig{
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					Registries: []addonapiv1alpha1.ImageMirror{
+			config: addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					Registries: []addonapiv1beta1.ImageMirror{
 						{
 							Source: "a",
 							Mirror: "x",
@@ -459,9 +459,9 @@ func TestToImageOverrideValuesFunc(t *testing.T) {
 			name:       "empty image",
 			imageKey:   "global.imageOverride.image",
 			imageValue: "",
-			config: addonapiv1alpha1.AddOnDeploymentConfig{
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					Registries: []addonapiv1alpha1.ImageMirror{
+			config: addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					Registries: []addonapiv1beta1.ImageMirror{
 						{
 							Source: "a",
 							Mirror: "x",
@@ -475,9 +475,9 @@ func TestToImageOverrideValuesFunc(t *testing.T) {
 			name:       "source not match",
 			imageKey:   "global.imageOverride.image",
 			imageValue: "a/b/c",
-			config: addonapiv1alpha1.AddOnDeploymentConfig{
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					Registries: []addonapiv1alpha1.ImageMirror{
+			config: addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					Registries: []addonapiv1beta1.ImageMirror{
 						{
 							Source: "b",
 							Mirror: "y",
@@ -497,9 +497,9 @@ func TestToImageOverrideValuesFunc(t *testing.T) {
 			name:       "source empty",
 			imageKey:   "global.imageOverride.image",
 			imageValue: "a/b/c:v1",
-			config: addonapiv1alpha1.AddOnDeploymentConfig{
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					Registries: []addonapiv1alpha1.ImageMirror{
+			config: addonapiv1beta1.AddOnDeploymentConfig{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					Registries: []addonapiv1beta1.ImageMirror{
 						{
 							Mirror: "y",
 						},
@@ -543,7 +543,7 @@ func TestGetAgentImageValues(t *testing.T) {
 		imageKey              string
 		imageValue            string
 		cluster               *clusterv1.ManagedCluster
-		addon                 *addonapiv1alpha1.ManagedClusterAddOn
+		addon                 *addonapiv1beta1.ManagedClusterAddOn
 		addonDeploymentConfig []runtime.Object
 		expectedValues        Values
 		expectedError         string
@@ -676,16 +676,16 @@ func TestGetAgentImageValues(t *testing.T) {
 					},
 				},
 			},
-			addon: func() *addonapiv1alpha1.ManagedClusterAddOn {
+			addon: func() *addonapiv1beta1.ManagedClusterAddOn {
 				addon := addontesting.NewAddon("test", "cluster1")
-				addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+				addon.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 					{
-						ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+						ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 							Group:    "addon.open-cluster-management.io",
 							Resource: "addondeploymentconfigs",
 						},
-						DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+						DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+							ConfigReferent: addonapiv1beta1.ConfigReferent{
 								Namespace: "cluster1",
 								Name:      "config2",
 							},
@@ -696,13 +696,13 @@ func TestGetAgentImageValues(t *testing.T) {
 				return addon
 			}(),
 			addonDeploymentConfig: []runtime.Object{
-				&addonapiv1alpha1.AddOnDeploymentConfig{
+				&addonapiv1beta1.AddOnDeploymentConfig{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "config2",
 						Namespace: "cluster1",
 					},
-					Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-						Registries: []addonapiv1alpha1.ImageMirror{
+					Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+						Registries: []addonapiv1beta1.ImageMirror{
 							{
 								Source: "a",
 								Mirror: "y",
@@ -767,7 +767,7 @@ func TestGetRegexResourceRequirements(t *testing.T) {
 
 	cases := []struct {
 		name                          string
-		containerResourceRequirements []addonapiv1alpha1.ContainerResourceRequirements
+		containerResourceRequirements []addonapiv1beta1.ContainerResourceRequirements
 		expectedResourceRequirements  []RegexResourceRequirements
 		expectedErr                   error
 	}{
@@ -776,7 +776,7 @@ func TestGetRegexResourceRequirements(t *testing.T) {
 		},
 		{
 			name: "invalid ContainerID",
-			containerResourceRequirements: []addonapiv1alpha1.ContainerResourceRequirements{
+			containerResourceRequirements: []addonapiv1beta1.ContainerResourceRequirements{
 				{
 					ContainerID: "abc",
 					Resources:   reqirement,
@@ -786,7 +786,7 @@ func TestGetRegexResourceRequirements(t *testing.T) {
 		},
 		{
 			name: "no wildcard",
-			containerResourceRequirements: []addonapiv1alpha1.ContainerResourceRequirements{
+			containerResourceRequirements: []addonapiv1beta1.ContainerResourceRequirements{
 				{
 					ContainerID: "a:b:c",
 					Resources:   reqirement,
@@ -802,7 +802,7 @@ func TestGetRegexResourceRequirements(t *testing.T) {
 		},
 		{
 			name: "type is wildcard",
-			containerResourceRequirements: []addonapiv1alpha1.ContainerResourceRequirements{
+			containerResourceRequirements: []addonapiv1beta1.ContainerResourceRequirements{
 				{
 					ContainerID: "*:b:c",
 					Resources:   reqirement,
@@ -818,7 +818,7 @@ func TestGetRegexResourceRequirements(t *testing.T) {
 		},
 		{
 			name: "type and name are wildcard",
-			containerResourceRequirements: []addonapiv1alpha1.ContainerResourceRequirements{
+			containerResourceRequirements: []addonapiv1beta1.ContainerResourceRequirements{
 				{
 					ContainerID: "*:*:c",
 					Resources:   reqirement,
@@ -834,7 +834,7 @@ func TestGetRegexResourceRequirements(t *testing.T) {
 		},
 		{
 			name: "all are wildcard",
-			containerResourceRequirements: []addonapiv1alpha1.ContainerResourceRequirements{
+			containerResourceRequirements: []addonapiv1beta1.ContainerResourceRequirements{
 				{
 					ContainerID: "*:*:*",
 					Resources:   reqirement,

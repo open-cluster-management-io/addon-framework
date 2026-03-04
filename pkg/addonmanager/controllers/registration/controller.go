@@ -13,10 +13,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
-	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
-	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	addonv1beta1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addoninformerv1beta1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1beta1"
+	addonlisterv1beta1 "open-cluster-management.io/api/client/addon/listers/addon/v1beta1"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterlister "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
@@ -28,17 +28,17 @@ import (
 
 // addonRegistrationController reconciles instances of ManagedClusterAddon on the hub.
 type addonRegistrationController struct {
-	addonClient               addonv1alpha1client.Interface
+	addonClient               addonv1beta1client.Interface
 	managedClusterLister      clusterlister.ManagedClusterLister
-	managedClusterAddonLister addonlisterv1alpha1.ManagedClusterAddOnLister
+	managedClusterAddonLister addonlisterv1beta1.ManagedClusterAddOnLister
 	agentAddons               map[string]agent.AgentAddon
 	mcaFilterFunc             utils.ManagedClusterAddOnFilterFunc
 }
 
 func NewAddonRegistrationController(
-	addonClient addonv1alpha1client.Interface,
+	addonClient addonv1beta1client.Interface,
 	clusterInformers clusterinformers.ManagedClusterInformer,
-	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
+	addonInformers addoninformerv1beta1.ManagedClusterAddOnInformer,
 	agentAddons map[string]agent.AgentAddon,
 	mcaFilterFunc utils.ManagedClusterAddOnFilterFunc,
 ) factory.Controller {
@@ -76,12 +76,12 @@ func NewAddonRegistrationController(
 //   - "csr": uses subject from newConfigs, or sets default if empty
 //
 // For other signer names, always uses subject from newConfigs.
-func buildRegistrationConfigs(newConfigs, existingRegistrations []addonapiv1alpha1.RegistrationConfig,
-	kubeClientDriver, clusterName, addonName string) []addonapiv1alpha1.RegistrationConfig {
-	result := []addonapiv1alpha1.RegistrationConfig{}
+func buildRegistrationConfigs(newConfigs, existingRegistrations []addonapiv1beta1.RegistrationConfig,
+	kubeClientDriver, clusterName, addonName string) []addonapiv1beta1.RegistrationConfig {
+	result := []addonapiv1beta1.RegistrationConfig{}
 
 	for i := range newConfigs {
-		config := addonapiv1alpha1.RegistrationConfig{
+		config := addonapiv1beta1.RegistrationConfig{
 			SignerName: newConfigs[i].SignerName,
 			Subject:    newConfigs[i].Subject,
 		}
@@ -110,12 +110,12 @@ func buildRegistrationConfigs(newConfigs, existingRegistrations []addonapiv1alph
 			}
 			// If no matching existing registration found, clear subject (agent will set it).
 			if !found {
-				config.Subject = addonapiv1alpha1.Subject{}
+				config.Subject = addonapiv1beta1.Subject{}
 			}
 		} else if kubeClientDriver == "csr" {
 			// CSR driver - use subject from newConfigs, or set default if empty
-			if equality.Semantic.DeepEqual(config.Subject, addonapiv1alpha1.Subject{}) {
-				config.Subject = addonapiv1alpha1.Subject{
+			if equality.Semantic.DeepEqual(config.Subject, addonapiv1beta1.Subject{}) {
+				config.Subject = addonapiv1beta1.Subject{
 					User:   agent.DefaultUser(clusterName, addonName, addonName),
 					Groups: agent.DefaultGroups(clusterName, addonName),
 				}
@@ -173,14 +173,14 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 	}
 
 	addonPatcher := patcher.NewPatcher[
-		*addonapiv1alpha1.ManagedClusterAddOn,
-		addonapiv1alpha1.ManagedClusterAddOnSpec,
-		addonapiv1alpha1.ManagedClusterAddOnStatus](c.addonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName))
+		*addonapiv1beta1.ManagedClusterAddOn,
+		addonapiv1beta1.ManagedClusterAddOnSpec,
+		addonapiv1beta1.ManagedClusterAddOnStatus](c.addonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName))
 
 	// patch supported configs
-	var supportedConfigs []addonapiv1alpha1.ConfigGroupResource
+	var supportedConfigs []addonapiv1beta1.ConfigGroupResource
 	for _, config := range agentAddon.GetAgentAddonOptions().SupportedConfigGVRs {
-		supportedConfigs = append(supportedConfigs, addonapiv1alpha1.ConfigGroupResource{
+		supportedConfigs = append(supportedConfigs, addonapiv1beta1.ConfigGroupResource{
 			Group:    config.Group,
 			Resource: config.Resource,
 		})
@@ -199,9 +199,9 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 	registrationOption := agentAddon.GetAgentAddonOptions().Registration
 	if registrationOption == nil {
 		meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
-			Type:    addonapiv1alpha1.ManagedClusterAddOnRegistrationApplied,
+			Type:    addonapiv1beta1.ManagedClusterAddOnRegistrationApplied,
 			Status:  metav1.ConditionTrue,
-			Reason:  addonapiv1alpha1.RegistrationAppliedNilRegistration,
+			Reason:  addonapiv1beta1.RegistrationAppliedNilRegistration,
 			Message: "Registration of the addon agent is configured",
 		})
 		_, err = addonPatcher.PatchStatus(ctx, managedClusterAddonCopy, managedClusterAddonCopy.Status, managedClusterAddon.Status)
@@ -225,9 +225,9 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 			} else {
 				// This is a real error, set condition to false and return immediately
 				meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
-					Type:    addonapiv1alpha1.ManagedClusterAddOnRegistrationApplied,
+					Type:    addonapiv1beta1.ManagedClusterAddOnRegistrationApplied,
 					Status:  metav1.ConditionFalse,
-					Reason:  addonapiv1alpha1.RegistrationAppliedSetPermissionFailed,
+					Reason:  addonapiv1beta1.RegistrationAppliedSetPermissionFailed,
 					Message: fmt.Sprintf("Failed to set permission for hub agent: %v", err),
 				})
 				if _, patchErr := addonPatcher.PatchStatus(
@@ -241,9 +241,9 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 
 	if registrationOption.CSRConfigurations == nil {
 		meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
-			Type:    addonapiv1alpha1.ManagedClusterAddOnRegistrationApplied,
+			Type:    addonapiv1beta1.ManagedClusterAddOnRegistrationApplied,
 			Status:  metav1.ConditionTrue,
-			Reason:  addonapiv1alpha1.RegistrationAppliedNilRegistration,
+			Reason:  addonapiv1beta1.RegistrationAppliedNilRegistration,
 			Message: "Registration of the addon agent is configured",
 		})
 		_, err = addonPatcher.PatchStatus(ctx, managedClusterAddonCopy, managedClusterAddonCopy.Status, managedClusterAddon.Status)
@@ -288,14 +288,14 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 	// Set condition based on whether permission is ready
 	if permissionReady {
 		meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
-			Type:    addonapiv1alpha1.ManagedClusterAddOnRegistrationApplied,
+			Type:    addonapiv1beta1.ManagedClusterAddOnRegistrationApplied,
 			Status:  metav1.ConditionTrue,
-			Reason:  addonapiv1alpha1.RegistrationAppliedSetPermissionApplied,
+			Reason:  addonapiv1beta1.RegistrationAppliedSetPermissionApplied,
 			Message: "Registration of the addon agent is configured",
 		})
 	} else {
 		meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
-			Type:    addonapiv1alpha1.ManagedClusterAddOnRegistrationApplied,
+			Type:    addonapiv1beta1.ManagedClusterAddOnRegistrationApplied,
 			Status:  metav1.ConditionFalse,
 			Reason:  "PermissionConfigPending",
 			Message: "registration subject not ready",

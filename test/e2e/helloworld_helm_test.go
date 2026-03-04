@@ -14,7 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
@@ -27,11 +27,11 @@ const (
 )
 
 var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
-	var helloworldhelmAddon = addonapiv1alpha1.ManagedClusterAddOn{
+	var helloworldhelmAddon = addonapiv1beta1.ManagedClusterAddOn{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: helloWorldHelmAddonName,
 		},
-		Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{},
+		Spec: addonapiv1beta1.ManagedClusterAddOnSpec{},
 	}
 
 	ginkgo.BeforeEach(func() {
@@ -156,7 +156,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 			}
 			hasPreDeleteFinalizer := false
 			for _, f := range addon.Finalizers {
-				if f == addonapiv1alpha1.AddonPreDeleteHookFinalizer {
+				if f == addonapiv1beta1.AddonPreDeleteHookFinalizer {
 					hasPreDeleteFinalizer = true
 				}
 			}
@@ -296,22 +296,22 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 			newAddon.SetAnnotations(map[string]string{
 				"addon.open-cluster-management.io/values": `{"global":{"imagePullSecret":"mySecret"}}`,
 			})
-			newAddon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+			newAddon.Spec.Configs = []addonapiv1beta1.AddOnConfig{
 				{
-					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 						Resource: "configmaps",
 					},
-					ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					ConfigReferent: addonapiv1beta1.ConfigReferent{
 						Namespace: managedClusterName,
 						Name:      imageConfigName,
 					},
 				},
 				{
-					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 						Group:    "addon.open-cluster-management.io",
 						Resource: "addondeploymentconfigs",
 					},
-					ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					ConfigReferent: addonapiv1beta1.ConfigReferent{
 						Namespace: managedClusterName,
 						Name:      deployConfigName,
 					},
@@ -366,9 +366,9 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 
 	ginkgo.It("addon image override should be configured by addonDeploymentConfig, and it takes precedence over the managed cluster annotation", func() {
 		ginkgo.By("Prepare cluster annotation for addon image override config")
-		overrideRegistries := addonapiv1alpha1.AddOnDeploymentConfigSpec{
+		overrideRegistries := addonapiv1beta1.AddOnDeploymentConfigSpec{
 			// should be different from the registries in the addonDeploymentConfig
-			Registries: []addonapiv1alpha1.ImageMirror{
+			Registries: []addonapiv1beta1.ImageMirror{
 				{
 					Source: "quay.io/open-cluster-management/addon-examples",
 					Mirror: "quay.io/ocm/addon-examples-test",
@@ -411,13 +411,13 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 				return err
 			}
 			newAddon := addon.DeepCopy()
-			newAddon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+			newAddon.Spec.Configs = []addonapiv1beta1.AddOnConfig{
 				{
-					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 						Group:    "addon.open-cluster-management.io",
 						Resource: "addondeploymentconfigs",
 					},
-					ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					ConfigReferent: addonapiv1beta1.ConfigReferent{
 						Namespace: managedClusterName,
 						Name:      deployImageOverrideConfigName,
 					},
@@ -470,7 +470,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 
 	ginkgo.It("addon should be configured by managed cluster annotation for image override", func() {
 		ginkgo.By("Prepare cluster annotation for addon image override config")
-		overrideRegistries := addonapiv1alpha1.AddOnDeploymentConfigSpec{
+		overrideRegistries := addonapiv1beta1.AddOnDeploymentConfigSpec{
 			Registries: registries,
 		}
 		registriesJson, err := json.Marshal(overrideRegistries)
@@ -547,13 +547,13 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 				return err
 			}
 			newAddon := addon.DeepCopy()
-			newAddon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+			newAddon.Spec.Configs = []addonapiv1beta1.AddOnConfig{
 				{
-					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 						Group:    "addon.open-cluster-management.io",
 						Resource: "addondeploymentconfigs",
 					},
-					ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					ConfigReferent: addonapiv1beta1.ConfigReferent{
 						Namespace: managedClusterName,
 						Name:      deployProxyConfigName,
 					},
@@ -581,7 +581,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 			}
 
 			// check the proxy settings
-			deployProxyConfig := addonapiv1alpha1.ProxyConfig{}
+			deployProxyConfig := addonapiv1beta1.ProxyConfig{}
 			for _, envVar := range containers[0].Env {
 				if envVar.Name == "HTTP_PROXY" {
 					deployProxyConfig.HTTPProxy = envVar.Value
@@ -618,13 +618,13 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 				return err
 			}
 			newAddon := addon.DeepCopy()
-			newAddon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+			newAddon.Spec.Configs = []addonapiv1beta1.AddOnConfig{
 				{
-					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 						Group:    "addon.open-cluster-management.io",
 						Resource: "addondeploymentconfigs",
 					},
-					ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					ConfigReferent: addonapiv1beta1.ConfigReferent{
 						Namespace: managedClusterName,
 						Name:      deployResourceRequirementConfigName,
 					},
@@ -680,13 +680,13 @@ var _ = ginkgo.Describe("install/uninstall helloworld helm addons", func() {
 				return err
 			}
 			newAddon := addon.DeepCopy()
-			newAddon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+			newAddon.Spec.Configs = []addonapiv1beta1.AddOnConfig{
 				{
-					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 						Group:    "addon.open-cluster-management.io",
 						Resource: "addondeploymentconfigs",
 					},
-					ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					ConfigReferent: addonapiv1beta1.ConfigReferent{
 						Namespace: managedClusterName,
 						Name:      deployAgentInstallNamespaceConfigName,
 					},

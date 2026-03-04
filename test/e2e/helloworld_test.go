@@ -15,7 +15,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 )
 
 const (
@@ -35,14 +35,14 @@ const (
 var (
 	nodeSelector = map[string]string{"kubernetes.io/os": "linux"}
 	tolerations  = []corev1.Toleration{{Key: "foo", Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoExecute}}
-	registries   = []addonapiv1alpha1.ImageMirror{
+	registries   = []addonapiv1beta1.ImageMirror{
 		{
 			Source: "quay.io/open-cluster-management/addon-examples",
 			Mirror: "quay.io/ocm/addon-examples",
 		},
 	}
 
-	proxyConfig = addonapiv1alpha1.ProxyConfig{
+	proxyConfig = addonapiv1beta1.ProxyConfig{
 		// settings of http proxy will not impact the communicaiton between
 		// hub kube-apiserver and the add-on agent running on managed cluster.
 		HTTPProxy: "http://127.0.0.1:3128",
@@ -165,13 +165,13 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 				return err
 			}
 			newAddon := addon.DeepCopy()
-			newAddon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+			newAddon.Spec.Configs = []addonapiv1beta1.AddOnConfig{
 				{
-					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 						Group:    "addon.open-cluster-management.io",
 						Resource: "addondeploymentconfigs",
 					},
-					ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					ConfigReferent: addonapiv1beta1.ConfigReferent{
 						Namespace: managedClusterName,
 						Name:      deployConfigName,
 					},
@@ -266,13 +266,13 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 				return err
 			}
 			newAddon := addon.DeepCopy()
-			newAddon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+			newAddon.Spec.Configs = []addonapiv1beta1.AddOnConfig{
 				{
-					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 						Group:    "addon.open-cluster-management.io",
 						Resource: "addondeploymentconfigs",
 					},
-					ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					ConfigReferent: addonapiv1beta1.ConfigReferent{
 						Namespace: managedClusterName,
 						Name:      deployProxyConfigName,
 					},
@@ -298,7 +298,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 			}
 
 			// check the proxy settings
-			deployProxyConfig := addonapiv1alpha1.ProxyConfig{}
+			deployProxyConfig := addonapiv1beta1.ProxyConfig{}
 			for _, envVar := range containers[0].Env {
 				if envVar.Name == "HTTP_PROXY" {
 					deployProxyConfig.HTTPProxy = envVar.Value
@@ -384,13 +384,13 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 				return err
 			}
 			newAddon := addon.DeepCopy()
-			newAddon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+			newAddon.Spec.Configs = []addonapiv1beta1.AddOnConfig{
 				{
-					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 						Group:    "addon.open-cluster-management.io",
 						Resource: "addondeploymentconfigs",
 					},
-					ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					ConfigReferent: addonapiv1beta1.ConfigReferent{
 						Namespace: managedClusterName,
 						Name:      deployResourceRequirementConfigName,
 					},
@@ -494,13 +494,13 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 				return err
 			}
 			newAddon := addon.DeepCopy()
-			newAddon.Spec.Configs = []addonapiv1alpha1.AddOnConfig{
+			newAddon.Spec.Configs = []addonapiv1beta1.AddOnConfig{
 				{
-					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 						Group:    "addon.open-cluster-management.io",
 						Resource: "addondeploymentconfigs",
 					},
-					ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					ConfigReferent: addonapiv1beta1.ConfigReferent{
 						Namespace: managedClusterName,
 						Name:      deployAgentInstallNamespaceConfigName,
 					},
@@ -532,13 +532,13 @@ func prepareAddOnDeploymentConfig(namespace string) error {
 	if errors.IsNotFound(err) {
 		if _, err := hubAddOnClient.AddonV1alpha1().AddOnDeploymentConfigs(managedClusterName).Create(
 			context.Background(),
-			&addonapiv1alpha1.AddOnDeploymentConfig{
+			&addonapiv1beta1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      deployConfigName,
 					Namespace: namespace,
 				},
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-					NodePlacement: &addonapiv1alpha1.NodePlacement{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+					NodePlacement: &addonapiv1beta1.NodePlacement{
 						NodeSelector: nodeSelector,
 						Tolerations:  tolerations,
 					},
@@ -562,12 +562,12 @@ func prepareImageOverrideAddOnDeploymentConfig(namespace string) error {
 	if errors.IsNotFound(err) {
 		if _, err := hubAddOnClient.AddonV1alpha1().AddOnDeploymentConfigs(managedClusterName).Create(
 			context.Background(),
-			&addonapiv1alpha1.AddOnDeploymentConfig{
+			&addonapiv1beta1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      deployImageOverrideConfigName,
 					Namespace: namespace,
 				},
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
 					Registries:            registries,
 					AgentInstallNamespace: addonInstallNamespace,
 				},
@@ -588,12 +588,12 @@ func prepareProxyConfigAddOnDeploymentConfig(namespace string) error {
 	if errors.IsNotFound(err) {
 		if _, err := hubAddOnClient.AddonV1alpha1().AddOnDeploymentConfigs(managedClusterName).Create(
 			context.Background(),
-			&addonapiv1alpha1.AddOnDeploymentConfig{
+			&addonapiv1beta1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      deployProxyConfigName,
 					Namespace: namespace,
 				},
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
 					ProxyConfig:           proxyConfig,
 					AgentInstallNamespace: addonInstallNamespace,
 				},
@@ -614,14 +614,14 @@ func prepareResourceRequirementsAddOnDeploymentConfig(namespace string) error {
 	if errors.IsNotFound(err) {
 		if _, err := hubAddOnClient.AddonV1alpha1().AddOnDeploymentConfigs(managedClusterName).Create(
 			context.Background(),
-			&addonapiv1alpha1.AddOnDeploymentConfig{
+			&addonapiv1beta1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      deployResourceRequirementConfigName,
 					Namespace: namespace,
 				},
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
 					AgentInstallNamespace: addonInstallNamespace,
-					ResourceRequirements: []addonapiv1alpha1.ContainerResourceRequirements{
+					ResourceRequirements: []addonapiv1beta1.ContainerResourceRequirements{
 						{
 							ContainerID: "*:*:*",
 							Resources: corev1.ResourceRequirements{
@@ -658,12 +658,12 @@ func prepareAgentInstallNamespaceAddOnDeploymentConfig(namespace string) error {
 	if errors.IsNotFound(err) {
 		if _, err := hubAddOnClient.AddonV1alpha1().AddOnDeploymentConfigs(managedClusterName).Create(
 			context.Background(),
-			&addonapiv1alpha1.AddOnDeploymentConfig{
+			&addonapiv1beta1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      deployAgentInstallNamespaceConfigName,
 					Namespace: namespace,
 				},
-				Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
+				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
 					AgentInstallNamespace: agentInstallNamespaceConfig,
 				},
 			},
@@ -681,7 +681,7 @@ func prepareAgentInstallNamespaceAddOnDeploymentConfig(namespace string) error {
 func cleanupCSR(hubKubeClient kubernetes.Interface, addonName string) error {
 	csrs, err := hubKubeClient.CertificatesV1().CertificateSigningRequests().List(
 		context.Background(), metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("%s=%s", addonapiv1alpha1.AddonLabelKey, addonName),
+			LabelSelector: fmt.Sprintf("%s=%s", addonapiv1beta1.AddonLabelKey, addonName),
 		})
 	if err != nil {
 		return err

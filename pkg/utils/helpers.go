@@ -17,15 +17,15 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	coreclientv1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	"open-cluster-management.io/addon-framework/pkg/agent"
 )
 
-func MergeRelatedObjects(modified *bool, objs *[]addonapiv1alpha1.ObjectReference, obj addonapiv1alpha1.ObjectReference) {
+func MergeRelatedObjects(modified *bool, objs *[]addonapiv1beta1.ObjectReference, obj addonapiv1beta1.ObjectReference) {
 	if *objs == nil {
-		*objs = []addonapiv1alpha1.ObjectReference{}
+		*objs = []addonapiv1beta1.ObjectReference{}
 	}
 
 	for _, o := range *objs {
@@ -248,7 +248,7 @@ func ownerRefMatched(existing, required metav1.OwnerReference) bool {
 }
 
 // AddonManagementFilterFunc is to check if the addon should be managed by addon manager or self-managed
-type AddonManagementFilterFunc func(cma *addonapiv1alpha1.ClusterManagementAddOn) bool
+type AddonManagementFilterFunc func(cma *addonapiv1beta1.ClusterManagementAddOn) bool
 
 func ManagedByAddonManager(obj interface{}) bool {
 	accessor, _ := meta.Accessor(obj)
@@ -257,12 +257,12 @@ func ManagedByAddonManager(obj interface{}) bool {
 		return true
 	}
 
-	value, ok := annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey]
+	value, ok := annotations[addonapiv1beta1.AddonLifecycleAnnotationKey]
 	if !ok {
 		return true
 	}
 
-	return value == addonapiv1alpha1.AddonLifecycleAddonManagerAnnotationValue
+	return value == addonapiv1beta1.AddonLifecycleAddonManagerAnnotationValue
 }
 
 func FilterByAddonName(agentAddons map[string]agent.AgentAddon) func(obj interface{}) bool {
@@ -273,7 +273,7 @@ func FilterByAddonName(agentAddons map[string]agent.AgentAddon) func(obj interfa
 	}
 }
 
-func IsOwnedByCMA(addon *addonapiv1alpha1.ManagedClusterAddOn) bool {
+func IsOwnedByCMA(addon *addonapiv1beta1.ManagedClusterAddOn) bool {
 	for _, owner := range addon.OwnerReferences {
 		if owner.Kind != "ClusterManagementAddOn" {
 			continue
