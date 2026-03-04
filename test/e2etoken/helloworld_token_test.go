@@ -14,7 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 )
 
 const (
@@ -74,8 +74,8 @@ var _ = ginkgo.Describe("Token-based addon registration", func() {
 				return err
 			}
 
-			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnRegistrationApplied) {
-				cond := meta.FindStatusCondition(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnRegistrationApplied)
+			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnRegistrationApplied) {
+				cond := meta.FindStatusCondition(addon.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnRegistrationApplied)
 				return fmt.Errorf("RegistrationApplied condition not true: %v", cond)
 			}
 
@@ -151,7 +151,7 @@ var _ = ginkgo.Describe("Token-based addon registration", func() {
 	})
 
 	ginkgo.It("should create RBAC with subjects matching registration status", func() {
-		var regSubject *addonapiv1alpha1.Subject
+		var regSubject *addonapiv1beta1.Subject
 
 		ginkgo.By("Get registration subject from addon status")
 		gomega.Eventually(func() error {

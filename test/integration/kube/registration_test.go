@@ -12,13 +12,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
 var _ = ginkgo.Describe("Addon Registration", func() {
 	var managedClusterName string
-	var cma *addonapiv1alpha1.ClusterManagementAddOn
+	var cma *addonapiv1beta1.ClusterManagementAddOn
 	var err error
 
 	ginkgo.BeforeEach(func() {
@@ -41,13 +41,13 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		// Create clustermanagement addon
-		cma = &addonapiv1alpha1.ClusterManagementAddOn{
+		cma = &addonapiv1beta1.ClusterManagementAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testAddonImpl.name,
 			},
-			Spec: addonapiv1alpha1.ClusterManagementAddOnSpec{
-				InstallStrategy: addonapiv1alpha1.InstallStrategy{
-					Type: addonapiv1alpha1.AddonInstallStrategyManual,
+			Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
+				InstallStrategy: addonapiv1beta1.InstallStrategy{
+					Type: addonapiv1beta1.AddonInstallStrategyManual,
 				},
 			},
 		}
@@ -66,10 +66,10 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 	})
 
 	ginkgo.It("Should setup registration successfully", func() {
-		testAddonImpl.registrations[managedClusterName] = []addonapiv1alpha1.RegistrationConfig{
+		testAddonImpl.registrations[managedClusterName] = []addonapiv1beta1.RegistrationConfig{
 			{
 				SignerName: certificatesv1.KubeAPIServerClientSignerName,
-				Subject: addonapiv1alpha1.Subject{
+				Subject: addonapiv1beta1.Subject{
 					User: fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s:agent:%s",
 						managedClusterName, testAddonImpl.name, testAddonImpl.name),
 					Groups: []string{
@@ -81,11 +81,11 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 			},
 		}
 
-		addon := &addonapiv1alpha1.ManagedClusterAddOn{
+		addon := &addonapiv1beta1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testAddonImpl.name,
 			},
-			Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
+			Spec: addonapiv1beta1.ManagedClusterAddOnSpec{
 				InstallNamespace: "test",
 			},
 		}
@@ -107,10 +107,10 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 	})
 
 	ginkgo.It("Should update registration successfully", func() {
-		testAddonImpl.registrations[managedClusterName] = []addonapiv1alpha1.RegistrationConfig{
+		testAddonImpl.registrations[managedClusterName] = []addonapiv1beta1.RegistrationConfig{
 			{
 				SignerName: certificatesv1.KubeAPIServerClientSignerName,
-				Subject: addonapiv1alpha1.Subject{
+				Subject: addonapiv1beta1.Subject{
 					User: fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s:agent:%s",
 						managedClusterName, testAddonImpl.name, testAddonImpl.name),
 					Groups: []string{
@@ -125,11 +125,11 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 			},
 		}
 
-		addon := &addonapiv1alpha1.ManagedClusterAddOn{
+		addon := &addonapiv1beta1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testAddonImpl.name,
 			},
-			Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
+			Spec: addonapiv1beta1.ManagedClusterAddOnSpec{
 				InstallNamespace: "test",
 			},
 		}
@@ -143,8 +143,8 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 			if err != nil {
 				return err
 			}
-			actual.Status = addonapiv1alpha1.ManagedClusterAddOnStatus{
-				Registrations: []addonapiv1alpha1.RegistrationConfig{
+			actual.Status = addonapiv1beta1.ManagedClusterAddOnStatus{
+				Registrations: []addonapiv1beta1.RegistrationConfig{
 					{
 						SignerName: certificatesv1.KubeAPIServerClientSignerName,
 					},

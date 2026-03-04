@@ -4,14 +4,14 @@ import (
 	"encoding/json"
 	"testing"
 
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
 // newImageRegistriesAnnotation creates a JSON annotation string for image registries
-func newImageRegistriesAnnotation(registries []addonapiv1alpha1.ImageMirror) string {
+func newImageRegistriesAnnotation(registries []addonapiv1beta1.ImageMirror) string {
 	type ImageRegistries struct {
-		Registries []addonapiv1alpha1.ImageMirror `json:"registries"`
+		Registries []addonapiv1beta1.ImageMirror `json:"registries"`
 	}
 	data, _ := json.Marshal(ImageRegistries{Registries: registries})
 	return string(data)
@@ -69,7 +69,7 @@ func TestOverrideImageByAnnotation(t *testing.T) {
 		{
 			name: "single registry with match",
 			annotations: map[string]string{
-				clusterv1.ClusterImageRegistriesAnnotationKey: newImageRegistriesAnnotation([]addonapiv1alpha1.ImageMirror{
+				clusterv1.ClusterImageRegistriesAnnotationKey: newImageRegistriesAnnotation([]addonapiv1beta1.ImageMirror{
 					{Source: "docker.io/library", Mirror: "quay.io/library"},
 				}),
 			},
@@ -80,7 +80,7 @@ func TestOverrideImageByAnnotation(t *testing.T) {
 		{
 			name: "single registry no match",
 			annotations: map[string]string{
-				clusterv1.ClusterImageRegistriesAnnotationKey: newImageRegistriesAnnotation([]addonapiv1alpha1.ImageMirror{
+				clusterv1.ClusterImageRegistriesAnnotationKey: newImageRegistriesAnnotation([]addonapiv1beta1.ImageMirror{
 					{Source: "docker.io/library", Mirror: "quay.io/library"},
 				}),
 			},
@@ -91,7 +91,7 @@ func TestOverrideImageByAnnotation(t *testing.T) {
 		{
 			name: "multiple registries with different sources",
 			annotations: map[string]string{
-				clusterv1.ClusterImageRegistriesAnnotationKey: newImageRegistriesAnnotation([]addonapiv1alpha1.ImageMirror{
+				clusterv1.ClusterImageRegistriesAnnotationKey: newImageRegistriesAnnotation([]addonapiv1beta1.ImageMirror{
 					{Source: "docker.io/library", Mirror: "quay.io/library"},
 					{Source: "gcr.io/project", Mirror: "quay.io/project"},
 				}),
@@ -103,7 +103,7 @@ func TestOverrideImageByAnnotation(t *testing.T) {
 		{
 			name: "multiple registries latter wins when both match",
 			annotations: map[string]string{
-				clusterv1.ClusterImageRegistriesAnnotationKey: newImageRegistriesAnnotation([]addonapiv1alpha1.ImageMirror{
+				clusterv1.ClusterImageRegistriesAnnotationKey: newImageRegistriesAnnotation([]addonapiv1beta1.ImageMirror{
 					{Source: "docker.io/library", Mirror: "quay.io/library"},
 					{Source: "docker.io/library/nginx:latest", Mirror: "private.registry.io/nginx:v2"},
 				}),
@@ -115,7 +115,7 @@ func TestOverrideImageByAnnotation(t *testing.T) {
 		{
 			name: "empty source acts as wildcard",
 			annotations: map[string]string{
-				clusterv1.ClusterImageRegistriesAnnotationKey: newImageRegistriesAnnotation([]addonapiv1alpha1.ImageMirror{
+				clusterv1.ClusterImageRegistriesAnnotationKey: newImageRegistriesAnnotation([]addonapiv1beta1.ImageMirror{
 					{Source: "", Mirror: "private.registry.io/mirror"},
 				}),
 			},
@@ -126,7 +126,7 @@ func TestOverrideImageByAnnotation(t *testing.T) {
 		{
 			name: "trailing slashes trimmed",
 			annotations: map[string]string{
-				clusterv1.ClusterImageRegistriesAnnotationKey: newImageRegistriesAnnotation([]addonapiv1alpha1.ImageMirror{
+				clusterv1.ClusterImageRegistriesAnnotationKey: newImageRegistriesAnnotation([]addonapiv1beta1.ImageMirror{
 					{Source: "docker.io/library/", Mirror: "quay.io/library/"},
 				}),
 			},
@@ -137,7 +137,7 @@ func TestOverrideImageByAnnotation(t *testing.T) {
 		{
 			name: "image with SHA digest",
 			annotations: map[string]string{
-				clusterv1.ClusterImageRegistriesAnnotationKey: newImageRegistriesAnnotation([]addonapiv1alpha1.ImageMirror{
+				clusterv1.ClusterImageRegistriesAnnotationKey: newImageRegistriesAnnotation([]addonapiv1beta1.ImageMirror{
 					{Source: "docker.io/library", Mirror: "quay.io/library"},
 				}),
 			},

@@ -14,31 +14,31 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"open-cluster-management.io/addon-framework/pkg/utils"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 )
 
 const addOnDefaultConfigSpecHash = "287d774850847584cc3ebd8b72e2ad3ef8ac6c31803a59324943a7f94054b08a"
 const addOnTest1ConfigSpecHash = "d76dad0a6448910652950163cc4324e4616ab5143046555c5ad5b003a622ab8d"
 const addOnTest2ConfigSpecHash = "3f815fe02492288fd235ed9bd881987aebb6f15fd2fa2b37c982525c293679bd"
 
-var addOnDefaultConfigSpec = addonapiv1alpha1.AddOnDeploymentConfigSpec{
-	CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+var addOnDefaultConfigSpec = addonapiv1beta1.AddOnDeploymentConfigSpec{
+	CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 		{
 			Name:  "test",
 			Value: "test",
 		},
 	},
 }
-var addOnTest1ConfigSpec = addonapiv1alpha1.AddOnDeploymentConfigSpec{
-	CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+var addOnTest1ConfigSpec = addonapiv1beta1.AddOnDeploymentConfigSpec{
+	CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 		{
 			Name:  "test1",
 			Value: "test1",
 		},
 	},
 }
-var addOnTest2ConfigSpec = addonapiv1alpha1.AddOnDeploymentConfigSpec{
-	CustomizedVariables: []addonapiv1alpha1.CustomizedVariable{
+var addOnTest2ConfigSpec = addonapiv1beta1.AddOnDeploymentConfigSpec{
+	CustomizedVariables: []addonapiv1beta1.CustomizedVariable{
 		{
 			Name:  "test2",
 			Value: "test2",
@@ -46,33 +46,33 @@ var addOnTest2ConfigSpec = addonapiv1alpha1.AddOnDeploymentConfigSpec{
 	},
 }
 
-func createClusterManagementAddOn(name, defaultConfigNamespace, defaultConfigName string) (*addonapiv1alpha1.ClusterManagementAddOn, error) {
+func createClusterManagementAddOn(name, defaultConfigNamespace, defaultConfigName string) (*addonapiv1beta1.ClusterManagementAddOn, error) {
 	clusterManagementAddon, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		clusterManagementAddon, err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Create(
 			context.Background(),
-			&addonapiv1alpha1.ClusterManagementAddOn{
+			&addonapiv1beta1.ClusterManagementAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: name,
 					Annotations: map[string]string{
-						addonapiv1alpha1.AddonLifecycleAnnotationKey: addonapiv1alpha1.AddonLifecycleAddonManagerAnnotationValue,
+						addonapiv1beta1.AddonLifecycleAnnotationKey: addonapiv1beta1.AddonLifecycleAddonManagerAnnotationValue,
 					},
 				},
-				Spec: addonapiv1alpha1.ClusterManagementAddOnSpec{
-					SupportedConfigs: []addonapiv1alpha1.ConfigMeta{
+				Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
+					SupportedConfigs: []addonapiv1beta1.ConfigMeta{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    addOnDeploymentConfigGVR.Group,
 								Resource: addOnDeploymentConfigGVR.Resource,
 							},
-							DefaultConfig: &addonapiv1alpha1.ConfigReferent{
+							DefaultConfig: &addonapiv1beta1.ConfigReferent{
 								Name:      defaultConfigName,
 								Namespace: defaultConfigNamespace,
 							},
 						},
 					},
-					InstallStrategy: addonapiv1alpha1.InstallStrategy{
-						Type: addonapiv1alpha1.AddonInstallStrategyManual,
+					InstallStrategy: addonapiv1beta1.InstallStrategy{
+						Type: addonapiv1beta1.AddonInstallStrategyManual,
 					},
 				},
 			},
@@ -91,7 +91,7 @@ func createClusterManagementAddOn(name, defaultConfigNamespace, defaultConfigNam
 	return clusterManagementAddon, nil
 }
 
-func updateClusterManagementAddOn(ctx context.Context, new *addonapiv1alpha1.ClusterManagementAddOn) {
+func updateClusterManagementAddOn(ctx context.Context, new *addonapiv1beta1.ClusterManagementAddOn) {
 	gomega.Eventually(func() bool {
 		old, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), new.Name, metav1.GetOptions{})
 		old.Spec = new.Spec
@@ -106,7 +106,7 @@ func updateClusterManagementAddOn(ctx context.Context, new *addonapiv1alpha1.Clu
 
 // The addon owner controller exist in general addon manager.
 // This is for integration testing to assume that addon manager has already added the OwnerReferences.
-func createManagedClusterAddOnwithOwnerRefs(namespace string, addon *addonapiv1alpha1.ManagedClusterAddOn, cma *addonapiv1alpha1.ClusterManagementAddOn) {
+func createManagedClusterAddOnwithOwnerRefs(namespace string, addon *addonapiv1beta1.ManagedClusterAddOn, cma *addonapiv1beta1.ClusterManagementAddOn) {
 	addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(namespace).Create(context.Background(), addon, metav1.CreateOptions{})
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -114,8 +114,8 @@ func createManagedClusterAddOnwithOwnerRefs(namespace string, addon *addonapiv1a
 
 	// This is to assume that addon-manager has already added the OwnerReferences.
 	owner := metav1.NewControllerRef(cma, schema.GroupVersionKind{
-		Group:   addonapiv1alpha1.GroupName,
-		Version: addonapiv1alpha1.GroupVersion.Version,
+		Group:   addonapiv1beta1.GroupName,
+		Version: addonapiv1beta1.GroupVersion.Version,
 		Kind:    "ClusterManagementAddOn",
 	})
 	modified := utils.MergeOwnerRefs(&addonCopy.OwnerReferences, *owner, false)
@@ -137,7 +137,7 @@ func setKubeClientDriver(namespace, addonName, driver string) {
 	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 }
 
-func updateManagedClusterAddOnStatus(ctx context.Context, new *addonapiv1alpha1.ManagedClusterAddOn) {
+func updateManagedClusterAddOnStatus(ctx context.Context, new *addonapiv1beta1.ManagedClusterAddOn) {
 	gomega.Eventually(func() bool {
 		old, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(new.Namespace).Get(context.Background(), new.Name, metav1.GetOptions{})
 		old.Status = new.Status
@@ -149,7 +149,7 @@ func updateManagedClusterAddOnStatus(ctx context.Context, new *addonapiv1alpha1.
 	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
 }
 
-func assertClusterManagementAddOnDefaultConfigReferences(name string, expect ...addonapiv1alpha1.DefaultConfigReference) {
+func assertClusterManagementAddOnDefaultConfigReferences(name string, expect ...addonapiv1beta1.DefaultConfigReference) {
 	ginkgo.By(fmt.Sprintf("Check ClusterManagementAddOn %s DefaultConfigReferences", name))
 
 	gomega.Eventually(func() error {
@@ -174,7 +174,7 @@ func assertClusterManagementAddOnDefaultConfigReferences(name string, expect ...
 	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 }
 
-func assertClusterManagementAddOnInstallProgression(name string, expect ...addonapiv1alpha1.InstallProgression) {
+func assertClusterManagementAddOnInstallProgression(name string, expect ...addonapiv1beta1.InstallProgression) {
 	ginkgo.By(fmt.Sprintf("Check ClusterManagementAddOn %s InstallProgression", name))
 
 	gomega.Eventually(func() error {
@@ -222,7 +222,7 @@ func assertClusterManagementAddOnConditions(name string, expect ...metav1.Condit
 	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 }
 
-func assertManagedClusterAddOnConfigReferences(name, namespace string, expect ...addonapiv1alpha1.ConfigReference) {
+func assertManagedClusterAddOnConfigReferences(name, namespace string, expect ...addonapiv1beta1.ConfigReference) {
 	ginkgo.By(fmt.Sprintf("Check ManagedClusterAddOn %s/%s ConfigReferences", namespace, name))
 
 	gomega.Eventually(func() error {

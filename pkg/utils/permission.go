@@ -12,7 +12,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	rbacclientv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	"k8s.io/utils/pointer"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -151,7 +151,7 @@ func (p *permissionBuilder) BindRoleToGroup(role *rbacv1.Role, userGroup string)
 func (p *permissionBuilder) BindKubeClientClusterRole(clusterRole *rbacv1.ClusterRole) RBACPermissionBuilder {
 	p.WithStaticClusterRole(clusterRole)
 
-	p.u.fns = append(p.u.fns, func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+	p.u.fns = append(p.u.fns, func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 		// Build subjects from the registration status
 		subjects := BuildSubjectsFromRegistration(addon, certificatesv1.KubeAPIServerClientSignerName)
 
@@ -182,7 +182,7 @@ func (p *permissionBuilder) BindKubeClientClusterRole(clusterRole *rbacv1.Cluste
 func (p *permissionBuilder) BindKubeClientRole(role *rbacv1.Role) RBACPermissionBuilder {
 	p.WithStaticRole(role)
 
-	p.u.fns = append(p.u.fns, func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+	p.u.fns = append(p.u.fns, func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 		// Build subjects from the registration status
 		subjects := BuildSubjectsFromRegistration(addon, certificatesv1.KubeAPIServerClientSignerName)
 
@@ -213,7 +213,7 @@ func (p *permissionBuilder) BindKubeClientRole(role *rbacv1.Role) RBACPermission
 }
 
 func (p *permissionBuilder) WithStaticClusterRole(clusterRole *rbacv1.ClusterRole) RBACPermissionBuilder {
-	p.u.fns = append(p.u.fns, func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+	p.u.fns = append(p.u.fns, func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 		_, _, err := ApplyClusterRole(context.TODO(), p.kubeClient.RbacV1(), clusterRole)
 		return err
 	})
@@ -221,7 +221,7 @@ func (p *permissionBuilder) WithStaticClusterRole(clusterRole *rbacv1.ClusterRol
 }
 
 func (p *permissionBuilder) WithStaticClusterRoleBinding(binding *rbacv1.ClusterRoleBinding) RBACPermissionBuilder {
-	p.u.fns = append(p.u.fns, func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+	p.u.fns = append(p.u.fns, func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 		_, _, err := ApplyClusterRoleBinding(context.TODO(), p.kubeClient.RbacV1(), binding)
 		return err
 	})
@@ -229,7 +229,7 @@ func (p *permissionBuilder) WithStaticClusterRoleBinding(binding *rbacv1.Cluster
 }
 
 func (p *permissionBuilder) WithStaticRole(role *rbacv1.Role) RBACPermissionBuilder {
-	p.u.fns = append(p.u.fns, func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+	p.u.fns = append(p.u.fns, func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 		role.Namespace = cluster.Name
 		ensureAddonOwnerReference(&role.ObjectMeta, addon)
 		_, _, err := ApplyRole(context.TODO(), p.kubeClient.RbacV1(), role)
@@ -239,7 +239,7 @@ func (p *permissionBuilder) WithStaticRole(role *rbacv1.Role) RBACPermissionBuil
 }
 
 func (p *permissionBuilder) WithStaticRoleBinding(binding *rbacv1.RoleBinding) RBACPermissionBuilder {
-	p.u.fns = append(p.u.fns, func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+	p.u.fns = append(p.u.fns, func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 		binding.Namespace = cluster.Name
 		ensureAddonOwnerReference(&binding.ObjectMeta, addon)
 		_, _, err := ApplyRoleBinding(context.TODO(), p.kubeClient.RbacV1(), binding)
@@ -257,7 +257,7 @@ type unionPermissionBuilder struct {
 }
 
 func (b *unionPermissionBuilder) build() agent.PermissionConfigFunc {
-	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 		for _, fn := range b.fns {
 			if err := fn(cluster, addon); err != nil {
 				return err
@@ -270,9 +270,9 @@ func (b *unionPermissionBuilder) build() agent.PermissionConfigFunc {
 // BuildSubjectsFromRegistration extracts and builds RBAC subjects from addon registration status.
 // Returns nil if no matching registration is found or if the subject is empty.
 // The system:authenticated group is filtered out to prevent overly permissive RBAC bindings.
-func BuildSubjectsFromRegistration(addon *addonapiv1alpha1.ManagedClusterAddOn, signerName string) []rbacv1.Subject {
+func BuildSubjectsFromRegistration(addon *addonapiv1beta1.ManagedClusterAddOn, signerName string) []rbacv1.Subject {
 	// Find the registration config for the specified signer
-	var subject *addonapiv1alpha1.Subject
+	var subject *addonapiv1beta1.Subject
 	for _, registration := range addon.Status.Registrations {
 		if registration.SignerName == signerName {
 			subject = &registration.Subject
@@ -281,7 +281,7 @@ func BuildSubjectsFromRegistration(addon *addonapiv1alpha1.ManagedClusterAddOn, 
 	}
 
 	// If no registration config found or subject is empty, return nil
-	if subject == nil || equality.Semantic.DeepEqual(*subject, addonapiv1alpha1.Subject{}) {
+	if subject == nil || equality.Semantic.DeepEqual(*subject, addonapiv1beta1.Subject{}) {
 		return nil
 	}
 
@@ -312,10 +312,10 @@ func BuildSubjectsFromRegistration(addon *addonapiv1alpha1.ManagedClusterAddOn, 
 	return subjects
 }
 
-func ensureAddonOwnerReference(metadata *metav1.ObjectMeta, addon *addonapiv1alpha1.ManagedClusterAddOn) {
+func ensureAddonOwnerReference(metadata *metav1.ObjectMeta, addon *addonapiv1beta1.ManagedClusterAddOn) {
 	metadata.OwnerReferences = []metav1.OwnerReference{
 		{
-			APIVersion:         addonapiv1alpha1.GroupVersion.String(),
+			APIVersion:         addonapiv1beta1.GroupVersion.String(),
 			Kind:               "ManagedClusterAddOn",
 			Name:               addon.Name,
 			BlockOwnerDeletion: pointer.Bool(true),

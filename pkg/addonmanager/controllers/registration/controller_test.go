@@ -15,7 +15,7 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/agent"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	fakecluster "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
@@ -26,12 +26,12 @@ import (
 type testAgent struct {
 	name                  string
 	namespace             string
-	registrations         []addonapiv1alpha1.RegistrationConfig
-	agentInstallNamespace func(addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error)
+	registrations         []addonapiv1beta1.RegistrationConfig
+	agentInstallNamespace func(addon *addonapiv1beta1.ManagedClusterAddOn) (string, error)
 	permissionConfig      agent.PermissionConfigFunc
 }
 
-func (t *testAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
+func (t *testAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error) {
 	return []runtime.Object{}, nil
 }
 
@@ -44,7 +44,7 @@ func (t *testAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
 	agentOption := agent.AgentAddonOptions{
 		AddonName: t.name,
 		Registration: &agent.RegistrationOption{
-			CSRConfigurations: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]addonapiv1alpha1.RegistrationConfig, error) {
+			CSRConfigurations: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) ([]addonapiv1beta1.RegistrationConfig, error) {
 				return t.registrations, nil
 			},
 			PermissionConfig: t.permissionConfig,
@@ -72,13 +72,13 @@ func TestReconcile(t *testing.T) {
 			addon:                []runtime.Object{addontesting.NewAddon("test", "cluster1")},
 			cluster:              []runtime.Object{},
 			validateAddonActions: addontesting.AssertNoActions,
-			testaddon:            &testAgent{name: "test", registrations: []addonapiv1alpha1.RegistrationConfig{}},
+			testaddon:            &testAgent{name: "test", registrations: []addonapiv1beta1.RegistrationConfig{}},
 		},
 		{
 			name:                 "no addon",
 			cluster:              []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			validateAddonActions: addontesting.AssertNoActions,
-			testaddon:            &testAgent{name: "test", registrations: []addonapiv1alpha1.RegistrationConfig{}},
+			testaddon:            &testAgent{name: "test", registrations: []addonapiv1beta1.RegistrationConfig{}},
 		},
 		{
 			name:    "no registrations",
@@ -89,27 +89,27 @@ func TestReconcile(t *testing.T) {
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "patch")
 				actual := actions[0].(clienttesting.PatchActionImpl).Patch
-				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
 				err := json.Unmarshal(actual, addOn)
 				if err != nil {
 					t.Fatal(err)
 				}
-				if !meta.IsStatusConditionTrue(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnRegistrationApplied) {
+				if !meta.IsStatusConditionTrue(addOn.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnRegistrationApplied) {
 					t.Errorf("Unexpected status condition patch, got %s", string(actual))
 				}
 			},
-			testaddon: &testAgent{name: "test", registrations: []addonapiv1alpha1.RegistrationConfig{}},
+			testaddon: &testAgent{name: "test", registrations: []addonapiv1beta1.RegistrationConfig{}},
 		},
 		{
 			name:    "no owner",
 			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			addon: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1")
 					return addon
 				}(),
 			},
-			testaddon: &testAgent{name: "test", namespace: "default", registrations: []addonapiv1alpha1.RegistrationConfig{
+			testaddon: &testAgent{name: "test", namespace: "default", registrations: []addonapiv1beta1.RegistrationConfig{
 				{
 					SignerName: "test",
 				},
@@ -120,7 +120,7 @@ func TestReconcile(t *testing.T) {
 			name:    "with registrations",
 			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			addon: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1", metav1.OwnerReference{
 						Kind: "ClusterManagementAddOn",
 						Name: "test",
@@ -131,7 +131,7 @@ func TestReconcile(t *testing.T) {
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "patch")
 				actual := actions[0].(clienttesting.PatchActionImpl).Patch
-				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
 				err := json.Unmarshal(actual, addOn)
 				if err != nil {
 					t.Fatal(err)
@@ -143,7 +143,7 @@ func TestReconcile(t *testing.T) {
 					t.Errorf("Namespace in status is not correct")
 				}
 			},
-			testaddon: &testAgent{name: "test", namespace: "default", registrations: []addonapiv1alpha1.RegistrationConfig{
+			testaddon: &testAgent{name: "test", namespace: "default", registrations: []addonapiv1beta1.RegistrationConfig{
 				{
 					SignerName: "test",
 				},
@@ -153,7 +153,7 @@ func TestReconcile(t *testing.T) {
 			name:    "with registrations and override namespace",
 			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			addon: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1", metav1.OwnerReference{
 						Kind: "ClusterManagementAddOn",
 						Name: "test",
@@ -165,7 +165,7 @@ func TestReconcile(t *testing.T) {
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "patch")
 				actual := actions[0].(clienttesting.PatchActionImpl).Patch
-				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
 				err := json.Unmarshal(actual, addOn)
 				if err != nil {
 					t.Fatal(err)
@@ -177,7 +177,7 @@ func TestReconcile(t *testing.T) {
 					t.Errorf("Namespace %s in status is not correct default2", addOn.Status.Namespace)
 				}
 			},
-			testaddon: &testAgent{name: "test", namespace: "default", registrations: []addonapiv1alpha1.RegistrationConfig{
+			testaddon: &testAgent{name: "test", namespace: "default", registrations: []addonapiv1beta1.RegistrationConfig{
 				{
 					SignerName: "test",
 				},
@@ -187,7 +187,7 @@ func TestReconcile(t *testing.T) {
 			name:    "with registrations and override namespace by agentInstallNamespace",
 			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			addon: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1", metav1.OwnerReference{
 						Kind: "ClusterManagementAddOn",
 						Name: "test",
@@ -199,7 +199,7 @@ func TestReconcile(t *testing.T) {
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "patch")
 				actual := actions[0].(clienttesting.PatchActionImpl).Patch
-				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
 				err := json.Unmarshal(actual, addOn)
 				if err != nil {
 					t.Fatal(err)
@@ -212,8 +212,8 @@ func TestReconcile(t *testing.T) {
 				}
 			},
 			testaddon: &testAgent{name: "test", namespace: "default",
-				registrations: []addonapiv1alpha1.RegistrationConfig{{SignerName: "test"}},
-				agentInstallNamespace: func(addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error) {
+				registrations: []addonapiv1beta1.RegistrationConfig{{SignerName: "test"}},
+				agentInstallNamespace: func(addon *addonapiv1beta1.ManagedClusterAddOn) (string, error) {
 					return "default3", nil
 				},
 			},
@@ -222,7 +222,7 @@ func TestReconcile(t *testing.T) {
 			name:    "default namespace when no namespace is specified",
 			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			addon: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1", metav1.OwnerReference{
 						Kind: "ClusterManagementAddOn",
 						Name: "test",
@@ -233,7 +233,7 @@ func TestReconcile(t *testing.T) {
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "patch")
 				actual := actions[0].(clienttesting.PatchActionImpl).Patch
-				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
 				err := json.Unmarshal(actual, addOn)
 				if err != nil {
 					t.Fatal(err)
@@ -245,7 +245,7 @@ func TestReconcile(t *testing.T) {
 					t.Errorf("Namespace %s in status is not correct, expected open-cluster-management-agent-addon", addOn.Status.Namespace)
 				}
 			},
-			testaddon: &testAgent{name: "test", namespace: "", registrations: []addonapiv1alpha1.RegistrationConfig{
+			testaddon: &testAgent{name: "test", namespace: "", registrations: []addonapiv1beta1.RegistrationConfig{
 				{
 					SignerName: "test",
 				},
@@ -255,7 +255,7 @@ func TestReconcile(t *testing.T) {
 			name:    "permission config pending - prerequisites not met",
 			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			addon: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1", metav1.OwnerReference{
 						Kind: "ClusterManagementAddOn",
 						Name: "test",
@@ -266,12 +266,12 @@ func TestReconcile(t *testing.T) {
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "patch")
 				actual := actions[0].(clienttesting.PatchActionImpl).Patch
-				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
 				err := json.Unmarshal(actual, addOn)
 				if err != nil {
 					t.Fatal(err)
 				}
-				cond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnRegistrationApplied)
+				cond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnRegistrationApplied)
 				if cond == nil {
 					t.Errorf("Expected RegistrationApplied condition to be set")
 				} else if cond.Status != metav1.ConditionFalse {
@@ -285,10 +285,10 @@ func TestReconcile(t *testing.T) {
 			testaddon: &testAgent{
 				name:      "test",
 				namespace: "default",
-				registrations: []addonapiv1alpha1.RegistrationConfig{
+				registrations: []addonapiv1beta1.RegistrationConfig{
 					{SignerName: "test"},
 				},
-				permissionConfig: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+				permissionConfig: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 					return &agent.SubjectNotReadyError{}
 				},
 			},
@@ -297,7 +297,7 @@ func TestReconcile(t *testing.T) {
 			name:    "success - both permission and subject ready",
 			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			addon: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1", metav1.OwnerReference{
 						Kind: "ClusterManagementAddOn",
 						Name: "test",
@@ -309,12 +309,12 @@ func TestReconcile(t *testing.T) {
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "patch")
 				actual := actions[0].(clienttesting.PatchActionImpl).Patch
-				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
 				err := json.Unmarshal(actual, addOn)
 				if err != nil {
 					t.Fatal(err)
 				}
-				cond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnRegistrationApplied)
+				cond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnRegistrationApplied)
 				if cond == nil {
 					t.Errorf("Expected RegistrationApplied condition to be set")
 				} else if cond.Status != metav1.ConditionTrue {
@@ -324,10 +324,10 @@ func TestReconcile(t *testing.T) {
 			testaddon: &testAgent{
 				name:      "test",
 				namespace: "default",
-				registrations: []addonapiv1alpha1.RegistrationConfig{
+				registrations: []addonapiv1beta1.RegistrationConfig{
 					{SignerName: certificatesv1.KubeAPIServerClientSignerName},
 				},
-				permissionConfig: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+				permissionConfig: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 					return nil
 				},
 			},
@@ -336,7 +336,7 @@ func TestReconcile(t *testing.T) {
 			name:    "success - permission ready even with empty kubeClientDriver",
 			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			addon: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1", metav1.OwnerReference{
 						Kind: "ClusterManagementAddOn",
 						Name: "test",
@@ -348,22 +348,22 @@ func TestReconcile(t *testing.T) {
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "patch")
 				actual := actions[0].(clienttesting.PatchActionImpl).Patch
-				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
 				err := json.Unmarshal(actual, addOn)
 				if err != nil {
 					t.Fatal(err)
 				}
-				if !meta.IsStatusConditionTrue(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnRegistrationApplied) {
+				if !meta.IsStatusConditionTrue(addOn.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnRegistrationApplied) {
 					t.Errorf("Expected RegistrationApplied condition to be true")
 				}
 			},
 			testaddon: &testAgent{
 				name:      "test",
 				namespace: "default",
-				registrations: []addonapiv1alpha1.RegistrationConfig{
+				registrations: []addonapiv1beta1.RegistrationConfig{
 					{SignerName: certificatesv1.KubeAPIServerClientSignerName},
 				},
-				permissionConfig: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+				permissionConfig: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 					return nil
 				},
 			},
@@ -372,7 +372,7 @@ func TestReconcile(t *testing.T) {
 			name:    "permission not ready - takes precedence",
 			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			addon: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1", metav1.OwnerReference{
 						Kind: "ClusterManagementAddOn",
 						Name: "test",
@@ -384,12 +384,12 @@ func TestReconcile(t *testing.T) {
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "patch")
 				actual := actions[0].(clienttesting.PatchActionImpl).Patch
-				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
 				err := json.Unmarshal(actual, addOn)
 				if err != nil {
 					t.Fatal(err)
 				}
-				cond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnRegistrationApplied)
+				cond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnRegistrationApplied)
 				if cond == nil {
 					t.Errorf("Expected RegistrationApplied condition to be set")
 				} else if cond.Status != metav1.ConditionFalse {
@@ -401,10 +401,10 @@ func TestReconcile(t *testing.T) {
 			testaddon: &testAgent{
 				name:      "test",
 				namespace: "default",
-				registrations: []addonapiv1alpha1.RegistrationConfig{
+				registrations: []addonapiv1beta1.RegistrationConfig{
 					{SignerName: certificatesv1.KubeAPIServerClientSignerName},
 				},
-				permissionConfig: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+				permissionConfig: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 					return &agent.SubjectNotReadyError{}
 				},
 			},
@@ -414,7 +414,7 @@ func TestReconcile(t *testing.T) {
 			cluster:     []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			expectError: true,
 			addon: []runtime.Object{
-				func() *addonapiv1alpha1.ManagedClusterAddOn {
+				func() *addonapiv1beta1.ManagedClusterAddOn {
 					addon := addontesting.NewAddon("test", "cluster1", metav1.OwnerReference{
 						Kind: "ClusterManagementAddOn",
 						Name: "test",
@@ -425,27 +425,27 @@ func TestReconcile(t *testing.T) {
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "patch")
 				actual := actions[0].(clienttesting.PatchActionImpl).Patch
-				addOn := &addonapiv1alpha1.ManagedClusterAddOn{}
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
 				err := json.Unmarshal(actual, addOn)
 				if err != nil {
 					t.Fatal(err)
 				}
-				cond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnRegistrationApplied)
+				cond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnRegistrationApplied)
 				if cond == nil {
 					t.Errorf("Expected RegistrationApplied condition to be set")
 				} else if cond.Status != metav1.ConditionFalse {
 					t.Errorf("Expected RegistrationApplied condition status to be False, got %s", cond.Status)
-				} else if cond.Reason != addonapiv1alpha1.RegistrationAppliedSetPermissionFailed {
+				} else if cond.Reason != addonapiv1beta1.RegistrationAppliedSetPermissionFailed {
 					t.Errorf("Expected RegistrationApplied condition reason to be RegistrationAppliedSetPermissionFailed, got %s", cond.Reason)
 				}
 			},
 			testaddon: &testAgent{
 				name:      "test",
 				namespace: "default",
-				registrations: []addonapiv1alpha1.RegistrationConfig{
+				registrations: []addonapiv1beta1.RegistrationConfig{
 					{SignerName: "test"},
 				},
-				permissionConfig: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+				permissionConfig: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 					return fmt.Errorf("permission config failed")
 				},
 			},
@@ -479,7 +479,7 @@ func TestReconcile(t *testing.T) {
 			}
 
 			for _, obj := range c.addon {
-				addon := obj.(*addonapiv1alpha1.ManagedClusterAddOn)
+				addon := obj.(*addonapiv1beta1.ManagedClusterAddOn)
 				key := fmt.Sprintf("%s/%s", addon.Namespace, addon.Name)
 				syncContext := addontesting.NewFakeSyncContext(t)
 				err := controller.sync(context.TODO(), syncContext, key)
@@ -501,11 +501,11 @@ func TestReconcile(t *testing.T) {
 
 func TestBuildRegistrationConfigs(t *testing.T) {
 	customSignerName := "example.com/custom-signer"
-	testSubject := addonapiv1alpha1.Subject{
+	testSubject := addonapiv1beta1.Subject{
 		User:   "test-user",
 		Groups: []string{"test-group"},
 	}
-	existingSubject := addonapiv1alpha1.Subject{
+	existingSubject := addonapiv1beta1.Subject{
 		User:   "existing-user",
 		Groups: []string{"existing-group"},
 	}
@@ -513,28 +513,28 @@ func TestBuildRegistrationConfigs(t *testing.T) {
 	tests := []struct {
 		name                  string
 		kubeClientDriver      string
-		newConfigs            []addonapiv1alpha1.RegistrationConfig
-		existingRegistrations []addonapiv1alpha1.RegistrationConfig
-		expectedRegistrations []addonapiv1alpha1.RegistrationConfig
+		newConfigs            []addonapiv1beta1.RegistrationConfig
+		existingRegistrations []addonapiv1beta1.RegistrationConfig
+		expectedRegistrations []addonapiv1beta1.RegistrationConfig
 	}{
 		{
 			name:                  "empty new configs",
 			kubeClientDriver:      "",
-			newConfigs:            []addonapiv1alpha1.RegistrationConfig{},
-			existingRegistrations: []addonapiv1alpha1.RegistrationConfig{},
-			expectedRegistrations: []addonapiv1alpha1.RegistrationConfig{},
+			newConfigs:            []addonapiv1beta1.RegistrationConfig{},
+			existingRegistrations: []addonapiv1beta1.RegistrationConfig{},
+			expectedRegistrations: []addonapiv1beta1.RegistrationConfig{},
 		},
 		{
 			name:             "no existing registrations - kubeClientDriver empty",
 			kubeClientDriver: "",
-			newConfigs: []addonapiv1alpha1.RegistrationConfig{
+			newConfigs: []addonapiv1beta1.RegistrationConfig{
 				{
 					SignerName: certificatesv1.KubeAPIServerClientSignerName,
 					Subject:    testSubject,
 				},
 			},
-			existingRegistrations: []addonapiv1alpha1.RegistrationConfig{},
-			expectedRegistrations: []addonapiv1alpha1.RegistrationConfig{
+			existingRegistrations: []addonapiv1beta1.RegistrationConfig{},
+			expectedRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
 					SignerName: certificatesv1.KubeAPIServerClientSignerName,
 					Subject:    testSubject, // use subject from newConfigs
@@ -544,14 +544,14 @@ func TestBuildRegistrationConfigs(t *testing.T) {
 		{
 			name:             "non-kubeclient type - use subject from newConfigs",
 			kubeClientDriver: "",
-			newConfigs: []addonapiv1alpha1.RegistrationConfig{
+			newConfigs: []addonapiv1beta1.RegistrationConfig{
 				{
 					SignerName: customSignerName,
 					Subject:    testSubject,
 				},
 			},
-			existingRegistrations: []addonapiv1alpha1.RegistrationConfig{},
-			expectedRegistrations: []addonapiv1alpha1.RegistrationConfig{
+			existingRegistrations: []addonapiv1beta1.RegistrationConfig{},
+			expectedRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
 					SignerName: customSignerName,
 					Subject:    testSubject, // from newConfigs
@@ -561,14 +561,14 @@ func TestBuildRegistrationConfigs(t *testing.T) {
 		{
 			name:             "kubeclient with csr driver - use subject from newConfigs",
 			kubeClientDriver: "csr",
-			newConfigs: []addonapiv1alpha1.RegistrationConfig{
+			newConfigs: []addonapiv1beta1.RegistrationConfig{
 				{
 					SignerName: certificatesv1.KubeAPIServerClientSignerName,
 					Subject:    testSubject,
 				},
 			},
-			existingRegistrations: []addonapiv1alpha1.RegistrationConfig{},
-			expectedRegistrations: []addonapiv1alpha1.RegistrationConfig{
+			existingRegistrations: []addonapiv1beta1.RegistrationConfig{},
+			expectedRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
 					SignerName: certificatesv1.KubeAPIServerClientSignerName,
 					Subject:    testSubject, // from newConfigs (not preserved because driver is csr)
@@ -578,19 +578,19 @@ func TestBuildRegistrationConfigs(t *testing.T) {
 		{
 			name:             "kubeclient with token driver - preserve existing subject",
 			kubeClientDriver: "token",
-			newConfigs: []addonapiv1alpha1.RegistrationConfig{
+			newConfigs: []addonapiv1beta1.RegistrationConfig{
 				{
 					SignerName: certificatesv1.KubeAPIServerClientSignerName,
 					Subject:    testSubject,
 				},
 			},
-			existingRegistrations: []addonapiv1alpha1.RegistrationConfig{
+			existingRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
 					SignerName: certificatesv1.KubeAPIServerClientSignerName,
 					Subject:    existingSubject,
 				},
 			},
-			expectedRegistrations: []addonapiv1alpha1.RegistrationConfig{
+			expectedRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
 					SignerName: certificatesv1.KubeAPIServerClientSignerName,
 					Subject:    existingSubject, // preserved from existing
@@ -600,19 +600,19 @@ func TestBuildRegistrationConfigs(t *testing.T) {
 		{
 			name:             "kubeclient with empty driver - use subject from newConfigs",
 			kubeClientDriver: "",
-			newConfigs: []addonapiv1alpha1.RegistrationConfig{
+			newConfigs: []addonapiv1beta1.RegistrationConfig{
 				{
 					SignerName: certificatesv1.KubeAPIServerClientSignerName,
 					Subject:    testSubject,
 				},
 			},
-			existingRegistrations: []addonapiv1alpha1.RegistrationConfig{
+			existingRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
 					SignerName: certificatesv1.KubeAPIServerClientSignerName,
 					Subject:    existingSubject,
 				},
 			},
-			expectedRegistrations: []addonapiv1alpha1.RegistrationConfig{
+			expectedRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
 					SignerName: certificatesv1.KubeAPIServerClientSignerName,
 					Subject:    testSubject, // use subject from newConfigs
@@ -622,58 +622,58 @@ func TestBuildRegistrationConfigs(t *testing.T) {
 		{
 			name:             "kubeclient with token driver and empty existing subject",
 			kubeClientDriver: "token",
-			newConfigs: []addonapiv1alpha1.RegistrationConfig{
+			newConfigs: []addonapiv1beta1.RegistrationConfig{
 				{
 					SignerName: certificatesv1.KubeAPIServerClientSignerName,
 					Subject:    testSubject,
 				},
 			},
-			existingRegistrations: []addonapiv1alpha1.RegistrationConfig{
+			existingRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
 					SignerName: certificatesv1.KubeAPIServerClientSignerName,
-					Subject:    addonapiv1alpha1.Subject{}, // empty subject
+					Subject:    addonapiv1beta1.Subject{}, // empty subject
 				},
 			},
-			expectedRegistrations: []addonapiv1alpha1.RegistrationConfig{
+			expectedRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
 					SignerName: certificatesv1.KubeAPIServerClientSignerName,
-					Subject:    addonapiv1alpha1.Subject{}, // preserved empty subject
+					Subject:    addonapiv1beta1.Subject{}, // preserved empty subject
 				},
 			},
 		},
 		{
 			name:             "kubeclient with token driver - no existing registration",
 			kubeClientDriver: "token",
-			newConfigs: []addonapiv1alpha1.RegistrationConfig{
+			newConfigs: []addonapiv1beta1.RegistrationConfig{
 				{
 					SignerName: certificatesv1.KubeAPIServerClientSignerName,
 					Subject:    testSubject,
 				},
 			},
-			existingRegistrations: []addonapiv1alpha1.RegistrationConfig{}, // no existing registration
-			expectedRegistrations: []addonapiv1alpha1.RegistrationConfig{
+			existingRegistrations: []addonapiv1beta1.RegistrationConfig{}, // no existing registration
+			expectedRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
 					SignerName: certificatesv1.KubeAPIServerClientSignerName,
-					Subject:    addonapiv1alpha1.Subject{}, // cleared, waiting for agent to set
+					Subject:    addonapiv1beta1.Subject{}, // cleared, waiting for agent to set
 				},
 			},
 		},
 		{
 			name:             "kubeclient with csr driver - existing registrations ignored",
 			kubeClientDriver: "csr",
-			newConfigs: []addonapiv1alpha1.RegistrationConfig{
+			newConfigs: []addonapiv1beta1.RegistrationConfig{
 				{
 					SignerName: certificatesv1.KubeAPIServerClientSignerName,
 					Subject:    testSubject,
 				},
 			},
-			existingRegistrations: []addonapiv1alpha1.RegistrationConfig{
+			existingRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
 					SignerName: certificatesv1.KubeAPIServerClientSignerName,
 					Subject:    existingSubject,
 				},
 			},
-			expectedRegistrations: []addonapiv1alpha1.RegistrationConfig{
+			expectedRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
 					SignerName: certificatesv1.KubeAPIServerClientSignerName,
 					Subject:    testSubject, // from newConfigs, existing ignored
@@ -683,7 +683,7 @@ func TestBuildRegistrationConfigs(t *testing.T) {
 		{
 			name:             "multiple configs - mixed signer types",
 			kubeClientDriver: "token",
-			newConfigs: []addonapiv1alpha1.RegistrationConfig{
+			newConfigs: []addonapiv1beta1.RegistrationConfig{
 				{
 					SignerName: certificatesv1.KubeAPIServerClientSignerName,
 					Subject:    testSubject,
@@ -693,13 +693,13 @@ func TestBuildRegistrationConfigs(t *testing.T) {
 					Subject:    testSubject,
 				},
 			},
-			existingRegistrations: []addonapiv1alpha1.RegistrationConfig{
+			existingRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
 					SignerName: certificatesv1.KubeAPIServerClientSignerName,
 					Subject:    existingSubject,
 				},
 			},
-			expectedRegistrations: []addonapiv1alpha1.RegistrationConfig{
+			expectedRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
 					SignerName: certificatesv1.KubeAPIServerClientSignerName,
 					Subject:    existingSubject, // preserved from existing for KubeClient
@@ -713,39 +713,39 @@ func TestBuildRegistrationConfigs(t *testing.T) {
 		{
 			name:             "kubeclient with token driver - mismatched signer in existing",
 			kubeClientDriver: "token",
-			newConfigs: []addonapiv1alpha1.RegistrationConfig{
+			newConfigs: []addonapiv1beta1.RegistrationConfig{
 				{
 					SignerName: certificatesv1.KubeAPIServerClientSignerName,
 					Subject:    testSubject,
 				},
 			},
-			existingRegistrations: []addonapiv1alpha1.RegistrationConfig{
+			existingRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
 					SignerName: customSignerName, // different signer
 					Subject:    existingSubject,
 				},
 			},
-			expectedRegistrations: []addonapiv1alpha1.RegistrationConfig{
+			expectedRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
 					SignerName: certificatesv1.KubeAPIServerClientSignerName,
-					Subject:    addonapiv1alpha1.Subject{}, // cleared, no matching existing
+					Subject:    addonapiv1beta1.Subject{}, // cleared, no matching existing
 				},
 			},
 		},
 		{
 			name:             "kubeclient with csr driver - empty subject gets default",
 			kubeClientDriver: "csr",
-			newConfigs: []addonapiv1alpha1.RegistrationConfig{
+			newConfigs: []addonapiv1beta1.RegistrationConfig{
 				{
 					SignerName: certificatesv1.KubeAPIServerClientSignerName,
-					Subject:    addonapiv1alpha1.Subject{}, // empty subject
+					Subject:    addonapiv1beta1.Subject{}, // empty subject
 				},
 			},
-			existingRegistrations: []addonapiv1alpha1.RegistrationConfig{},
-			expectedRegistrations: []addonapiv1alpha1.RegistrationConfig{
+			existingRegistrations: []addonapiv1beta1.RegistrationConfig{},
+			expectedRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
 					SignerName: certificatesv1.KubeAPIServerClientSignerName,
-					Subject: addonapiv1alpha1.Subject{
+					Subject: addonapiv1beta1.Subject{
 						User:   "system:open-cluster-management:cluster:cluster1:addon:test-addon:agent:test-addon",
 						Groups: []string{"system:open-cluster-management:cluster:cluster1:addon:test-addon", "system:open-cluster-management:addon:test-addon"},
 					}, // default subject set

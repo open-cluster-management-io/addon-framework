@@ -9,7 +9,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
@@ -28,9 +28,9 @@ type healthCheckSyncer struct {
 func (s *healthCheckSyncer) sync(ctx context.Context,
 	syncCtx factory.SyncContext,
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.ManagedClusterAddOn, error) {
+	addon *addonapiv1beta1.ManagedClusterAddOn) (*addonapiv1beta1.ManagedClusterAddOn, error) {
 	// reconcile health check mode
-	var expectedHealthCheckMode addonapiv1alpha1.HealthCheckMode
+	var expectedHealthCheckMode addonapiv1beta1.HealthCheckMode
 
 	if s.agentAddon.GetAgentAddonOptions().HealthProber == nil {
 		return addon, nil
@@ -39,11 +39,11 @@ func (s *healthCheckSyncer) sync(ctx context.Context,
 	switch s.agentAddon.GetAgentAddonOptions().HealthProber.Type {
 	case agent.HealthProberTypeWork, agent.HealthProberTypeNone,
 		agent.HealthProberTypeDeploymentAvailability, agent.HealthProberTypeWorkloadAvailability:
-		expectedHealthCheckMode = addonapiv1alpha1.HealthCheckModeCustomized
+		expectedHealthCheckMode = addonapiv1beta1.HealthCheckModeCustomized
 	case agent.HealthProberTypeLease:
-		expectedHealthCheckMode = addonapiv1alpha1.HealthCheckModeLease
+		expectedHealthCheckMode = addonapiv1beta1.HealthCheckModeLease
 	default:
-		expectedHealthCheckMode = addonapiv1alpha1.HealthCheckModeLease
+		expectedHealthCheckMode = addonapiv1beta1.HealthCheckModeLease
 	}
 
 	if expectedHealthCheckMode != addon.Status.HealthCheck.Mode {
@@ -56,7 +56,7 @@ func (s *healthCheckSyncer) sync(ctx context.Context,
 
 func (s *healthCheckSyncer) probeAddonStatus(
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+	addon *addonapiv1beta1.ManagedClusterAddOn) error {
 	switch s.agentAddon.GetAgentAddonOptions().HealthProber.Type {
 	case agent.HealthProberTypeWork:
 		return s.probeWorkAddonStatus(cluster, addon)
@@ -70,23 +70,23 @@ func (s *healthCheckSyncer) probeAddonStatus(
 }
 func (s *healthCheckSyncer) probeWorkAddonStatus(
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+	addon *addonapiv1beta1.ManagedClusterAddOn) error {
 	if s.agentAddon.GetAgentAddonOptions().HealthProber.Type != agent.HealthProberTypeWork {
 		return nil
 	}
 
 	if s.agentAddon.GetAgentAddonOptions().HealthProber.WorkProber == nil {
 		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-			Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+			Type:    addonapiv1beta1.ManagedClusterAddOnConditionAvailable,
 			Status:  metav1.ConditionTrue,
-			Reason:  addonapiv1alpha1.AddonAvailableReasonWorkApply,
+			Reason:  addonapiv1beta1.AddonAvailableReasonWorkApply,
 			Message: "Addon manifestWork is applied",
 		})
 		return nil
 	}
 
 	// update Available condition after addon manifestWorks are applied
-	if meta.FindStatusCondition(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnManifestApplied) == nil {
+	if meta.FindStatusCondition(addon.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnManifestApplied) == nil {
 		return nil
 	}
 
@@ -94,12 +94,12 @@ func (s *healthCheckSyncer) probeWorkAddonStatus(
 }
 
 func (s *healthCheckSyncer) probeDeploymentAvailabilityAddonStatus(
-	cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+	cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 	return s.probeWorkloadAvailabilityAddonStatus(cluster, addon)
 }
 
 func (s *healthCheckSyncer) probeWorkloadAvailabilityAddonStatus(
-	cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+	cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 
 	proberType := s.agentAddon.GetAgentAddonOptions().HealthProber.Type
 	if proberType != agent.HealthProberTypeDeploymentAvailability &&
@@ -108,7 +108,7 @@ func (s *healthCheckSyncer) probeWorkloadAvailabilityAddonStatus(
 	}
 
 	// wait for the addon manifest applied
-	if meta.FindStatusCondition(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnManifestApplied) == nil {
+	if meta.FindStatusCondition(addon.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnManifestApplied) == nil {
 		return nil
 	}
 
@@ -116,7 +116,7 @@ func (s *healthCheckSyncer) probeWorkloadAvailabilityAddonStatus(
 }
 
 func (s *healthCheckSyncer) probeAddonStatusByWorks(
-	cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+	cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 
 	if cluster != nil {
 		clusterAvailableCondition := meta.FindStatusCondition(cluster.Status.Conditions,
@@ -143,9 +143,9 @@ func (s *healthCheckSyncer) probeAddonStatusByWorks(
 
 	if err != nil || len(addonManifestWorks) == 0 {
 		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-			Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+			Type:    addonapiv1beta1.ManagedClusterAddOnConditionAvailable,
 			Status:  metav1.ConditionUnknown,
-			Reason:  addonapiv1alpha1.AddonAvailableReasonWorkNotFound,
+			Reason:  addonapiv1beta1.AddonAvailableReasonWorkNotFound,
 			Message: "Addon manifestWork is not found",
 		})
 		return err
@@ -161,17 +161,17 @@ func (s *healthCheckSyncer) probeAddonStatusByWorks(
 		switch {
 		case workCond == nil:
 			meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+				Type:    addonapiv1beta1.ManagedClusterAddOnConditionAvailable,
 				Status:  metav1.ConditionUnknown,
-				Reason:  addonapiv1alpha1.AddonAvailableReasonWorkNotApply,
+				Reason:  addonapiv1beta1.AddonAvailableReasonWorkNotApply,
 				Message: "Addon manifestWork is not applied yet",
 			})
 			return nil
 		case workCond.Status == metav1.ConditionFalse:
 			meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+				Type:    addonapiv1beta1.ManagedClusterAddOnConditionAvailable,
 				Status:  metav1.ConditionFalse,
-				Reason:  addonapiv1alpha1.AddonAvailableReasonWorkNotApply,
+				Reason:  addonapiv1beta1.AddonAvailableReasonWorkNotApply,
 				Message: workCond.Message,
 			})
 			return nil
@@ -205,9 +205,9 @@ func (s *healthCheckSyncer) probeAddonStatusByWorks(
 
 		if healthCheck == nil {
 			meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+				Type:    addonapiv1beta1.ManagedClusterAddOnConditionAvailable,
 				Status:  metav1.ConditionFalse,
-				Reason:  addonapiv1alpha1.AddonAvailableReasonProbeUnavailable,
+				Reason:  addonapiv1beta1.AddonAvailableReasonProbeUnavailable,
 				Message: fmt.Sprintf("health checker function is not set %v", err),
 			})
 			return nil
@@ -217,9 +217,9 @@ func (s *healthCheckSyncer) probeAddonStatusByWorks(
 			err := healthCheck(result.ResourceIdentifier, result.FeedbackResult)
 			if err != nil {
 				meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-					Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+					Type:    addonapiv1beta1.ManagedClusterAddOnConditionAvailable,
 					Status:  metav1.ConditionFalse,
-					Reason:  addonapiv1alpha1.AddonAvailableReasonProbeUnavailable,
+					Reason:  addonapiv1beta1.AddonAvailableReasonProbeUnavailable,
 					Message: fmt.Sprintf("Probe addon unavailable with err %v", err),
 				})
 				return nil
@@ -231,9 +231,9 @@ func (s *healthCheckSyncer) probeAddonStatusByWorks(
 	// If all probe fields have no results, mark condition to unknown
 	if len(probeFields) > 0 && len(fieldResults) == 0 {
 		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-			Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+			Type:    addonapiv1beta1.ManagedClusterAddOnConditionAvailable,
 			Status:  metav1.ConditionUnknown,
-			Reason:  addonapiv1alpha1.AddonAvailableReasonNoProbeResult,
+			Reason:  addonapiv1beta1.AddonAvailableReasonNoProbeResult,
 			Message: "Probe results are not returned",
 		})
 		return nil
@@ -245,9 +245,9 @@ func (s *healthCheckSyncer) probeAddonStatusByWorks(
 	if healthChecker != nil {
 		if err := healthChecker(fieldResults, cluster, addon); err != nil {
 			meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-				Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+				Type:    addonapiv1beta1.ManagedClusterAddOnConditionAvailable,
 				Status:  metav1.ConditionFalse,
-				Reason:  addonapiv1alpha1.AddonAvailableReasonProbeUnavailable,
+				Reason:  addonapiv1beta1.AddonAvailableReasonProbeUnavailable,
 				Message: fmt.Sprintf("Probe addon unavailable with err %v", err),
 			})
 			return nil
@@ -255,9 +255,9 @@ func (s *healthCheckSyncer) probeAddonStatusByWorks(
 	}
 
 	meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-		Type:    addonapiv1alpha1.ManagedClusterAddOnConditionAvailable,
+		Type:    addonapiv1beta1.ManagedClusterAddOnConditionAvailable,
 		Status:  metav1.ConditionTrue,
-		Reason:  addonapiv1alpha1.AddonAvailableReasonProbeAvailable,
+		Reason:  addonapiv1beta1.AddonAvailableReasonProbeAvailable,
 		Message: fmt.Sprintf("%s add-on is available.", addon.Name),
 	})
 	return nil
@@ -267,7 +267,7 @@ func (s *healthCheckSyncer) probeAddonStatusByWorks(
 func (s *healthCheckSyncer) analyzeWorkProber(
 	agentAddon agent.AgentAddon,
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn,
+	addon *addonapiv1beta1.ManagedClusterAddOn,
 ) ([]agent.ProbeField, agent.AddonHealthCheckFunc, agent.AddonHealthCheckerFunc, error) {
 
 	switch agentAddon.GetAgentAddonOptions().HealthProber.Type {
@@ -291,7 +291,7 @@ func (s *healthCheckSyncer) analyzeWorkProber(
 func (s *healthCheckSyncer) analyzeDeploymentWorkProber(
 	agentAddon agent.AgentAddon,
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn,
+	addon *addonapiv1beta1.ManagedClusterAddOn,
 ) ([]agent.ProbeField, agent.AddonHealthCheckerFunc, error) {
 	probeFields := []agent.ProbeField{}
 
@@ -319,7 +319,7 @@ func (s *healthCheckSyncer) analyzeDeploymentWorkProber(
 func (s *healthCheckSyncer) analyzeWorkloadsWorkProber(
 	agentAddon agent.AgentAddon,
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn,
+	addon *addonapiv1beta1.ManagedClusterAddOn,
 ) ([]agent.ProbeField, agent.AddonHealthCheckerFunc, error) {
 	probeFields := []agent.ProbeField{}
 

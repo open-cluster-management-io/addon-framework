@@ -21,7 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
 	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
 	workv1listers "open-cluster-management.io/api/client/work/listers/work/v1"
@@ -152,7 +152,7 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 	var cancel context.CancelFunc
 	var err error
 	var managedClusterName string
-	var cma *addonapiv1alpha1.ClusterManagementAddOn
+	var cma *addonapiv1beta1.ClusterManagementAddOn
 	// var agentWorkClient workclientset.Interface
 	var agentWorkClient workv1client.ManifestWorkInterface
 	var agentWorkInformer workv1informers.ManifestWorkInformer
@@ -216,11 +216,11 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 		}
 
 		// Create ManagedClusterAddOn
-		addon := &addonapiv1alpha1.ManagedClusterAddOn{
+		addon := &addonapiv1beta1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testAddonImpl.name,
 			},
-			Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
+			Spec: addonapiv1beta1.ManagedClusterAddOnSpec{
 				InstallNamespace: "default",
 			},
 		}
@@ -270,10 +270,10 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 			if err != nil {
 				return err
 			}
-			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnManifestApplied) {
+			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnManifestApplied) {
 				return fmt.Errorf("Unexpected addon applied condition, %v", addon.Status.Conditions)
 			}
-			if cond := meta.FindStatusCondition(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionProgressing); cond != nil {
+			if cond := meta.FindStatusCondition(addon.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnConditionProgressing); cond != nil {
 				return fmt.Errorf("expected no addon progressing condition, %v", addon.Status.Conditions)
 			}
 			return nil
@@ -303,10 +303,10 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 			if err != nil {
 				return err
 			}
-			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionAvailable) {
+			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnConditionAvailable) {
 				return fmt.Errorf("Unexpected addon available condition, %v", addon.Status.Conditions)
 			}
-			if cond := meta.FindStatusCondition(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionProgressing); cond != nil {
+			if cond := meta.FindStatusCondition(addon.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnConditionProgressing); cond != nil {
 				return fmt.Errorf("expected no addon progressing condition, %v", addon.Status.Conditions)
 			}
 			return nil
@@ -335,11 +335,11 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 		testAddonImpl.manifests[managedClusterName] = []runtime.Object{obj}
 		testAddonImpl.prober = utils.NewDeploymentProber(types.NamespacedName{Name: "nginx-deployment", Namespace: "default"})
 
-		addon := &addonapiv1alpha1.ManagedClusterAddOn{
+		addon := &addonapiv1beta1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testAddonImpl.name,
 			},
-			Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
+			Spec: addonapiv1beta1.ManagedClusterAddOnSpec{
 				InstallNamespace: "default",
 			},
 		}
@@ -437,13 +437,13 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 			if err != nil {
 				return err
 			}
-			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnManifestApplied) {
+			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnManifestApplied) {
 				return fmt.Errorf("Unexpected addon applied condition, %v", addon.Status.Conditions)
 			}
-			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionAvailable) {
+			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnConditionAvailable) {
 				return fmt.Errorf("Unexpected addon available condition, %v", addon.Status.Conditions)
 			}
-			if cond := meta.FindStatusCondition(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionProgressing); cond != nil {
+			if cond := meta.FindStatusCondition(addon.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnConditionProgressing); cond != nil {
 				return fmt.Errorf("expected no addon progressing condition, %v", addon.Status.Conditions)
 			}
 			return nil
@@ -462,11 +462,11 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 			Type: agent.HealthProberTypeDeploymentAvailability,
 		}
 
-		addon := &addonapiv1alpha1.ManagedClusterAddOn{
+		addon := &addonapiv1beta1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testAddonImpl.name,
 			},
-			Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
+			Spec: addonapiv1beta1.ManagedClusterAddOnSpec{
 				InstallNamespace: "default",
 			},
 		}
@@ -566,13 +566,13 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 			if err != nil {
 				return err
 			}
-			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnManifestApplied) {
+			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnManifestApplied) {
 				return fmt.Errorf("Unexpected addon applied condition, %v", addon.Status.Conditions)
 			}
-			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionAvailable) {
+			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnConditionAvailable) {
 				return fmt.Errorf("Unexpected addon available condition, %v", addon.Status.Conditions)
 			}
-			if cond := meta.FindStatusCondition(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionProgressing); cond != nil {
+			if cond := meta.FindStatusCondition(addon.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnConditionProgressing); cond != nil {
 				return fmt.Errorf("expected no addon progressing condition, %v", addon.Status.Conditions)
 			}
 			return nil
@@ -591,11 +591,11 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 			Type: agent.HealthProberTypeWorkloadAvailability,
 		}
 
-		addon := &addonapiv1alpha1.ManagedClusterAddOn{
+		addon := &addonapiv1beta1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testAddonImpl.name,
 			},
-			Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
+			Spec: addonapiv1beta1.ManagedClusterAddOnSpec{
 				InstallNamespace: "default",
 			},
 		}
@@ -725,13 +725,13 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 			if err != nil {
 				return err
 			}
-			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnManifestApplied) {
+			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnManifestApplied) {
 				return fmt.Errorf("Unexpected addon applied condition, %v", addon.Status.Conditions)
 			}
-			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionAvailable) {
+			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnConditionAvailable) {
 				return fmt.Errorf("Unexpected addon available condition, %v", addon.Status.Conditions)
 			}
-			if cond := meta.FindStatusCondition(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnConditionProgressing); cond != nil {
+			if cond := meta.FindStatusCondition(addon.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnConditionProgressing); cond != nil {
 				return fmt.Errorf("expected no addon progressing condition, %v", addon.Status.Conditions)
 			}
 			return nil
@@ -741,7 +741,7 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 
 // The addon owner controller exist in general addon manager.
 // This is for integration testing to assume that addon manager has already added the OwnerReferences.
-func createManagedClusterAddOnwithOwnerRefs(namespace string, addon *addonapiv1alpha1.ManagedClusterAddOn, cma *addonapiv1alpha1.ClusterManagementAddOn) {
+func createManagedClusterAddOnwithOwnerRefs(namespace string, addon *addonapiv1beta1.ManagedClusterAddOn, cma *addonapiv1beta1.ClusterManagementAddOn) {
 	addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(namespace).Create(context.Background(), addon, metav1.CreateOptions{})
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -749,8 +749,8 @@ func createManagedClusterAddOnwithOwnerRefs(namespace string, addon *addonapiv1a
 
 	// This is to assume that addon-manager has already added the OwnerReferences.
 	owner := metav1.NewControllerRef(cma, schema.GroupVersionKind{
-		Group:   addonapiv1alpha1.GroupName,
-		Version: addonapiv1alpha1.GroupVersion.Version,
+		Group:   addonapiv1beta1.GroupName,
+		Version: addonapiv1beta1.GroupVersion.Version,
 		Kind:    "ClusterManagementAddOn",
 	})
 	modified := utils.MergeOwnerRefs(&addonCopy.OwnerReferences, *owner, false)

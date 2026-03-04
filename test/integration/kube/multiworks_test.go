@@ -17,7 +17,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
@@ -93,7 +93,7 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 	var managedClusterName string
 	var err error
 	var manifestWorkName0, manifestWorkName1 string
-	var cma *addonapiv1alpha1.ClusterManagementAddOn
+	var cma *addonapiv1beta1.ClusterManagementAddOn
 	ginkgo.BeforeEach(func() {
 		suffix := rand.String(5)
 		managedClusterName = fmt.Sprintf("managedcluster-%s", suffix)
@@ -150,11 +150,11 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 		}
 
 		// case 1: apply 2 works for the addon
-		addon := &addonapiv1alpha1.ManagedClusterAddOn{
+		addon := &addonapiv1beta1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testMultiWorksAddonImpl.name,
 			},
-			Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
+			Spec: addonapiv1beta1.ManagedClusterAddOnSpec{
 				InstallNamespace: "default",
 			},
 		}
@@ -162,7 +162,7 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 
 		gomega.Eventually(func() error {
 			works, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).List(context.Background(), metav1.ListOptions{
-				LabelSelector: fmt.Sprintf("%s=%s", addonapiv1alpha1.AddonLabelKey, testMultiWorksAddonImpl.name),
+				LabelSelector: fmt.Sprintf("%s=%s", addonapiv1beta1.AddonLabelKey, testMultiWorksAddonImpl.name),
 			})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			if len(works.Items) != 2 {
@@ -203,7 +203,7 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 
 		gomega.Eventually(func() error {
 			works, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).List(context.Background(), metav1.ListOptions{
-				LabelSelector: fmt.Sprintf("%s=%s", addonapiv1alpha1.AddonLabelKey, testMultiWorksAddonImpl.name),
+				LabelSelector: fmt.Sprintf("%s=%s", addonapiv1beta1.AddonLabelKey, testMultiWorksAddonImpl.name),
 			})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			if len(works.Items) != 2 {
@@ -240,7 +240,7 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 
 		gomega.Eventually(func() error {
 			works, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).List(context.Background(), metav1.ListOptions{
-				LabelSelector: fmt.Sprintf("%s=%s", addonapiv1alpha1.AddonLabelKey, testMultiWorksAddonImpl.name),
+				LabelSelector: fmt.Sprintf("%s=%s", addonapiv1beta1.AddonLabelKey, testMultiWorksAddonImpl.name),
 			})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			if len(works.Items) != 2 {
@@ -339,11 +339,11 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 		testMultiWorksAddonImpl.prober = utils.NewDeploymentProber(types.NamespacedName{Name: "nginx-deployment-0", Namespace: "default"},
 			types.NamespacedName{Name: "nginx-deployment-1", Namespace: "default"})
 
-		addon := &addonapiv1alpha1.ManagedClusterAddOn{
+		addon := &addonapiv1beta1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testMultiWorksAddonImpl.name,
 			},
-			Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
+			Spec: addonapiv1beta1.ManagedClusterAddOnSpec{
 				InstallNamespace: "default",
 			},
 		}
@@ -351,7 +351,7 @@ var _ = ginkgo.Describe("Agent deploy multi works", func() {
 
 		gomega.Eventually(func() error {
 			works, err := hubWorkClient.WorkV1().ManifestWorks(managedClusterName).List(context.Background(), metav1.ListOptions{
-				LabelSelector: fmt.Sprintf("%s=%s", addonapiv1alpha1.AddonLabelKey, testMultiWorksAddonImpl.name),
+				LabelSelector: fmt.Sprintf("%s=%s", addonapiv1beta1.AddonLabelKey, testMultiWorksAddonImpl.name),
 			})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			if len(works.Items) != 2 {

@@ -13,7 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 )
 
 const (
@@ -53,15 +53,15 @@ var _ = ginkgo.Describe("install/uninstall helloworld hosted addons in Hosted mo
 				if errors.IsNotFound(err) {
 					_, cerr := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(hostedManagedClusterName).Create(
 						context.Background(),
-						&addonapiv1alpha1.ManagedClusterAddOn{
+						&addonapiv1beta1.ManagedClusterAddOn{
 							ObjectMeta: metav1.ObjectMeta{
 								Namespace: hostedManagedClusterName,
 								Name:      helloWorldHostedAddonName,
 								Annotations: map[string]string{
-									addonapiv1alpha1.HostingClusterNameAnnotationKey: hostingClusterName,
+									addonapiv1beta1.HostingClusterNameAnnotationKey: hostingClusterName,
 								},
 							},
-							Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
+							Spec: addonapiv1beta1.ManagedClusterAddOnSpec{
 								InstallNamespace: addonAgentNamespace,
 							},
 						},
@@ -73,7 +73,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld hosted addons in Hosted mo
 				return err
 			}
 
-			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHostingClusterValidity) {
+			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnHostingClusterValidity) {
 				return fmt.Errorf("addon hosting cluster should be valid, but get condition %v",
 					addon.Status.Conditions)
 			}
@@ -110,7 +110,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld hosted addons in Hosted mo
 			if err != nil {
 				return err
 			}
-			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHostingManifestApplied) {
+			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnHostingManifestApplied) {
 				return fmt.Errorf("addon should be applied to hosting cluster, but get condition %v",
 					addon.Status.Conditions)
 			}

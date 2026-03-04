@@ -20,7 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"open-cluster-management.io/addon-framework/pkg/agent"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
 	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
 	workv1listers "open-cluster-management.io/api/client/work/listers/work/v1"
@@ -83,7 +83,7 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 	var err error
 	var managedClusterName, hostingClusterName string
 	var hostingJobCompleteValue = "True"
-	var cma *addonapiv1alpha1.ClusterManagementAddOn
+	var cma *addonapiv1beta1.ClusterManagementAddOn
 	// var agentWorkClient workclientset.Interface
 	var agentWorkClient workv1client.ManifestWorkInterface
 	var agentWorkInformer workv1informers.ManifestWorkInformer
@@ -175,16 +175,16 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 			Type: agent.HealthProberTypeWork,
 		}
 
-		addon := &addonapiv1alpha1.ManagedClusterAddOn{
+		addon := &addonapiv1beta1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testHostedAddonImpl.name,
 				Annotations: map[string]string{
-					addonapiv1alpha1.HostingClusterNameAnnotationKey: hostingClusterName,
+					addonapiv1beta1.HostingClusterNameAnnotationKey: hostingClusterName,
 				},
 				// this finalizer is to prevent the addon from being deleted for test, it will be deleted at the end.
 				Finalizers: []string{"pending"},
 			},
-			Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
+			Spec: addonapiv1beta1.ManagedClusterAddOnSpec{
 				InstallNamespace: "default",
 			},
 		}
@@ -223,7 +223,7 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 			}
 			finalizers := addon.GetFinalizers()
 			for _, f := range finalizers {
-				if f == addonapiv1alpha1.AddonHostingPreDeleteHookFinalizer {
+				if f == addonapiv1beta1.AddonHostingPreDeleteHookFinalizer {
 					return nil
 				}
 			}
@@ -252,7 +252,7 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 				return err
 			}
 
-			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHostingManifestApplied) {
+			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnHostingManifestApplied) {
 				return fmt.Errorf("Unexpected addon applied condition, %v", addon.Status.Conditions)
 			}
 			return nil
@@ -402,7 +402,7 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 			if addon.Finalizers[0] != "pending" {
 				return fmt.Errorf("addon is expected to only pending finalizer,but got %v", len(addon.Finalizers))
 			}
-			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHookManifestCompleted) {
+			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnHookManifestCompleted) {
 				return fmt.Errorf("addon HookManifestCompleted condition is expecte to true, but got false")
 			}
 			return nil

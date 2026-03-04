@@ -19,9 +19,9 @@ import (
 	v1beta1certificateslisters "k8s.io/client-go/listers/certificates/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addoninformerv1alpha1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1alpha1"
-	addonlisterv1alpha1 "open-cluster-management.io/api/client/addon/listers/addon/v1alpha1"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	addoninformerv1beta1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1beta1"
+	addonlisterv1beta1 "open-cluster-management.io/api/client/addon/listers/addon/v1beta1"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
 	clusterlister "open-cluster-management.io/api/client/cluster/listers/cluster/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -56,7 +56,7 @@ type csrApprovingController struct {
 	kubeClient                kubernetes.Interface
 	agentAddons               map[string]agent.AgentAddon
 	managedClusterLister      clusterlister.ManagedClusterLister
-	managedClusterAddonLister addonlisterv1alpha1.ManagedClusterAddOnLister
+	managedClusterAddonLister addonlisterv1beta1.ManagedClusterAddOnLister
 	csrLister                 certificateslisters.CertificateSigningRequestLister
 	csrListerBeta             v1beta1certificateslisters.CertificateSigningRequestLister
 	mcaFilterFunc             utils.ManagedClusterAddOnFilterFunc
@@ -68,7 +68,7 @@ func NewCSRApprovingController(
 	clusterInformers clusterinformers.ManagedClusterInformer,
 	csrV1Informer certificatesinformers.CertificateSigningRequestInformer,
 	csrBetaInformer v1beta1certificatesinformers.CertificateSigningRequestInformer,
-	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
+	addonInformers addoninformerv1beta1.ManagedClusterAddOnInformer,
 	agentAddons map[string]agent.AgentAddon,
 	mcaFilterFunc utils.ManagedClusterAddOnFilterFunc,
 ) factory.Controller {
@@ -106,7 +106,7 @@ func NewCSRApprovingController(
 				if len(accessor.GetLabels()) == 0 {
 					return false
 				}
-				addonName := accessor.GetLabels()[addonv1alpha1.AddonLabelKey]
+				addonName := accessor.GetLabels()[addonv1beta1.AddonLabelKey]
 				if _, ok := agentAddons[addonName]; !ok {
 					return false
 				}
@@ -134,7 +134,7 @@ func (c *csrApprovingController) sync(ctx context.Context, syncCtx factory.SyncC
 		return nil
 	}
 
-	addonName := csr.GetLabels()[addonv1alpha1.AddonLabelKey]
+	addonName := csr.GetLabels()[addonv1beta1.AddonLabelKey]
 	agentAddon, ok := c.agentAddons[addonName]
 	if !ok {
 		return nil
@@ -210,7 +210,7 @@ func (c *csrApprovingController) approve(
 	ctx context.Context,
 	registrationOption *agent.RegistrationOption,
 	managedCluster *clusterv1.ManagedCluster,
-	managedClusterAddon *addonv1alpha1.ManagedClusterAddOn,
+	managedClusterAddon *addonv1beta1.ManagedClusterAddOn,
 	csr metav1.Object) error {
 
 	switch t := csr.(type) {

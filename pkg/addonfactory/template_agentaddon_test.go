@@ -11,7 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"open-cluster-management.io/addon-framework/pkg/agent"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1apha1 "open-cluster-management.io/api/cluster/v1alpha1"
 )
@@ -58,7 +58,7 @@ func TestTemplateAddon_Manifests(t *testing.T) {
 			installNamespace: "myNs",
 			scheme:           scheme,
 			getValuesFunc: func(cluster *clusterv1.ManagedCluster,
-				addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
+				addon *addonapiv1beta1.ManagedClusterAddOn) (Values, error) {
 				config := config{Image: "quay.io/helloworld:latest"}
 				return StructToValues(config), nil
 			},
@@ -76,7 +76,7 @@ func TestTemplateAddon_Manifests(t *testing.T) {
 			addonName:   "helloworld",
 			scheme:      scheme,
 			getValuesFunc: func(cluster *clusterv1.ManagedCluster,
-				addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
+				addon *addonapiv1beta1.ManagedClusterAddOn) (Values, error) {
 				config := config{Image: "quay.io/helloworld:latest"}
 				return StructToValues(config), nil
 			},
@@ -133,7 +133,7 @@ func TestTemplateAddon_Manifests(t *testing.T) {
 			scheme:           scheme,
 			annotationConfig: `{"Image":"quay.io/helloworld:2.4"}`,
 			getValuesFunc: func(cluster *clusterv1.ManagedCluster,
-				addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
+				addon *addonapiv1beta1.ManagedClusterAddOn) (Values, error) {
 				config := secretConfig{
 					HubKubeConfigSecret:     "external-hub-kubeconfig",
 					ManagedKubeConfigSecret: "external-managed-kubeconfig",
@@ -156,7 +156,7 @@ func TestTemplateAddon_Manifests(t *testing.T) {
 			scheme:           scheme,
 			annotationConfig: `{"Image":"quay.io/helloworld:2.4"}`,
 			getValuesFunc: func(cluster *clusterv1.ManagedCluster,
-				addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
+				addon *addonapiv1beta1.ManagedClusterAddOn) (Values, error) {
 				return Values{
 					"ResourceRequirements": []RegexResourceRequirements{
 						{

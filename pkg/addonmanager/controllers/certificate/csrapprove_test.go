@@ -14,7 +14,7 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/agent"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	fakecluster "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
@@ -27,7 +27,7 @@ type testApproveAgent struct {
 	approved bool
 }
 
-func (t *testApproveAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
+func (t *testApproveAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error) {
 	return []runtime.Object{}, nil
 }
 
@@ -35,7 +35,7 @@ func (t *testApproveAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
 	return agent.AgentAddonOptions{
 		AddonName: t.name,
 		Registration: &agent.RegistrationOption{
-			CSRApproveCheck: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn, csr *certv1.CertificateSigningRequest) bool {
+			CSRApproveCheck: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn, csr *certv1.CertificateSigningRequest) bool {
 				return t.approved
 			},
 		},

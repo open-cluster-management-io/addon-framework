@@ -20,7 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	workv1client "open-cluster-management.io/api/client/work/clientset/versioned/typed/work/v1"
 	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
 	workv1listers "open-cluster-management.io/api/client/work/listers/work/v1"
@@ -78,7 +78,7 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 	var cancel context.CancelFunc
 	var err error
 	var managedClusterName, hostingClusterName string
-	var cma *addonapiv1alpha1.ClusterManagementAddOn
+	var cma *addonapiv1beta1.ClusterManagementAddOn
 	// var agentWorkClient workclientset.Interface
 	var agentWorkClient workv1client.ManifestWorkInterface
 	var agentWorkInformer workv1informers.ManifestWorkInformer
@@ -168,14 +168,14 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 			Type: agent.HealthProberTypeWork,
 		}
 
-		addon := &addonapiv1alpha1.ManagedClusterAddOn{
+		addon := &addonapiv1beta1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testHostedAddonImpl.name,
 				Annotations: map[string]string{
-					addonapiv1alpha1.HostingClusterNameAnnotationKey: hostingClusterName,
+					addonapiv1beta1.HostingClusterNameAnnotationKey: hostingClusterName,
 				},
 			},
-			Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
+			Spec: addonapiv1beta1.ManagedClusterAddOnSpec{
 				InstallNamespace: "default",
 			},
 		}
@@ -227,15 +227,15 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 				return err
 			}
 
-			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnHostingManifestApplied) {
+			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnHostingManifestApplied) {
 				return fmt.Errorf("Unexpected addon applied condition, %v", addon.Status.Conditions)
 			}
 
-			manifestAppliyedCondition := meta.FindStatusCondition(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnManifestApplied)
+			manifestAppliyedCondition := meta.FindStatusCondition(addon.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnManifestApplied)
 			if manifestAppliyedCondition == nil {
-				return fmt.Errorf("%s Condition is not found", addonapiv1alpha1.ManagedClusterAddOnManifestApplied)
+				return fmt.Errorf("%s Condition is not found", addonapiv1beta1.ManagedClusterAddOnManifestApplied)
 			}
-			if manifestAppliyedCondition.Reason != addonapiv1alpha1.AddonManifestAppliedReasonManifestsApplied {
+			if manifestAppliyedCondition.Reason != addonapiv1beta1.AddonManifestAppliedReasonManifestsApplied {
 				return fmt.Errorf("Condition Reason is not correct: %v", manifestAppliyedCondition.Reason)
 			}
 			if manifestAppliyedCondition.Message != "no manifest need to apply" {
@@ -319,14 +319,14 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 		testHostedAddonImpl.prober = utils.NewDeploymentProber(
 			types.NamespacedName{Name: "nginx-deployment", Namespace: "default"})
 
-		addon := &addonapiv1alpha1.ManagedClusterAddOn{
+		addon := &addonapiv1beta1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testHostedAddonImpl.name,
 				Annotations: map[string]string{
-					addonapiv1alpha1.HostingClusterNameAnnotationKey: hostingClusterName,
+					addonapiv1beta1.HostingClusterNameAnnotationKey: hostingClusterName,
 				},
 			},
-			Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
+			Spec: addonapiv1beta1.ManagedClusterAddOnSpec{
 				InstallNamespace: "default",
 			},
 		}
