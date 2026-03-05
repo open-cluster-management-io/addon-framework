@@ -12,7 +12,7 @@ var AddOnDeploymentConfigGVR = schema.GroupVersionResource{
 
 var AddOnTemplateGVR = schema.GroupVersionResource{
 	Group:    "addon.open-cluster-management.io",
-	Version:  "v1beta1",
+	Version:  "v1alpha1",
 	Resource: "addontemplates",
 }
 

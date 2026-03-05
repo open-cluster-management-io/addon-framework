@@ -14,6 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"open-cluster-management.io/addon-framework/pkg/utils"
+	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 )
 
@@ -47,25 +48,25 @@ var addOnTest2ConfigSpec = addonapiv1beta1.AddOnDeploymentConfigSpec{
 }
 
 func createClusterManagementAddOn(name, defaultConfigNamespace, defaultConfigName string) (*addonapiv1beta1.ClusterManagementAddOn, error) {
-	clusterManagementAddon, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
+	clusterManagementAddon, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		clusterManagementAddon, err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Create(
+		clusterManagementAddon, err = hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Create(
 			context.Background(),
 			&addonapiv1beta1.ClusterManagementAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: name,
 					Annotations: map[string]string{
-						addonapiv1beta1.AddonLifecycleAnnotationKey: addonapiv1beta1.AddonLifecycleAddonManagerAnnotationValue,
+						addonapiv1alpha1.AddonLifecycleAnnotationKey: addonapiv1alpha1.AddonLifecycleAddonManagerAnnotationValue,
 					},
 				},
 				Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
-					SupportedConfigs: []addonapiv1beta1.ConfigMeta{
+					DefaultConfigs: []addonapiv1beta1.AddOnConfig{
 						{
 							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    addOnDeploymentConfigGVR.Group,
 								Resource: addOnDeploymentConfigGVR.Resource,
 							},
-							DefaultConfig: &addonapiv1beta1.ConfigReferent{
+							ConfigReferent: addonapiv1beta1.ConfigReferent{
 								Name:      defaultConfigName,
 								Namespace: defaultConfigNamespace,
 							},
@@ -93,10 +94,10 @@ func createClusterManagementAddOn(name, defaultConfigNamespace, defaultConfigNam
 
 func updateClusterManagementAddOn(ctx context.Context, new *addonapiv1beta1.ClusterManagementAddOn) {
 	gomega.Eventually(func() bool {
-		old, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), new.Name, metav1.GetOptions{})
+		old, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Get(context.Background(), new.Name, metav1.GetOptions{})
 		old.Spec = new.Spec
 		old.Annotations = new.Annotations
-		_, err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Update(context.Background(), old, metav1.UpdateOptions{})
+		_, err = hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Update(context.Background(), old, metav1.UpdateOptions{})
 		if err == nil {
 			return true
 		}
@@ -107,7 +108,7 @@ func updateClusterManagementAddOn(ctx context.Context, new *addonapiv1beta1.Clus
 // The addon owner controller exist in general addon manager.
 // This is for integration testing to assume that addon manager has already added the OwnerReferences.
 func createManagedClusterAddOnwithOwnerRefs(namespace string, addon *addonapiv1beta1.ManagedClusterAddOn, cma *addonapiv1beta1.ClusterManagementAddOn) {
-	addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(namespace).Create(context.Background(), addon, metav1.CreateOptions{})
+	addon, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(namespace).Create(context.Background(), addon, metav1.CreateOptions{})
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 	addonCopy := addon.DeepCopy()
@@ -120,28 +121,50 @@ func createManagedClusterAddOnwithOwnerRefs(namespace string, addon *addonapiv1b
 	})
 	modified := utils.MergeOwnerRefs(&addonCopy.OwnerReferences, *owner, false)
 	if modified {
-		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(addonCopy.Namespace).Update(context.Background(), addonCopy, metav1.UpdateOptions{})
+		_, err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(addonCopy.Namespace).Update(context.Background(), addonCopy, metav1.UpdateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	}
 }
 
 func setKubeClientDriver(namespace, addonName, driver string) {
 	gomega.Eventually(func() error {
-		addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(namespace).Get(context.Background(), addonName, metav1.GetOptions{})
+		addon, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(namespace).Get(context.Background(), addonName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
-		addon.Status.KubeClientDriver = driver
-		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(namespace).UpdateStatus(context.Background(), addon, metav1.UpdateOptions{})
+
+		// Wait for registration controller to set registrations first
+		if len(addon.Status.Registrations) == 0 {
+			addon.Status.Registrations = []addonapiv1beta1.RegistrationConfig{
+				{
+					Type: addonapiv1beta1.KubeClient,
+					KubeClient: &addonapiv1beta1.KubeClientConfig{
+						Driver: driver,
+					},
+				},
+			}
+		} else {
+			for i := range addon.Status.Registrations {
+				if addon.Status.Registrations[i].Type == addonapiv1beta1.KubeClient {
+					if addon.Status.Registrations[i].KubeClient == nil {
+						addon.Status.Registrations[i].KubeClient = &addonapiv1beta1.KubeClientConfig{}
+					}
+					addon.Status.Registrations[i].KubeClient.Driver = driver
+					break
+				}
+			}
+		}
+
+		_, err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(namespace).UpdateStatus(context.Background(), addon, metav1.UpdateOptions{})
 		return err
 	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 }
 
 func updateManagedClusterAddOnStatus(ctx context.Context, new *addonapiv1beta1.ManagedClusterAddOn) {
 	gomega.Eventually(func() bool {
-		old, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(new.Namespace).Get(context.Background(), new.Name, metav1.GetOptions{})
+		old, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(new.Namespace).Get(context.Background(), new.Name, metav1.GetOptions{})
 		old.Status = new.Status
-		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(old.Namespace).UpdateStatus(context.Background(), old, metav1.UpdateOptions{})
+		_, err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(old.Namespace).UpdateStatus(context.Background(), old, metav1.UpdateOptions{})
 		if err == nil {
 			return true
 		}
@@ -153,7 +176,7 @@ func assertClusterManagementAddOnDefaultConfigReferences(name string, expect ...
 	ginkgo.By(fmt.Sprintf("Check ClusterManagementAddOn %s DefaultConfigReferences", name))
 
 	gomega.Eventually(func() error {
-		actual, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
+		actual, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -178,7 +201,7 @@ func assertClusterManagementAddOnInstallProgression(name string, expect ...addon
 	ginkgo.By(fmt.Sprintf("Check ClusterManagementAddOn %s InstallProgression", name))
 
 	gomega.Eventually(func() error {
-		actual, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
+		actual, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -203,7 +226,7 @@ func assertClusterManagementAddOnConditions(name string, expect ...metav1.Condit
 	ginkgo.By(fmt.Sprintf("Check ClusterManagementAddOn %s Conditions", name))
 
 	gomega.Eventually(func() error {
-		actual, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
+		actual, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Get(context.Background(), name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -226,7 +249,7 @@ func assertManagedClusterAddOnConfigReferences(name, namespace string, expect ..
 	ginkgo.By(fmt.Sprintf("Check ManagedClusterAddOn %s/%s ConfigReferences", namespace, name))
 
 	gomega.Eventually(func() error {
-		actual, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(namespace).Get(context.Background(), name, metav1.GetOptions{})
+		actual, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(namespace).Get(context.Background(), name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -258,7 +281,7 @@ func assertManagedClusterAddOnConditions(name, namespace string, expect ...metav
 	ginkgo.By(fmt.Sprintf("Check ManagedClusterAddOn %s/%s Conditions", namespace, name))
 
 	gomega.Eventually(func() error {
-		actual, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(namespace).Get(context.Background(), name, metav1.GetOptions{})
+		actual, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(namespace).Get(context.Background(), name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}

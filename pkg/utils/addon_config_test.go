@@ -84,8 +84,10 @@ func TestAgentInstallNamespaceFromDeploymentConfigFunc(t *testing.T) {
 								Group:    "addon.open-cluster-management.io",
 								Resource: "addondeploymentconfigs",
 							},
-							ConfigReferent: addonapiv1beta1.ConfigReferent{
-								Name: "test1",
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
+									Name: "test1",
+								},
 							},
 						},
 					},
@@ -151,10 +153,10 @@ func TestAgentInstallNamespaceFromDeploymentConfigFunc(t *testing.T) {
 								Group:    "addon.open-cluster-management.io",
 								Resource: "addondeploymentconfigs",
 							},
-							ConfigReferent: addonapiv1beta1.ConfigReferent{
-								Name: "test1",
-							},
 							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
+									Name: "test1",
+								},
 								SpecHash: "f97b3f6af1f786ec6f3273e2d6fc8717e45cb7bc9797ba7533663a7de84a5538",
 							},
 						},

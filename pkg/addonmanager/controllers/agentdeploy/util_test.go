@@ -8,6 +8,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
@@ -102,13 +103,13 @@ func TestAddonRemoveFinalizer(t *testing.T) {
 		},
 		{
 			name:               "remove deprecated",
-			existingFinalizers: []string{addonapiv1beta1.AddonDeprecatedHostingPreDeleteHookFinalizer, "test"},
+			existingFinalizers: []string{addonapiv1alpha1.AddonDeprecatedHostingPreDeleteHookFinalizer, "test"},
 			finalizerToRemove:  "test1",
 			expectedFinalizers: []string{"test"},
 		},
 		{
 			name:               "remove deprecated and matched",
-			existingFinalizers: []string{addonapiv1beta1.AddonDeprecatedHostingPreDeleteHookFinalizer, "test"},
+			existingFinalizers: []string{addonapiv1alpha1.AddonDeprecatedHostingPreDeleteHookFinalizer, "test"},
 			finalizerToRemove:  "test",
 		},
 	}
@@ -143,7 +144,7 @@ func TestAddonAddFinalizer(t *testing.T) {
 		},
 		{
 			name:               "remove deprecated",
-			existingFinalizers: []string{addonapiv1beta1.AddonDeprecatedHostingPreDeleteHookFinalizer},
+			existingFinalizers: []string{addonapiv1alpha1.AddonDeprecatedHostingPreDeleteHookFinalizer},
 			expectedFinalizers: []string{"test"},
 		},
 	}

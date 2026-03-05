@@ -272,10 +272,22 @@ func (b *unionPermissionBuilder) build() agent.PermissionConfigFunc {
 // The system:authenticated group is filtered out to prevent overly permissive RBAC bindings.
 func BuildSubjectsFromRegistration(addon *addonapiv1beta1.ManagedClusterAddOn, signerName string) []rbacv1.Subject {
 	// Find the registration config for the specified signer
-	var subject *addonapiv1beta1.Subject
+	var subject *addonapiv1beta1.BaseSubject
+
 	for _, registration := range addon.Status.Registrations {
-		if registration.SignerName == signerName {
-			subject = &registration.Subject
+		// For KubeClient type (default signer is KubeAPIServerClientSignerName)
+		if registration.Type == addonapiv1beta1.KubeClient &&
+			signerName == certificatesv1.KubeAPIServerClientSignerName &&
+			registration.KubeClient != nil {
+			subject = &registration.KubeClient.Subject.BaseSubject
+			break
+		}
+
+		// For CustomSigner type
+		if registration.Type == addonapiv1beta1.CustomSigner &&
+			registration.CustomSigner != nil &&
+			registration.CustomSigner.SignerName == signerName {
+			subject = &registration.CustomSigner.Subject.BaseSubject
 			break
 		}
 	}

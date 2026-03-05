@@ -129,7 +129,7 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		cma = newClusterManagementAddon(testHostedAddonImpl.name)
-		cma, err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Create(context.Background(),
+		cma, err = hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Create(context.Background(),
 			cma, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -155,7 +155,7 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 		err = hubClusterClient.ClusterV1().ManagedClusters().Delete(
 			context.Background(), hostingClusterName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Delete(context.Background(),
+		err = hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Delete(context.Background(),
 			testHostedAddonImpl.name, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -180,13 +180,12 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 				Name: testHostedAddonImpl.name,
 				Annotations: map[string]string{
 					addonapiv1beta1.HostingClusterNameAnnotationKey: hostingClusterName,
+					addonapiv1beta1.InstallNamespaceAnnotation:      "default",
 				},
 				// this finalizer is to prevent the addon from being deleted for test, it will be deleted at the end.
 				Finalizers: []string{"pending"},
 			},
-			Spec: addonapiv1beta1.ManagedClusterAddOnSpec{
-				InstallNamespace: "default",
-			},
+			Spec: addonapiv1beta1.ManagedClusterAddOnSpec{},
 		}
 		createManagedClusterAddOnwithOwnerRefs(managedClusterName, addon, cma)
 
@@ -216,7 +215,7 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 
 		// addon has a finalizer
 		gomega.Eventually(func() error {
-			addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).
+			addon, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).
 				Get(context.Background(), testHostedAddonImpl.name, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -246,7 +245,7 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
-			addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(
+			addon, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(
 				context.Background(), testHostedAddonImpl.name, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -277,7 +276,7 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
-			addon, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(
+			addon, err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(
 				context.Background(), testHostedAddonImpl.name, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -292,7 +291,7 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		// delete addon, hook manifestwork will be applied, addon is deleting and addon status will be updated.
-		err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).
+		err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).
 			Delete(context.Background(), testHostedAddonImpl.name, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -326,7 +325,7 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
-			addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).
+			addon, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).
 				Get(context.Background(), testHostedAddonImpl.name, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -391,7 +390,7 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 
 		// addon only has pending finalizer, and status is updated
 		gomega.Eventually(func() error {
-			addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).
+			addon, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).
 				Get(context.Background(), testHostedAddonImpl.name, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -411,13 +410,13 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 		// update addon to trigger reconcile 3 times, and per-delete manifestwork should be deleted and not be re-created
 		// for i := 0; i < 3; i++ {
 		// 	gomega.Eventually(func() error {
-		// 		addon, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).
+		// 		addon, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).
 		// 			Get(context.Background(), testHostedAddonImpl.name, metav1.GetOptions{})
 		// 		if err != nil {
 		// 			return err
 		// 		}
 		// 		addon.Labels = map[string]string{"test": fmt.Sprintf("%d", i)}
-		// 		_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).
+		// 		_, err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).
 		// 			Update(context.Background(), addon, metav1.UpdateOptions{})
 		// 		return err
 		// 	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
@@ -429,19 +428,19 @@ var _ = ginkgo.Describe("Agent hook deploy", func() {
 
 		// remove pending finalizer to delete addon
 		gomega.Eventually(func() error {
-			addon, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).
+			addon, err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).
 				Get(context.Background(), testHostedAddonImpl.name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 			addon.SetFinalizers([]string{})
-			_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).
+			_, err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).
 				Update(context.Background(), addon, metav1.UpdateOptions{})
 			return err
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
-			_, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).
+			_, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).
 				Get(context.Background(), testHostedAddonImpl.name, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {

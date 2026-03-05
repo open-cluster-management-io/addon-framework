@@ -88,12 +88,12 @@ func GetImageValues(kubeClient kubernetes.Interface) addonfactory.GetValuesFunc 
 
 			image, ok := configMap.Data["image"]
 			if !ok {
-				return nil, fmt.Errorf("no image in configmap %s/%s", config.Namespace, config.Name)
+				return nil, fmt.Errorf("no image in configmap %s/%s", config.DesiredConfig.Namespace, config.DesiredConfig.Name)
 			}
 
 			imagePullPolicy, ok := configMap.Data["imagePullPolicy"]
 			if !ok {
-				return nil, fmt.Errorf("no imagePullPolicy in configmap %s/%s", config.Namespace, config.Name)
+				return nil, fmt.Errorf("no imagePullPolicy in configmap %s/%s", config.DesiredConfig.Namespace, config.DesiredConfig.Name)
 			}
 
 			userJsonValues := userValues{

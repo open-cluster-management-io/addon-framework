@@ -1564,7 +1564,7 @@ k8s.io/utils/path
 k8s.io/utils/pointer
 k8s.io/utils/ptr
 k8s.io/utils/trace
-# open-cluster-management.io/api v1.2.1-0.20260305152611-5bfebdbc3fdf
+# open-cluster-management.io/api v1.2.1-0.20260312065816-1e760d50fbc3
 ## explicit; go 1.25.0
 open-cluster-management.io/api/addon/v1alpha1
 open-cluster-management.io/api/addon/v1beta1
@@ -1626,7 +1626,7 @@ open-cluster-management.io/api/operator/v1
 open-cluster-management.io/api/utils/work/v1/workapplier
 open-cluster-management.io/api/work/v1
 open-cluster-management.io/api/work/v1alpha1
-# open-cluster-management.io/sdk-go v1.2.1-0.20260306024852-c0938d15158a
+# open-cluster-management.io/sdk-go v1.2.1-0.20260324133742-9cbb733e75e4
 ## explicit; go 1.25.0
 open-cluster-management.io/sdk-go/pkg/apis/work/v1/applier
 open-cluster-management.io/sdk-go/pkg/apis/work/v1/builder

@@ -78,10 +78,6 @@ func TestSync(t *testing.T) {
 								Group:    fakeGVR.Group,
 								Resource: fakeGVR.Resource,
 							},
-							ConfigReferent: addonapiv1beta1.ConfigReferent{
-								Namespace: "cluster1",
-								Name:      "test",
-							},
 							LastObservedGeneration: 1,
 							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
 								ConfigReferent: addonapiv1beta1.ConfigReferent{
@@ -136,10 +132,6 @@ func TestSync(t *testing.T) {
 								Group:    fakeGVR.Group,
 								Resource: fakeGVR.Resource + "-unsupported",
 							},
-							ConfigReferent: addonapiv1beta1.ConfigReferent{
-								Namespace: "cluster1",
-								Name:      "test",
-							},
 							LastObservedGeneration: 0,
 							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
 								ConfigReferent: addonapiv1beta1.ConfigReferent{
@@ -168,10 +160,6 @@ func TestSync(t *testing.T) {
 							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    fakeGVR.Group,
 								Resource: fakeGVR.Resource,
-							},
-							ConfigReferent: addonapiv1beta1.ConfigReferent{
-								Namespace: "cluster1",
-								Name:      "test",
 							},
 							LastObservedGeneration: 1,
 							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
@@ -253,10 +241,6 @@ func TestSync(t *testing.T) {
 								Group:    fakeGVR.Group,
 								Resource: fakeGVR.Resource,
 							},
-							ConfigReferent: addonapiv1beta1.ConfigReferent{
-								Namespace: "cluster1",
-								Name:      "test",
-							},
 							LastObservedGeneration: 1,
 							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
 								ConfigReferent: addonapiv1beta1.ConfigReferent{
@@ -297,9 +281,6 @@ func TestSync(t *testing.T) {
 								Group:    fakeGVR.Group,
 								Resource: fakeGVR.Resource,
 							},
-							ConfigReferent: addonapiv1beta1.ConfigReferent{
-								Name: "test",
-							},
 							LastObservedGeneration: 2,
 							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
 								ConfigReferent: addonapiv1beta1.ConfigReferent{
@@ -339,14 +320,14 @@ func TestSync(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			fakeAddonClient := fakeaddon.NewSimpleClientset(c.managedClusteraddon...)
 			addonInformers := addoninformers.NewSharedInformerFactory(fakeAddonClient, 10*time.Minute)
-			addonStore := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore()
+			addonStore := addonInformers.Addon().V1beta1().ManagedClusterAddOns().Informer().GetStore()
 			for _, addon := range c.managedClusteraddon {
 				if err := addonStore.Add(addon); err != nil {
 					t.Fatal(err)
 				}
 			}
 
-			cmaStore := addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Informer().GetStore()
+			cmaStore := addonInformers.Addon().V1beta1().ClusterManagementAddOns().Informer().GetStore()
 			if err := cmaStore.Add(&addonapiv1beta1.ClusterManagementAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
@@ -368,8 +349,8 @@ func TestSync(t *testing.T) {
 
 			ctrl := &addonConfigController{
 				addonClient:                  fakeAddonClient,
-				addonLister:                  addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
-				clusterManagementAddonLister: addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
+				addonLister:                  addonInformers.Addon().V1beta1().ManagedClusterAddOns().Lister(),
+				clusterManagementAddonLister: addonInformers.Addon().V1beta1().ClusterManagementAddOns().Lister(),
 				configListers:                map[schema.GroupResource]dynamiclister.Lister{},
 				cmaFilterFunc:                func(obj interface{}) bool { return true },
 				configGVRs:                   map[schema.GroupVersionResource]bool{fakeGVR: true},
@@ -457,8 +438,10 @@ func TestEnqueue(t *testing.T) {
 								Group:    fakeGVR.Group,
 								Resource: fakeGVR.Resource,
 							},
-							ConfigReferent: addonapiv1beta1.ConfigReferent{
-								Name: "test",
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
+									Name: "test",
+								},
 							},
 						},
 						{
@@ -466,8 +449,10 @@ func TestEnqueue(t *testing.T) {
 								Group:    "other",
 								Resource: "other",
 							},
-							ConfigReferent: addonapiv1beta1.ConfigReferent{
-								Name: "other",
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
+									Name: "other",
+								},
 							},
 						},
 					}
@@ -481,8 +466,10 @@ func TestEnqueue(t *testing.T) {
 								Group:    fakeGVR.Group,
 								Resource: fakeGVR.Resource,
 							},
-							ConfigReferent: addonapiv1beta1.ConfigReferent{
-								Name: "test",
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
+									Name: "test",
+								},
 							},
 						},
 					}
@@ -503,9 +490,11 @@ func TestEnqueue(t *testing.T) {
 								Group:    fakeGVR.Group,
 								Resource: fakeGVR.Resource,
 							},
-							ConfigReferent: addonapiv1beta1.ConfigReferent{
-								Namespace: "cluster1",
-								Name:      "test",
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
+									Namespace: "cluster1",
+									Name:      "test",
+								},
 							},
 							LastObservedGeneration: 1,
 						},
@@ -520,8 +509,10 @@ func TestEnqueue(t *testing.T) {
 								Group:    "otherconfigs.test",
 								Resource: "otherconfigs",
 							},
-							ConfigReferent: addonapiv1beta1.ConfigReferent{
-								Name: "other",
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
+									Name: "other",
+								},
 							},
 							LastObservedGeneration: 1,
 						},
@@ -538,7 +529,7 @@ func TestEnqueue(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			fakeAddonClient := fakeaddon.NewSimpleClientset(c.addons...)
 			addonInformers := addoninformers.NewSharedInformerFactory(fakeAddonClient, 10*time.Minute)
-			addonInformer := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer()
+			addonInformer := addonInformers.Addon().V1beta1().ManagedClusterAddOns().Informer()
 
 			ctrl := &addonConfigController{
 				addonIndexer: addonInformer.GetIndexer(),
