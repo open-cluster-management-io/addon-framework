@@ -183,7 +183,7 @@ func (c *agentController) sync(ctx context.Context, syncCtx factory.SyncContext,
 		return err
 	}
 
-	addon, err := c.addonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(ctx, c.addonName, metav1.GetOptions{})
+	addon, err := c.addonClient.AddonV1beta1().ManagedClusterAddOns(clusterName).Get(ctx, c.addonName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}

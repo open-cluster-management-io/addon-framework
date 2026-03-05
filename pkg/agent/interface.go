@@ -254,10 +254,14 @@ func KubeClientSignerConfigurations(addonName, agentName string) CSRConfiguratio
 		addon *addonapiv1beta1.ManagedClusterAddOn) ([]addonapiv1beta1.RegistrationConfig, error) {
 		return []addonapiv1beta1.RegistrationConfig{
 			{
-				SignerName: certificatesv1.KubeAPIServerClientSignerName,
-				Subject: addonapiv1beta1.Subject{
-					User:   DefaultUser(cluster.Name, addonName, agentName),
-					Groups: DefaultGroups(cluster.Name, addonName),
+				Type: addonapiv1beta1.KubeClient,
+				KubeClient: &addonapiv1beta1.KubeClientConfig{
+					Subject: addonapiv1beta1.KubeClientSubject{
+						BaseSubject: addonapiv1beta1.BaseSubject{
+							User:   DefaultUser(cluster.Name, addonName, agentName),
+							Groups: DefaultGroups(cluster.Name, addonName),
+						},
+					},
 				},
 			},
 		}, nil

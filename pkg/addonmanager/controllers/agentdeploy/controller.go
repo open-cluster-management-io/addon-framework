@@ -324,7 +324,7 @@ func (c *addonDeployController) sync(ctx context.Context, syncCtx factory.SyncCo
 // to avoid conflict updateAddon updates finalizers firstly if finalizers has change.
 func (c *addonDeployController) updateAddon(ctx context.Context, new, old *addonapiv1beta1.ManagedClusterAddOn) error {
 	if !equality.Semantic.DeepEqual(new.GetFinalizers(), old.GetFinalizers()) {
-		_, err := c.addonClient.AddonV1alpha1().ManagedClusterAddOns(new.Namespace).Update(ctx, new, metav1.UpdateOptions{})
+		_, err := c.addonClient.AddonV1beta1().ManagedClusterAddOns(new.Namespace).Update(ctx, new, metav1.UpdateOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to update addon finalizers: %w", err)
 		}
@@ -334,7 +334,7 @@ func (c *addonDeployController) updateAddon(ctx context.Context, new, old *addon
 	addonPatcher := patcher.NewPatcher[
 		*addonapiv1beta1.ManagedClusterAddOn,
 		addonapiv1beta1.ManagedClusterAddOnSpec,
-		addonapiv1beta1.ManagedClusterAddOnStatus](c.addonClient.AddonV1alpha1().ManagedClusterAddOns(new.Namespace))
+		addonapiv1beta1.ManagedClusterAddOnStatus](c.addonClient.AddonV1beta1().ManagedClusterAddOns(new.Namespace))
 
 	_, err := addonPatcher.PatchStatus(ctx, new, new.Status, old.Status)
 	if err != nil {

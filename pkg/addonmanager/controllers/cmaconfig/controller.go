@@ -63,7 +63,7 @@ func NewCMAConfigController(
 		configGVRs:                    configGVRs,
 		addonPatcher: patcher.NewPatcher[*addonapiv1beta1.ClusterManagementAddOn,
 			addonapiv1beta1.ClusterManagementAddOnSpec,
-			addonapiv1beta1.ClusterManagementAddOnStatus](addonClient.AddonV1alpha1().ClusterManagementAddOns()),
+			addonapiv1beta1.ClusterManagementAddOnStatus](addonClient.AddonV1beta1().ClusterManagementAddOns()),
 	}
 
 	configInformers := c.buildConfigInformers(configInformerFactory, configGVRs)

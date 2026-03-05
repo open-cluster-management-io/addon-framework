@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	certificatesv1 "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -69,61 +68,110 @@ func NewAddonRegistrationController(
 		WithSync(c.sync).ToController("addon-registration-controller")
 }
 
+// findExistingRegistration finds matching existing registration for a config.
+// For KubeClient type, we match by index (assuming order is stable).
+// For CustomSigner type, we match by SignerName.
+func findExistingRegistration(config *addonapiv1beta1.RegistrationConfig, index int,
+	newConfigs, existingRegistrations []addonapiv1beta1.RegistrationConfig) *addonapiv1beta1.RegistrationConfig {
+	if config.Type == addonapiv1beta1.KubeClient {
+		// For KubeClient, try to match by index first
+		// Count how many KubeClient configs we've seen so far
+		kubeClientIndex := 0
+		for i := 0; i < index; i++ {
+			if newConfigs[i].Type == addonapiv1beta1.KubeClient {
+				kubeClientIndex++
+			}
+		}
+
+		// Find the corresponding KubeClient in existingRegistrations
+		currentIndex := 0
+		for j := range existingRegistrations {
+			if existingRegistrations[j].Type == addonapiv1beta1.KubeClient {
+				if currentIndex == kubeClientIndex {
+					return &existingRegistrations[j]
+				}
+				currentIndex++
+			}
+		}
+	} else if config.Type == addonapiv1beta1.CustomSigner && config.CustomSigner != nil {
+		// For CustomSigner, match by SignerName
+		for j := range existingRegistrations {
+			if existingRegistrations[j].Type == addonapiv1beta1.CustomSigner &&
+				existingRegistrations[j].CustomSigner != nil &&
+				existingRegistrations[j].CustomSigner.SignerName == config.CustomSigner.SignerName {
+				return &existingRegistrations[j]
+			}
+		}
+	}
+	return nil
+}
+
 // buildRegistrationConfigs builds registration configs from new configs and existing registrations.
-// For KubeAPIServerClientSignerName, handling depends on kubeClientDriver:
+// In v1beta1, RegistrationConfig uses Type-based structure (KubeClient or CustomSigner).
+// For KubeClient type, handling depends on kubeClientDriver:
 //   - "": uses subject from newConfigs
 //   - "token": preserves subject from existing registrations, or empty if not found
 //   - "csr": uses subject from newConfigs, or sets default if empty
 //
-// For other signer names, always uses subject from newConfigs.
+// For CustomSigner type, always uses subject from newConfigs.
 func buildRegistrationConfigs(newConfigs, existingRegistrations []addonapiv1beta1.RegistrationConfig,
-	kubeClientDriver, clusterName, addonName string) []addonapiv1beta1.RegistrationConfig {
+	clusterName, addonName string) []addonapiv1beta1.RegistrationConfig {
 	result := []addonapiv1beta1.RegistrationConfig{}
 
 	for i := range newConfigs {
-		config := addonapiv1beta1.RegistrationConfig{
-			SignerName: newConfigs[i].SignerName,
-			Subject:    newConfigs[i].Subject,
-		}
+		config := newConfigs[i].DeepCopy()
 
-		// Only apply special handling for KubeAPIServerClientSignerName
-		if config.SignerName != certificatesv1.KubeAPIServerClientSignerName {
-			result = append(result, config)
+		// Only apply special handling for KubeClient type
+		if config.Type != addonapiv1beta1.KubeClient {
+			result = append(result, *config)
 			continue
 		}
 
-		// If kubeClientDriver is not set, use subject from newConfigs as-is
-		if kubeClientDriver == "" {
-			result = append(result, config)
+		// Ensure KubeClient config exists
+		if config.KubeClient == nil {
+			config.KubeClient = &addonapiv1beta1.KubeClientConfig{}
+		}
+
+		// Find matching existing registration
+		existingReg := findExistingRegistration(config, i, newConfigs, existingRegistrations)
+
+		// Get driver from existing registration if available, otherwise use driver from newConfig
+		driver := config.KubeClient.Driver
+		if existingReg != nil && existingReg.KubeClient != nil && existingReg.KubeClient.Driver != "" {
+			driver = existingReg.KubeClient.Driver
+		}
+
+		// Set the driver
+		config.KubeClient.Driver = driver
+
+		// If driver is empty, use config as-is (subject from newConfigs)
+		if driver == "" {
+			result = append(result, *config)
 			continue
 		}
 
-		if kubeClientDriver == "token" {
+		if driver == "token" {
 			// Token driver - preserve existing subject set by agent
-			found := false
-			for j := range existingRegistrations {
-				if existingRegistrations[j].SignerName == config.SignerName {
-					config.Subject = existingRegistrations[j].Subject
-					found = true
-					break
-				}
+			if existingReg != nil && existingReg.KubeClient != nil {
+				config.KubeClient.Subject = existingReg.KubeClient.Subject
+			} else {
+				// If no matching existing registration found, clear subject (agent will set it).
+				config.KubeClient.Subject = addonapiv1beta1.KubeClientSubject{}
 			}
-			// If no matching existing registration found, clear subject (agent will set it).
-			if !found {
-				config.Subject = addonapiv1beta1.Subject{}
-			}
-		} else if kubeClientDriver == "csr" {
+		} else if driver == "csr" {
 			// CSR driver - use subject from newConfigs, or set default if empty
-			if equality.Semantic.DeepEqual(config.Subject, addonapiv1beta1.Subject{}) {
-				config.Subject = addonapiv1beta1.Subject{
-					User:   agent.DefaultUser(clusterName, addonName, addonName),
-					Groups: agent.DefaultGroups(clusterName, addonName),
+			if equality.Semantic.DeepEqual(config.KubeClient.Subject, addonapiv1beta1.KubeClientSubject{}) {
+				config.KubeClient.Subject = addonapiv1beta1.KubeClientSubject{
+					BaseSubject: addonapiv1beta1.BaseSubject{
+						User:   agent.DefaultUser(clusterName, addonName, addonName),
+						Groups: agent.DefaultGroups(clusterName, addonName),
+					},
 				}
 			}
 		}
 		// For other drivers, use subject from newConfigs
 
-		result = append(result, config)
+		result = append(result, *config)
 	}
 
 	return result
@@ -175,7 +223,7 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 	addonPatcher := patcher.NewPatcher[
 		*addonapiv1beta1.ManagedClusterAddOn,
 		addonapiv1beta1.ManagedClusterAddOnSpec,
-		addonapiv1beta1.ManagedClusterAddOnStatus](c.addonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName))
+		addonapiv1beta1.ManagedClusterAddOnStatus](c.addonClient.AddonV1beta1().ManagedClusterAddOns(clusterName))
 
 	// patch supported configs
 	var supportedConfigs []addonapiv1beta1.ConfigGroupResource
@@ -259,27 +307,29 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 	}
 
 	managedClusterAddonCopy.Status.Registrations = buildRegistrationConfigs(configs, managedClusterAddon.Status.Registrations,
-		managedClusterAddon.Status.KubeClientDriver, clusterName, addonName)
+		clusterName, addonName)
 
 	// explicitly set the default namespace value, since the mca.spec.installNamespace is deprceated and
 	//  the addonDeploymentConfig.spec.agentInstallNamespace could be empty
+	// Priority (lowest to highest): default < annotation < registrationOption.Namespace < AgentInstallNamespace function
 	managedClusterAddonCopy.Status.Namespace = "open-cluster-management-agent-addon"
 
-	// Set the default namespace to registrationOption.Namespace
+	// Override with annotation if present
+	if installNs, ok := managedClusterAddonCopy.Annotations[addonapiv1beta1.InstallNamespaceAnnotation]; ok && len(installNs) > 0 {
+		managedClusterAddonCopy.Status.Namespace = installNs
+	}
+
+	// Override with registrationOption.Namespace if set (higher priority than annotation)
 	if len(registrationOption.Namespace) > 0 {
 		managedClusterAddonCopy.Status.Namespace = registrationOption.Namespace
 	}
 
-	if len(managedClusterAddonCopy.Spec.InstallNamespace) > 0 {
-		managedClusterAddonCopy.Status.Namespace = managedClusterAddonCopy.Spec.InstallNamespace
-	}
-
+	// Override with AgentInstallNamespace function if provided (highest priority)
 	if registrationOption.AgentInstallNamespace != nil {
 		ns, err := registrationOption.AgentInstallNamespace(managedClusterAddonCopy)
 		if err != nil {
 			return err
 		}
-		// Override if agentInstallNamespace or InstallNamespace is specified
 		if len(ns) > 0 {
 			managedClusterAddonCopy.Status.Namespace = ns
 		}

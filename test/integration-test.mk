@@ -32,9 +32,32 @@ endif
 clean-integration-test:
 	rm -rf $(TEST_TMP)/kubebuilder
 	$(RM) ./integration.test
+	$(RM) ./kube-integration.test
+	$(RM) ./cloudevents-integration.test
+	@if [ -f "$(TEST_TMP)/managedclusteraddons.crd.yaml.backup" ]; then \
+		echo "Cleaning up CRD backup..."; \
+		rm -f "$(TEST_TMP)/managedclusteraddons.crd.yaml.backup"; \
+	fi
 .PHONY: clean-integration-test
 
 clean: clean-integration-test
+
+update-crd-storage-version:
+	@echo "Updating CRD storage version to v1beta1 since no conversion webhook in integration test..."
+	@bash hack/fix-crd-storage-version.sh
+.PHONY: update-crd-storage-version
+
+restore-crd-storage-version:
+	@echo "Restoring original CRD..."
+	@if [ -f "$(TEST_TMP)/managedclusteraddons.crd.yaml.backup" ]; then \
+		cp "$(TEST_TMP)/managedclusteraddons.crd.yaml.backup" \
+		   "vendor/open-cluster-management.io/api/addon/v1beta1/0000_01_addon.open-cluster-management.io_managedclusteraddons.crd.yaml"; \
+		rm -f "$(TEST_TMP)/managedclusteraddons.crd.yaml.backup"; \
+		echo "✓ CRD restored and backup removed"; \
+	else \
+		echo "✓ No backup found, CRD already in original state"; \
+	fi
+.PHONY: restore-crd-storage-version
 
 test-kube-integration: ensure-kubebuilder-tools
 	go test -c ./test/integration/kube -o ./kube-integration.test
@@ -46,5 +69,6 @@ test-cloudevents-integration: ensure-kubebuilder-tools
 	./cloudevents-integration.test -ginkgo.slowSpecThreshold=15 -ginkgo.v -ginkgo.failFast
 .PHONY: test-cloudevents-integration
 
-test-integration: test-kube-integration
+test-integration: update-crd-storage-version test-kube-integration
+	@$(MAKE) restore-crd-storage-version
 .PHONY: test-integration

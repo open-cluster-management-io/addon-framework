@@ -28,7 +28,7 @@ func NewAddOnDeploymentConfigGetter(addonClient addonv1beta1client.Interface) Ad
 
 func (g *defaultAddOnDeploymentConfigGetter) Get(
 	ctx context.Context, namespace, name string) (*addonapiv1beta1.AddOnDeploymentConfig, error) {
-	return g.addonClient.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Get(ctx, name, metav1.GetOptions{})
+	return g.addonClient.AddonV1beta1().AddOnDeploymentConfigs(namespace).Get(ctx, name, metav1.GetOptions{})
 }
 
 // AgentInstallNamespaceFromDeploymentConfigFunc returns an agent install namespace helper function which will get the
