@@ -54,7 +54,7 @@ func GetHostedManifestLocation(labels, annotations map[string]string) (string, b
 
 	// TODO: deprecate HostedManifestLocationLabelKey in the future release
 	if manifestLocation == "" {
-		manifestLocation = labels[addonv1beta1.HostedManifestLocationLabelKey]
+		manifestLocation = labels[addonv1beta1.HostedManifestLocationAnnotationKey]
 	}
 
 	switch manifestLocation {

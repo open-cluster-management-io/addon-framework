@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
+	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
@@ -36,9 +37,9 @@ func addonRemoveFinalizer(addon *addonapiv1beta1.ManagedClusterAddOn, finalizer 
 			continue
 		}
 		// remove deperecated finalizers also
-		if f == addonapiv1beta1.AddonDeprecatedHostingManifestFinalizer ||
-			f == addonapiv1beta1.AddonDeprecatedPreDeleteHookFinalizer ||
-			f == addonapiv1beta1.AddonDeprecatedHostingPreDeleteHookFinalizer {
+		if f == addonapiv1alpha1.AddonDeprecatedHostingManifestFinalizer ||
+			f == addonapiv1alpha1.AddonDeprecatedPreDeleteHookFinalizer ||
+			f == addonapiv1alpha1.AddonDeprecatedHostingPreDeleteHookFinalizer {
 			continue
 		}
 		rst = append(rst, f)
@@ -59,9 +60,9 @@ func addonAddFinalizer(addon *addonapiv1beta1.ManagedClusterAddOn, finalizer str
 	var rst []string
 	for _, f := range addon.Finalizers {
 		// remove deperecated finalizers also
-		if f == addonapiv1beta1.AddonDeprecatedHostingManifestFinalizer ||
-			f == addonapiv1beta1.AddonDeprecatedPreDeleteHookFinalizer ||
-			f == addonapiv1beta1.AddonDeprecatedHostingPreDeleteHookFinalizer {
+		if f == addonapiv1alpha1.AddonDeprecatedHostingManifestFinalizer ||
+			f == addonapiv1alpha1.AddonDeprecatedPreDeleteHookFinalizer ||
+			f == addonapiv1alpha1.AddonDeprecatedHostingPreDeleteHookFinalizer {
 			continue
 		}
 		rst = append(rst, f)
@@ -130,7 +131,7 @@ func (b *addonWorksBuilder) isPreDeleteHookObject(obj runtime.Object) (bool, *wo
 	annotations := accessor.GetAnnotations()
 
 	// TODO: deprecate PreDeleteHookLabel in the future release.
-	_, hasPreDeleteLabel := labels[addonapiv1beta1.AddonPreDeleteHookLabelKey]
+	_, hasPreDeleteLabel := labels[addonapiv1beta1.AddonPreDeleteHookAnnotationKey]
 	_, hasPreDeleteAnnotation := annotations[addonapiv1beta1.AddonPreDeleteHookAnnotationKey]
 	if !hasPreDeleteLabel && !hasPreDeleteAnnotation {
 		return false, nil

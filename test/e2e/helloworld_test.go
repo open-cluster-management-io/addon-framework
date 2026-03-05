@@ -109,7 +109,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 	ginkgo.It("addon should be worked", func() {
 		ginkgo.By("Make sure addon is available")
 		gomega.Eventually(func() error {
-			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addonName, metav1.GetOptions{})
+			addon, err := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addonName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -160,7 +160,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 
 		ginkgo.By("Add the configs to ManagedClusterAddOn")
 		gomega.Eventually(func() error {
-			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addonName, metav1.GetOptions{})
+			addon, err := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addonName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -177,7 +177,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 					},
 				},
 			}
-			_, err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Update(context.Background(), newAddon, metav1.UpdateOptions{})
+			_, err = hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Update(context.Background(), newAddon, metav1.UpdateOptions{})
 			if err != nil {
 				return err
 			}
@@ -203,14 +203,14 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Remove addon")
-		err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Delete(context.Background(), addonName, metav1.DeleteOptions{})
+		err = hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Delete(context.Background(), addonName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 
 	ginkgo.It("addon should be worked with proxy settings", func() {
 		ginkgo.By("Make sure addon is available")
 		gomega.Eventually(func() error {
-			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addonName, metav1.GetOptions{})
+			addon, err := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addonName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -261,7 +261,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 
 		ginkgo.By("Add the configs to ManagedClusterAddOn")
 		gomega.Eventually(func() error {
-			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addonName, metav1.GetOptions{})
+			addon, err := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addonName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -278,7 +278,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 					},
 				},
 			}
-			_, err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Update(context.Background(), newAddon, metav1.UpdateOptions{})
+			_, err = hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Update(context.Background(), newAddon, metav1.UpdateOptions{})
 			if err != nil {
 				return err
 			}
@@ -321,14 +321,14 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Remove addon")
-		err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Delete(context.Background(), addonName, metav1.DeleteOptions{})
+		err = hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Delete(context.Background(), addonName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 
 	ginkgo.It("addon should be worked with resource requirements settings", func() {
 		ginkgo.By("Make sure addon is available")
 		gomega.Eventually(func() error {
-			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addonName, metav1.GetOptions{})
+			addon, err := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addonName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -379,7 +379,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 
 		ginkgo.By("Add the configs to ManagedClusterAddOn")
 		gomega.Eventually(func() error {
-			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addonName, metav1.GetOptions{})
+			addon, err := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addonName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -396,7 +396,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 					},
 				},
 			}
-			_, err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Update(context.Background(), newAddon, metav1.UpdateOptions{})
+			_, err = hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Update(context.Background(), newAddon, metav1.UpdateOptions{})
 			if err != nil {
 				return err
 			}
@@ -430,14 +430,14 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Remove addon")
-		err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Delete(context.Background(), addonName, metav1.DeleteOptions{})
+		err = hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Delete(context.Background(), addonName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 
 	ginkgo.It("addon registraion agent install namespace should work", func() {
 		ginkgo.By("Make sure addon is available")
 		gomega.Eventually(func() error {
-			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addonName, metav1.GetOptions{})
+			addon, err := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), addonName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -488,7 +488,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 
 		ginkgo.By("Add the configs to ManagedClusterAddOn")
 		gomega.Eventually(func() error {
-			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(
+			addon, err := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(
 				context.Background(), addonName, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -506,7 +506,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 					},
 				},
 			}
-			_, err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Update(
+			_, err = hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Update(
 				context.Background(), newAddon, metav1.UpdateOptions{})
 			if err != nil {
 				return err
@@ -522,15 +522,15 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		ginkgo.By("Remove addon")
-		err = hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Delete(context.Background(), addonName, metav1.DeleteOptions{})
+		err = hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Delete(context.Background(), addonName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 })
 
 func prepareAddOnDeploymentConfig(namespace string) error {
-	_, err := hubAddOnClient.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Get(context.Background(), deployConfigName, metav1.GetOptions{})
+	_, err := hubAddOnClient.AddonV1beta1().AddOnDeploymentConfigs(namespace).Get(context.Background(), deployConfigName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		if _, err := hubAddOnClient.AddonV1alpha1().AddOnDeploymentConfigs(managedClusterName).Create(
+		if _, err := hubAddOnClient.AddonV1beta1().AddOnDeploymentConfigs(managedClusterName).Create(
 			context.Background(),
 			&addonapiv1beta1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
@@ -557,10 +557,10 @@ func prepareAddOnDeploymentConfig(namespace string) error {
 }
 
 func prepareImageOverrideAddOnDeploymentConfig(namespace string) error {
-	_, err := hubAddOnClient.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Get(
+	_, err := hubAddOnClient.AddonV1beta1().AddOnDeploymentConfigs(namespace).Get(
 		context.Background(), deployImageOverrideConfigName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		if _, err := hubAddOnClient.AddonV1alpha1().AddOnDeploymentConfigs(managedClusterName).Create(
+		if _, err := hubAddOnClient.AddonV1beta1().AddOnDeploymentConfigs(managedClusterName).Create(
 			context.Background(),
 			&addonapiv1beta1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
@@ -584,9 +584,9 @@ func prepareImageOverrideAddOnDeploymentConfig(namespace string) error {
 }
 
 func prepareProxyConfigAddOnDeploymentConfig(namespace string) error {
-	_, err := hubAddOnClient.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Get(context.Background(), deployProxyConfigName, metav1.GetOptions{})
+	_, err := hubAddOnClient.AddonV1beta1().AddOnDeploymentConfigs(namespace).Get(context.Background(), deployProxyConfigName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		if _, err := hubAddOnClient.AddonV1alpha1().AddOnDeploymentConfigs(managedClusterName).Create(
+		if _, err := hubAddOnClient.AddonV1beta1().AddOnDeploymentConfigs(managedClusterName).Create(
 			context.Background(),
 			&addonapiv1beta1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
@@ -610,9 +610,9 @@ func prepareProxyConfigAddOnDeploymentConfig(namespace string) error {
 }
 
 func prepareResourceRequirementsAddOnDeploymentConfig(namespace string) error {
-	_, err := hubAddOnClient.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Get(context.Background(), deployResourceRequirementConfigName, metav1.GetOptions{})
+	_, err := hubAddOnClient.AddonV1beta1().AddOnDeploymentConfigs(namespace).Get(context.Background(), deployResourceRequirementConfigName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		if _, err := hubAddOnClient.AddonV1alpha1().AddOnDeploymentConfigs(managedClusterName).Create(
+		if _, err := hubAddOnClient.AddonV1beta1().AddOnDeploymentConfigs(managedClusterName).Create(
 			context.Background(),
 			&addonapiv1beta1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
@@ -653,10 +653,10 @@ func prepareResourceRequirementsAddOnDeploymentConfig(namespace string) error {
 }
 
 func prepareAgentInstallNamespaceAddOnDeploymentConfig(namespace string) error {
-	_, err := hubAddOnClient.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Get(
+	_, err := hubAddOnClient.AddonV1beta1().AddOnDeploymentConfigs(namespace).Get(
 		context.Background(), deployAgentInstallNamespaceConfigName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		if _, err := hubAddOnClient.AddonV1alpha1().AddOnDeploymentConfigs(managedClusterName).Create(
+		if _, err := hubAddOnClient.AddonV1beta1().AddOnDeploymentConfigs(managedClusterName).Create(
 			context.Background(),
 			&addonapiv1beta1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{

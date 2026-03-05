@@ -56,19 +56,20 @@ var _ = ginkgo.Describe("Addon CSR", func() {
 
 		testAddonImpl.registrations[managedClusterName] = []addonapiv1beta1.RegistrationConfig{
 			{
-				SignerName: certificatesv1.KubeAPIServerClientSignerName,
+				Type: addonapiv1beta1.KubeClient,
 			},
 		}
 
 		addon := &addonapiv1beta1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testAddonImpl.name,
+				Annotations: map[string]string{
+					addonapiv1beta1.InstallNamespaceAnnotation: "test",
+				},
 			},
-			Spec: addonapiv1beta1.ManagedClusterAddOnSpec{
-				InstallNamespace: "test",
-			},
+			Spec: addonapiv1beta1.ManagedClusterAddOnSpec{},
 		}
-		addon, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(context.Background(), addon, metav1.CreateOptions{})
+		addon, err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Create(context.Background(), addon, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		// Set kubeClientDriver to "csr" for CSR-based authentication

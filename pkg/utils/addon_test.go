@@ -42,8 +42,10 @@ func TestAllowAllAddOns(t *testing.T) {
 								Group:    "addon.open-cluster-management.io",
 								Resource: "addontemplates",
 							},
-							ConfigReferent: addonapiv1beta1.ConfigReferent{
-								Name: "test-template",
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
+									Name: "test-template",
+								},
 							},
 						},
 					},
@@ -111,8 +113,10 @@ func TestFilterTemplateBasedAddOns(t *testing.T) {
 								Group:    "addon.open-cluster-management.io",
 								Resource: "addondeploymentconfigs",
 							},
-							ConfigReferent: addonapiv1beta1.ConfigReferent{
-								Name: "test-config",
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
+									Name: "test-config",
+								},
 							},
 						},
 					},
@@ -134,10 +138,10 @@ func TestFilterTemplateBasedAddOns(t *testing.T) {
 								Group:    "addon.open-cluster-management.io",
 								Resource: "addontemplates",
 							},
-							ConfigReferent: addonapiv1beta1.ConfigReferent{
-								Name: "test-template",
-							},
 							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
+									Name: "test-template",
+								},
 								SpecHash: "test-hash",
 							},
 						},
@@ -160,8 +164,10 @@ func TestFilterTemplateBasedAddOns(t *testing.T) {
 								Group:    "addon.open-cluster-management.io",
 								Resource: "addondeploymentconfigs",
 							},
-							ConfigReferent: addonapiv1beta1.ConfigReferent{
-								Name: "test-config",
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
+									Name: "test-config",
+								},
 							},
 						},
 						{
@@ -169,10 +175,10 @@ func TestFilterTemplateBasedAddOns(t *testing.T) {
 								Group:    "addon.open-cluster-management.io",
 								Resource: "addontemplates",
 							},
-							ConfigReferent: addonapiv1beta1.ConfigReferent{
-								Name: "test-template",
-							},
 							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
+									Name: "test-template",
+								},
 								SpecHash: "test-hash",
 							},
 						},
@@ -195,8 +201,10 @@ func TestFilterTemplateBasedAddOns(t *testing.T) {
 								Group:    "other.group",
 								Resource: "addontemplates",
 							},
-							ConfigReferent: addonapiv1beta1.ConfigReferent{
-								Name: "test-template",
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
+									Name: "test-template",
+								},
 							},
 						},
 					},

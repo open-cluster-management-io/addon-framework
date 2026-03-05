@@ -106,22 +106,22 @@ func IndexAddonByConfig(obj interface{}) ([]string, error) {
 		return nil, fmt.Errorf("obj is supposed to be a ManagedClusterAddOn, but is %T", obj)
 	}
 
-	getIndex := func(config addonv1beta1.ConfigReference) string {
+	getIndex := func(config addonv1beta1.ConfigSpecHash, gr addonv1beta1.ConfigGroupResource) string {
 		if config.Namespace != "" {
-			return fmt.Sprintf("%s/%s/%s/%s", config.Group, config.Resource, config.Namespace, config.Name)
+			return fmt.Sprintf("%s/%s/%s/%s", gr.Group, gr.Resource, config.Namespace, config.Name)
 		}
 
-		return fmt.Sprintf("%s/%s/%s", config.Group, config.Resource, config.Name)
+		return fmt.Sprintf("%s/%s/%s", gr.Group, gr.Resource, config.Name)
 	}
 
 	configNames := []string{}
 	for _, configReference := range addon.Status.ConfigReferences {
-		if configReference.Name == "" {
+		if configReference.DesiredConfig == nil || configReference.DesiredConfig.Name == "" {
 			// bad config reference, ignore
 			continue
 		}
 
-		configNames = append(configNames, getIndex(configReference))
+		configNames = append(configNames, getIndex(*configReference.DesiredConfig, configReference.ConfigGroupResource))
 	}
 
 	return configNames, nil

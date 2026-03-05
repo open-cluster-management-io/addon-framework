@@ -6,7 +6,6 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	certificatesv1 "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/util/rand"
 
@@ -41,7 +40,7 @@ var _ = ginkgo.Describe("ClusterManagementAddon", func() {
 
 		testAddonImpl.registrations[managedClusterName] = []addonapiv1beta1.RegistrationConfig{
 			{
-				SignerName: certificatesv1.KubeAPIServerClientSignerName,
+				Type: addonapiv1beta1.KubeClient,
 			},
 		}
 
@@ -67,17 +66,18 @@ var _ = ginkgo.Describe("ClusterManagementAddon", func() {
 				},
 			},
 		}
-		cma, err := hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Create(context.Background(), cma, metav1.CreateOptions{})
+		cma, err := hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Create(context.Background(), cma, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		// Create managed cluster addon
 		addon := &addonapiv1beta1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testAddonImpl.name,
+				Annotations: map[string]string{
+					addonapiv1beta1.InstallNamespaceAnnotation: "test",
+				},
 			},
-			Spec: addonapiv1beta1.ManagedClusterAddOnSpec{
-				InstallNamespace: "test",
-			},
+			Spec: addonapiv1beta1.ManagedClusterAddOnSpec{},
 		}
 		createManagedClusterAddOnwithOwnerRefs(managedClusterName, addon, cma)
 
@@ -85,7 +85,7 @@ var _ = ginkgo.Describe("ClusterManagementAddon", func() {
 		setKubeClientDriver(managedClusterName, testAddonImpl.name, "csr")
 
 		gomega.Eventually(func() error {
-			actual, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testAddonImpl.name, metav1.GetOptions{})
+			actual, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testAddonImpl.name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -98,7 +98,7 @@ var _ = ginkgo.Describe("ClusterManagementAddon", func() {
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
-		err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Delete(context.Background(), testAddonImpl.name, metav1.DeleteOptions{})
+		err = hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Delete(context.Background(), testAddonImpl.name, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 })

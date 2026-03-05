@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	certificatesv1 "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -111,7 +110,10 @@ func TestReconcile(t *testing.T) {
 			},
 			testaddon: &testAgent{name: "test", namespace: "default", registrations: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: "test",
+					Type: addonapiv1beta1.CustomSigner,
+					CustomSigner: &addonapiv1beta1.CustomSignerConfig{
+						SignerName: "test",
+					},
 				},
 			}},
 			validateAddonActions: addontesting.AssertNoActions,
@@ -136,7 +138,7 @@ func TestReconcile(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if addOn.Status.Registrations[0].SignerName != "test" {
+				if addOn.Status.Registrations[0].Type != addonapiv1beta1.CustomSigner || addOn.Status.Registrations[0].CustomSigner.SignerName != "test" {
 					t.Errorf("Registration config is not updated")
 				}
 				if addOn.Status.Namespace != "default" {
@@ -145,7 +147,10 @@ func TestReconcile(t *testing.T) {
 			},
 			testaddon: &testAgent{name: "test", namespace: "default", registrations: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: "test",
+					Type: addonapiv1beta1.CustomSigner,
+					CustomSigner: &addonapiv1beta1.CustomSignerConfig{
+						SignerName: "test",
+					},
 				},
 			}},
 		},
@@ -158,7 +163,7 @@ func TestReconcile(t *testing.T) {
 						Kind: "ClusterManagementAddOn",
 						Name: "test",
 					})
-					addon.Spec.InstallNamespace = "default2"
+					addon.Annotations = map[string]string{addonapiv1beta1.InstallNamespaceAnnotation: "default2"}
 					return addon
 				}(),
 			},
@@ -170,16 +175,19 @@ func TestReconcile(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if addOn.Status.Registrations[0].SignerName != "test" {
+				if addOn.Status.Registrations[0].Type != addonapiv1beta1.CustomSigner || addOn.Status.Registrations[0].CustomSigner.SignerName != "test" {
 					t.Errorf("Registration config is not updated")
 				}
-				if addOn.Status.Namespace != "default2" {
-					t.Errorf("Namespace %s in status is not correct default2", addOn.Status.Namespace)
+				if addOn.Status.Namespace != "default" {
+					t.Errorf("Namespace %s in status is not correct, expected default", addOn.Status.Namespace)
 				}
 			},
 			testaddon: &testAgent{name: "test", namespace: "default", registrations: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: "test",
+					Type: addonapiv1beta1.CustomSigner,
+					CustomSigner: &addonapiv1beta1.CustomSignerConfig{
+						SignerName: "test",
+					},
 				},
 			}},
 		},
@@ -192,7 +200,7 @@ func TestReconcile(t *testing.T) {
 						Kind: "ClusterManagementAddOn",
 						Name: "test",
 					})
-					addon.Spec.InstallNamespace = "default2"
+					addon.Annotations = map[string]string{addonapiv1beta1.InstallNamespaceAnnotation: "default2"}
 					return addon
 				}(),
 			},
@@ -204,7 +212,7 @@ func TestReconcile(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if addOn.Status.Registrations[0].SignerName != "test" {
+				if addOn.Status.Registrations[0].Type != addonapiv1beta1.CustomSigner || addOn.Status.Registrations[0].CustomSigner.SignerName != "test" {
 					t.Errorf("Registration config is not updated")
 				}
 				if addOn.Status.Namespace != "default3" {
@@ -212,7 +220,12 @@ func TestReconcile(t *testing.T) {
 				}
 			},
 			testaddon: &testAgent{name: "test", namespace: "default",
-				registrations: []addonapiv1beta1.RegistrationConfig{{SignerName: "test"}},
+				registrations: []addonapiv1beta1.RegistrationConfig{{
+					Type: addonapiv1beta1.CustomSigner,
+					CustomSigner: &addonapiv1beta1.CustomSignerConfig{
+						SignerName: "test",
+					},
+				}},
 				agentInstallNamespace: func(addon *addonapiv1beta1.ManagedClusterAddOn) (string, error) {
 					return "default3", nil
 				},
@@ -238,7 +251,7 @@ func TestReconcile(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if addOn.Status.Registrations[0].SignerName != "test" {
+				if addOn.Status.Registrations[0].Type != addonapiv1beta1.CustomSigner || addOn.Status.Registrations[0].CustomSigner.SignerName != "test" {
 					t.Errorf("Registration config is not updated")
 				}
 				if addOn.Status.Namespace != "open-cluster-management-agent-addon" {
@@ -247,7 +260,10 @@ func TestReconcile(t *testing.T) {
 			},
 			testaddon: &testAgent{name: "test", namespace: "", registrations: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: "test",
+					Type: addonapiv1beta1.CustomSigner,
+					CustomSigner: &addonapiv1beta1.CustomSignerConfig{
+						SignerName: "test",
+					},
 				},
 			}},
 		},
@@ -286,7 +302,12 @@ func TestReconcile(t *testing.T) {
 				name:      "test",
 				namespace: "default",
 				registrations: []addonapiv1beta1.RegistrationConfig{
-					{SignerName: "test"},
+					{
+						Type: addonapiv1beta1.CustomSigner,
+						CustomSigner: &addonapiv1beta1.CustomSignerConfig{
+							SignerName: "test",
+						},
+					},
 				},
 				permissionConfig: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 					return &agent.SubjectNotReadyError{}
@@ -302,7 +323,12 @@ func TestReconcile(t *testing.T) {
 						Kind: "ClusterManagementAddOn",
 						Name: "test",
 					})
-					addon.Status.KubeClientDriver = "csr"
+					addon.Status.Registrations = []addonapiv1beta1.RegistrationConfig{
+						{
+							Type:       addonapiv1beta1.KubeClient,
+							KubeClient: &addonapiv1beta1.KubeClientConfig{Driver: "csr"},
+						},
+					}
 					return addon
 				}(),
 			},
@@ -325,7 +351,9 @@ func TestReconcile(t *testing.T) {
 				name:      "test",
 				namespace: "default",
 				registrations: []addonapiv1beta1.RegistrationConfig{
-					{SignerName: certificatesv1.KubeAPIServerClientSignerName},
+					{
+						Type: addonapiv1beta1.KubeClient,
+					},
 				},
 				permissionConfig: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 					return nil
@@ -361,7 +389,9 @@ func TestReconcile(t *testing.T) {
 				name:      "test",
 				namespace: "default",
 				registrations: []addonapiv1beta1.RegistrationConfig{
-					{SignerName: certificatesv1.KubeAPIServerClientSignerName},
+					{
+						Type: addonapiv1beta1.KubeClient,
+					},
 				},
 				permissionConfig: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 					return nil
@@ -402,7 +432,9 @@ func TestReconcile(t *testing.T) {
 				name:      "test",
 				namespace: "default",
 				registrations: []addonapiv1beta1.RegistrationConfig{
-					{SignerName: certificatesv1.KubeAPIServerClientSignerName},
+					{
+						Type: addonapiv1beta1.KubeClient,
+					},
 				},
 				permissionConfig: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 					return &agent.SubjectNotReadyError{}
@@ -443,7 +475,12 @@ func TestReconcile(t *testing.T) {
 				name:      "test",
 				namespace: "default",
 				registrations: []addonapiv1beta1.RegistrationConfig{
-					{SignerName: "test"},
+					{
+						Type: addonapiv1beta1.CustomSigner,
+						CustomSigner: &addonapiv1beta1.CustomSignerConfig{
+							SignerName: "test",
+						},
+					},
 				},
 				permissionConfig: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 					return fmt.Errorf("permission config failed")
@@ -466,7 +503,7 @@ func TestReconcile(t *testing.T) {
 				}
 			}
 			for _, obj := range c.addon {
-				if err := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore().Add(obj); err != nil {
+				if err := addonInformers.Addon().V1beta1().ManagedClusterAddOns().Informer().GetStore().Add(obj); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -474,7 +511,7 @@ func TestReconcile(t *testing.T) {
 			controller := addonRegistrationController{
 				addonClient:               fakeAddonClient,
 				managedClusterLister:      clusterInformers.Cluster().V1().ManagedClusters().Lister(),
-				managedClusterAddonLister: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
+				managedClusterAddonLister: addonInformers.Addon().V1beta1().ManagedClusterAddOns().Lister(),
 				agentAddons:               map[string]agent.AgentAddon{c.testaddon.name: c.testaddon},
 			}
 
@@ -502,253 +539,424 @@ func TestReconcile(t *testing.T) {
 func TestBuildRegistrationConfigs(t *testing.T) {
 	customSignerName := "example.com/custom-signer"
 	testSubject := addonapiv1beta1.Subject{
-		User:   "test-user",
-		Groups: []string{"test-group"},
+		BaseSubject: addonapiv1beta1.BaseSubject{
+			User:   "test-user",
+			Groups: []string{"test-group"},
+		},
 	}
 	existingSubject := addonapiv1beta1.Subject{
-		User:   "existing-user",
-		Groups: []string{"existing-group"},
+		BaseSubject: addonapiv1beta1.BaseSubject{
+			User:   "existing-user",
+			Groups: []string{"existing-group"},
+		},
 	}
 
 	tests := []struct {
 		name                  string
-		kubeClientDriver      string
 		newConfigs            []addonapiv1beta1.RegistrationConfig
 		existingRegistrations []addonapiv1beta1.RegistrationConfig
 		expectedRegistrations []addonapiv1beta1.RegistrationConfig
 	}{
 		{
 			name:                  "empty new configs",
-			kubeClientDriver:      "",
 			newConfigs:            []addonapiv1beta1.RegistrationConfig{},
 			existingRegistrations: []addonapiv1beta1.RegistrationConfig{},
 			expectedRegistrations: []addonapiv1beta1.RegistrationConfig{},
 		},
 		{
-			name:             "no existing registrations - kubeClientDriver empty",
-			kubeClientDriver: "",
+			name: "no existing registrations - kubeClientDriver empty",
 			newConfigs: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: certificatesv1.KubeAPIServerClientSignerName,
-					Subject:    testSubject,
+					Type: addonapiv1beta1.KubeClient,
+					KubeClient: &addonapiv1beta1.KubeClientConfig{
+						Subject: addonapiv1beta1.KubeClientSubject{
+							BaseSubject: addonapiv1beta1.BaseSubject{
+								User:   testSubject.User,
+								Groups: testSubject.Groups,
+							},
+						},
+					},
 				},
 			},
 			existingRegistrations: []addonapiv1beta1.RegistrationConfig{},
 			expectedRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: certificatesv1.KubeAPIServerClientSignerName,
-					Subject:    testSubject, // use subject from newConfigs
+					Type: addonapiv1beta1.KubeClient,
+					KubeClient: &addonapiv1beta1.KubeClientConfig{
+						Subject: addonapiv1beta1.KubeClientSubject{
+							BaseSubject: addonapiv1beta1.BaseSubject{
+								User:   testSubject.User,
+								Groups: testSubject.Groups,
+							},
+						}, // use subject from newConfigs
+					},
 				},
 			},
 		},
 		{
-			name:             "non-kubeclient type - use subject from newConfigs",
-			kubeClientDriver: "",
+			name: "non-kubeclient type - use subject from newConfigs",
 			newConfigs: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: customSignerName,
-					Subject:    testSubject,
+					Type: addonapiv1beta1.CustomSigner,
+					CustomSigner: &addonapiv1beta1.CustomSignerConfig{
+						SignerName: customSignerName,
+						Subject:    testSubject,
+					},
 				},
 			},
 			existingRegistrations: []addonapiv1beta1.RegistrationConfig{},
 			expectedRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: customSignerName,
-					Subject:    testSubject, // from newConfigs
+					Type: addonapiv1beta1.CustomSigner,
+					CustomSigner: &addonapiv1beta1.CustomSignerConfig{
+						SignerName: customSignerName,
+						Subject:    testSubject, // from newConfigs
+					},
 				},
 			},
 		},
 		{
-			name:             "kubeclient with csr driver - use subject from newConfigs",
-			kubeClientDriver: "csr",
+			name: "kubeclient with csr driver - use subject from newConfigs",
 			newConfigs: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: certificatesv1.KubeAPIServerClientSignerName,
-					Subject:    testSubject,
+					Type: addonapiv1beta1.KubeClient,
+					KubeClient: &addonapiv1beta1.KubeClientConfig{
+						Subject: addonapiv1beta1.KubeClientSubject{
+							BaseSubject: addonapiv1beta1.BaseSubject{
+								User:   testSubject.User,
+								Groups: testSubject.Groups,
+							},
+						},
+						Driver: "csr",
+					},
 				},
 			},
 			existingRegistrations: []addonapiv1beta1.RegistrationConfig{},
 			expectedRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: certificatesv1.KubeAPIServerClientSignerName,
-					Subject:    testSubject, // from newConfigs (not preserved because driver is csr)
+					Type: addonapiv1beta1.KubeClient,
+					KubeClient: &addonapiv1beta1.KubeClientConfig{
+						Driver: "csr",
+						Subject: addonapiv1beta1.KubeClientSubject{
+							BaseSubject: addonapiv1beta1.BaseSubject{
+								User:   testSubject.User,
+								Groups: testSubject.Groups,
+							},
+						}, // from newConfigs (not preserved because driver is csr)
+					},
 				},
 			},
 		},
 		{
-			name:             "kubeclient with token driver - preserve existing subject",
-			kubeClientDriver: "token",
+			name: "kubeclient with token driver - preserve existing subject",
 			newConfigs: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: certificatesv1.KubeAPIServerClientSignerName,
-					Subject:    testSubject,
+					Type: addonapiv1beta1.KubeClient,
+					KubeClient: &addonapiv1beta1.KubeClientConfig{
+						Subject: addonapiv1beta1.KubeClientSubject{
+							BaseSubject: addonapiv1beta1.BaseSubject{
+								User:   testSubject.User,
+								Groups: testSubject.Groups,
+							},
+						},
+						Driver: "token",
+					},
 				},
 			},
 			existingRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: certificatesv1.KubeAPIServerClientSignerName,
-					Subject:    existingSubject,
+					Type: addonapiv1beta1.KubeClient,
+					KubeClient: &addonapiv1beta1.KubeClientConfig{
+						Subject: addonapiv1beta1.KubeClientSubject{
+							BaseSubject: addonapiv1beta1.BaseSubject{
+								User:   existingSubject.User,
+								Groups: existingSubject.Groups,
+							},
+						},
+					},
 				},
 			},
 			expectedRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: certificatesv1.KubeAPIServerClientSignerName,
-					Subject:    existingSubject, // preserved from existing
+					Type: addonapiv1beta1.KubeClient,
+					KubeClient: &addonapiv1beta1.KubeClientConfig{
+						Driver: "token",
+						Subject: addonapiv1beta1.KubeClientSubject{
+							BaseSubject: addonapiv1beta1.BaseSubject{
+								User:   existingSubject.User,
+								Groups: existingSubject.Groups,
+							},
+						}, // preserved from existing
+					},
 				},
 			},
 		},
 		{
-			name:             "kubeclient with empty driver - use subject from newConfigs",
-			kubeClientDriver: "",
+			name: "kubeclient with empty driver - use subject from newConfigs",
 			newConfigs: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: certificatesv1.KubeAPIServerClientSignerName,
-					Subject:    testSubject,
+					Type: addonapiv1beta1.KubeClient,
+					KubeClient: &addonapiv1beta1.KubeClientConfig{
+						Subject: addonapiv1beta1.KubeClientSubject{
+							BaseSubject: addonapiv1beta1.BaseSubject{
+								User:   testSubject.User,
+								Groups: testSubject.Groups,
+							},
+						},
+					},
 				},
 			},
 			existingRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: certificatesv1.KubeAPIServerClientSignerName,
-					Subject:    existingSubject,
+					Type: addonapiv1beta1.KubeClient,
+					KubeClient: &addonapiv1beta1.KubeClientConfig{
+						Subject: addonapiv1beta1.KubeClientSubject{
+							BaseSubject: addonapiv1beta1.BaseSubject{
+								User:   existingSubject.User,
+								Groups: existingSubject.Groups,
+							},
+						},
+					},
 				},
 			},
 			expectedRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: certificatesv1.KubeAPIServerClientSignerName,
-					Subject:    testSubject, // use subject from newConfigs
+					Type: addonapiv1beta1.KubeClient,
+					KubeClient: &addonapiv1beta1.KubeClientConfig{
+						Subject: addonapiv1beta1.KubeClientSubject{
+							BaseSubject: addonapiv1beta1.BaseSubject{
+								User:   testSubject.User,
+								Groups: testSubject.Groups,
+							},
+						}, // use subject from newConfigs
+					},
 				},
 			},
 		},
 		{
-			name:             "kubeclient with token driver and empty existing subject",
-			kubeClientDriver: "token",
+			name: "kubeclient with token driver and empty existing subject",
 			newConfigs: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: certificatesv1.KubeAPIServerClientSignerName,
-					Subject:    testSubject,
+					Type: addonapiv1beta1.KubeClient,
+					KubeClient: &addonapiv1beta1.KubeClientConfig{
+						Subject: addonapiv1beta1.KubeClientSubject{
+							BaseSubject: addonapiv1beta1.BaseSubject{
+								User:   testSubject.User,
+								Groups: testSubject.Groups,
+							},
+						},
+						Driver: "token",
+					},
 				},
 			},
 			existingRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: certificatesv1.KubeAPIServerClientSignerName,
-					Subject:    addonapiv1beta1.Subject{}, // empty subject
+					Type: addonapiv1beta1.KubeClient,
+					KubeClient: &addonapiv1beta1.KubeClientConfig{
+						Subject: addonapiv1beta1.KubeClientSubject{}, // empty subject
+					},
 				},
 			},
 			expectedRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: certificatesv1.KubeAPIServerClientSignerName,
-					Subject:    addonapiv1beta1.Subject{}, // preserved empty subject
+					Type: addonapiv1beta1.KubeClient,
+					KubeClient: &addonapiv1beta1.KubeClientConfig{
+						Driver:  "token",
+						Subject: addonapiv1beta1.KubeClientSubject{}, // preserved empty subject
+					},
 				},
 			},
 		},
 		{
-			name:             "kubeclient with token driver - no existing registration",
-			kubeClientDriver: "token",
+			name: "kubeclient with token driver - no existing registration",
 			newConfigs: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: certificatesv1.KubeAPIServerClientSignerName,
-					Subject:    testSubject,
+					Type: addonapiv1beta1.KubeClient,
+					KubeClient: &addonapiv1beta1.KubeClientConfig{
+						Subject: addonapiv1beta1.KubeClientSubject{
+							BaseSubject: addonapiv1beta1.BaseSubject{
+								User:   testSubject.User,
+								Groups: testSubject.Groups,
+							},
+						},
+						Driver: "token",
+					},
 				},
 			},
 			existingRegistrations: []addonapiv1beta1.RegistrationConfig{}, // no existing registration
 			expectedRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: certificatesv1.KubeAPIServerClientSignerName,
-					Subject:    addonapiv1beta1.Subject{}, // cleared, waiting for agent to set
+					Type: addonapiv1beta1.KubeClient,
+					KubeClient: &addonapiv1beta1.KubeClientConfig{
+						Driver:  "token",
+						Subject: addonapiv1beta1.KubeClientSubject{}, // cleared, waiting for agent to set
+					},
 				},
 			},
 		},
 		{
-			name:             "kubeclient with csr driver - existing registrations ignored",
-			kubeClientDriver: "csr",
+			name: "kubeclient with csr driver - existing registrations ignored",
 			newConfigs: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: certificatesv1.KubeAPIServerClientSignerName,
-					Subject:    testSubject,
+					Type: addonapiv1beta1.KubeClient,
+					KubeClient: &addonapiv1beta1.KubeClientConfig{
+						Subject: addonapiv1beta1.KubeClientSubject{
+							BaseSubject: addonapiv1beta1.BaseSubject{
+								User:   testSubject.User,
+								Groups: testSubject.Groups,
+							},
+						},
+						Driver: "csr",
+					},
 				},
 			},
 			existingRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: certificatesv1.KubeAPIServerClientSignerName,
-					Subject:    existingSubject,
+					Type: addonapiv1beta1.KubeClient,
+					KubeClient: &addonapiv1beta1.KubeClientConfig{
+						Subject: addonapiv1beta1.KubeClientSubject{
+							BaseSubject: addonapiv1beta1.BaseSubject{
+								User:   existingSubject.User,
+								Groups: existingSubject.Groups,
+							},
+						},
+					},
 				},
 			},
 			expectedRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: certificatesv1.KubeAPIServerClientSignerName,
-					Subject:    testSubject, // from newConfigs, existing ignored
+					Type: addonapiv1beta1.KubeClient,
+					KubeClient: &addonapiv1beta1.KubeClientConfig{
+						Driver: "csr",
+						Subject: addonapiv1beta1.KubeClientSubject{
+							BaseSubject: addonapiv1beta1.BaseSubject{
+								User:   testSubject.User,
+								Groups: testSubject.Groups,
+							},
+						}, // from newConfigs, existing ignored
+					},
 				},
 			},
 		},
 		{
-			name:             "multiple configs - mixed signer types",
-			kubeClientDriver: "token",
+			name: "multiple configs - mixed signer types",
 			newConfigs: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: certificatesv1.KubeAPIServerClientSignerName,
-					Subject:    testSubject,
+					Type: addonapiv1beta1.KubeClient,
+					KubeClient: &addonapiv1beta1.KubeClientConfig{
+						Subject: addonapiv1beta1.KubeClientSubject{
+							BaseSubject: addonapiv1beta1.BaseSubject{
+								User:   testSubject.User,
+								Groups: testSubject.Groups,
+							},
+						},
+						Driver: "token",
+					},
 				},
 				{
-					SignerName: customSignerName,
-					Subject:    testSubject,
+					Type: addonapiv1beta1.CustomSigner,
+					CustomSigner: &addonapiv1beta1.CustomSignerConfig{
+						SignerName: customSignerName,
+						Subject:    testSubject,
+					},
 				},
 			},
 			existingRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: certificatesv1.KubeAPIServerClientSignerName,
-					Subject:    existingSubject,
+					Type: addonapiv1beta1.KubeClient,
+					KubeClient: &addonapiv1beta1.KubeClientConfig{
+						Subject: addonapiv1beta1.KubeClientSubject{
+							BaseSubject: addonapiv1beta1.BaseSubject{
+								User:   existingSubject.User,
+								Groups: existingSubject.Groups,
+							},
+						},
+					},
 				},
 			},
 			expectedRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: certificatesv1.KubeAPIServerClientSignerName,
-					Subject:    existingSubject, // preserved from existing for KubeClient
+					Type: addonapiv1beta1.KubeClient,
+					KubeClient: &addonapiv1beta1.KubeClientConfig{
+						Driver: "token",
+						Subject: addonapiv1beta1.KubeClientSubject{
+							BaseSubject: addonapiv1beta1.BaseSubject{
+								User:   existingSubject.User,
+								Groups: existingSubject.Groups,
+							},
+						}, // preserved from existing for KubeClient
+					},
 				},
 				{
-					SignerName: customSignerName,
-					Subject:    testSubject, // from newConfigs for custom signer
+					Type: addonapiv1beta1.CustomSigner,
+					CustomSigner: &addonapiv1beta1.CustomSignerConfig{
+						SignerName: customSignerName,
+						Subject:    testSubject, // from newConfigs for custom signer
+					},
 				},
 			},
 		},
 		{
-			name:             "kubeclient with token driver - mismatched signer in existing",
-			kubeClientDriver: "token",
+			name: "kubeclient with token driver - mismatched signer in existing",
 			newConfigs: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: certificatesv1.KubeAPIServerClientSignerName,
-					Subject:    testSubject,
+					Type: addonapiv1beta1.KubeClient,
+					KubeClient: &addonapiv1beta1.KubeClientConfig{
+						Subject: addonapiv1beta1.KubeClientSubject{
+							BaseSubject: addonapiv1beta1.BaseSubject{
+								User:   testSubject.User,
+								Groups: testSubject.Groups,
+							},
+						},
+						Driver: "token",
+					},
 				},
 			},
 			existingRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: customSignerName, // different signer
-					Subject:    existingSubject,
+					Type: addonapiv1beta1.CustomSigner,
+					CustomSigner: &addonapiv1beta1.CustomSignerConfig{
+						SignerName: customSignerName, // different signer
+						Subject:    existingSubject,
+					},
 				},
 			},
 			expectedRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: certificatesv1.KubeAPIServerClientSignerName,
-					Subject:    addonapiv1beta1.Subject{}, // cleared, no matching existing
+					Type: addonapiv1beta1.KubeClient,
+					KubeClient: &addonapiv1beta1.KubeClientConfig{
+						Driver:  "token",
+						Subject: addonapiv1beta1.KubeClientSubject{}, // cleared, no matching existing
+
+					},
 				},
 			},
 		},
 		{
-			name:             "kubeclient with csr driver - empty subject gets default",
-			kubeClientDriver: "csr",
+			name: "kubeclient with csr driver - empty subject gets default",
 			newConfigs: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: certificatesv1.KubeAPIServerClientSignerName,
-					Subject:    addonapiv1beta1.Subject{}, // empty subject
+					Type: addonapiv1beta1.KubeClient,
+					KubeClient: &addonapiv1beta1.KubeClientConfig{
+						Subject: addonapiv1beta1.KubeClientSubject{}, // empty subject
+						Driver:  "csr",
+					},
 				},
 			},
 			existingRegistrations: []addonapiv1beta1.RegistrationConfig{},
 			expectedRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
-					SignerName: certificatesv1.KubeAPIServerClientSignerName,
-					Subject: addonapiv1beta1.Subject{
-						User:   "system:open-cluster-management:cluster:cluster1:addon:test-addon:agent:test-addon",
-						Groups: []string{"system:open-cluster-management:cluster:cluster1:addon:test-addon", "system:open-cluster-management:addon:test-addon"},
-					}, // default subject set
+					Type: addonapiv1beta1.KubeClient,
+					KubeClient: &addonapiv1beta1.KubeClientConfig{
+						Driver: "csr",
+						Subject: addonapiv1beta1.KubeClientSubject{
+							BaseSubject: addonapiv1beta1.BaseSubject{
+								User:   "system:open-cluster-management:cluster:cluster1:addon:test-addon:agent:test-addon",
+								Groups: []string{"system:open-cluster-management:cluster:cluster1:addon:test-addon", "system:open-cluster-management:addon:test-addon"},
+							},
+						}, // default subject set
+
+					},
 				},
 			},
 		},
@@ -756,7 +964,7 @@ func TestBuildRegistrationConfigs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := buildRegistrationConfigs(tt.newConfigs, tt.existingRegistrations, tt.kubeClientDriver, "cluster1", "test-addon")
+			result := buildRegistrationConfigs(tt.newConfigs, tt.existingRegistrations, "cluster1", "test-addon")
 
 			if len(result) != len(tt.expectedRegistrations) {
 				t.Errorf("expected %d registrations, got %d", len(tt.expectedRegistrations), len(result))
@@ -764,18 +972,62 @@ func TestBuildRegistrationConfigs(t *testing.T) {
 			}
 
 			for i, expected := range tt.expectedRegistrations {
-				if result[i].SignerName != expected.SignerName {
-					t.Errorf("registration[%d].SignerName: expected %q, got %q", i, expected.SignerName, result[i].SignerName)
+				if result[i].Type != expected.Type {
+					t.Errorf("registration[%d].Type: expected %q, got %q", i, expected.Type, result[i].Type)
 				}
-				if result[i].Subject.User != expected.Subject.User {
-					t.Errorf("registration[%d].Subject.User: expected %q, got %q", i, expected.Subject.User, result[i].Subject.User)
-				}
-				if len(result[i].Subject.Groups) != len(expected.Subject.Groups) {
-					t.Errorf("registration[%d].Subject.Groups length: expected %d, got %d", i, len(expected.Subject.Groups), len(result[i].Subject.Groups))
-				} else {
-					for j, group := range expected.Subject.Groups {
-						if result[i].Subject.Groups[j] != group {
-							t.Errorf("registration[%d].Subject.Groups[%d]: expected %q, got %q", i, j, group, result[i].Subject.Groups[j])
+
+				// Check based on type
+				if expected.Type == addonapiv1beta1.KubeClient {
+					if expected.KubeClient == nil || result[i].KubeClient == nil {
+						if expected.KubeClient != result[i].KubeClient {
+							t.Errorf("registration[%d].KubeClient: expected %v, got %v", i, expected.KubeClient, result[i].KubeClient)
+						}
+					} else {
+						// Check Driver field
+						if result[i].KubeClient.Driver != expected.KubeClient.Driver {
+							t.Errorf("registration[%d].KubeClient.Driver: expected %q, got %q", i, expected.KubeClient.Driver, result[i].KubeClient.Driver)
+						}
+						expectedUser := expected.KubeClient.Subject.User
+						resultUser := result[i].KubeClient.Subject.User
+						if resultUser != expectedUser {
+							t.Errorf("registration[%d].KubeClient.Subject.User: expected %q, got %q", i, expectedUser, resultUser)
+						}
+						expectedGroups := expected.KubeClient.Subject.Groups
+						resultGroups := result[i].KubeClient.Subject.Groups
+						if len(resultGroups) != len(expectedGroups) {
+							t.Errorf("registration[%d].KubeClient.Subject.Groups length: expected %d, got %d", i, len(expectedGroups), len(resultGroups))
+						} else {
+							for j, group := range expectedGroups {
+								if resultGroups[j] != group {
+									t.Errorf("registration[%d].KubeClient.Subject.Groups[%d]: expected %q, got %q", i, j, group, resultGroups[j])
+								}
+							}
+						}
+					}
+				} else if expected.Type == addonapiv1beta1.CustomSigner {
+					if expected.CustomSigner == nil || result[i].CustomSigner == nil {
+						if expected.CustomSigner != result[i].CustomSigner {
+							t.Errorf("registration[%d].CustomSigner: expected %v, got %v", i, expected.CustomSigner, result[i].CustomSigner)
+						}
+					} else {
+						if result[i].CustomSigner.SignerName != expected.CustomSigner.SignerName {
+							t.Errorf("registration[%d].CustomSigner.SignerName: expected %q, got %q", i, expected.CustomSigner.SignerName, result[i].CustomSigner.SignerName)
+						}
+						expectedUser := expected.CustomSigner.Subject.User
+						resultUser := result[i].CustomSigner.Subject.User
+						if resultUser != expectedUser {
+							t.Errorf("registration[%d].CustomSigner.Subject.User: expected %q, got %q", i, expectedUser, resultUser)
+						}
+						expectedGroups := expected.CustomSigner.Subject.Groups
+						resultGroups := result[i].CustomSigner.Subject.Groups
+						if len(resultGroups) != len(expectedGroups) {
+							t.Errorf("registration[%d].CustomSigner.Subject.Groups length: expected %d, got %d", i, len(expectedGroups), len(resultGroups))
+						} else {
+							for j, group := range expectedGroups {
+								if resultGroups[j] != group {
+									t.Errorf("registration[%d].CustomSigner.Subject.Groups[%d]: expected %q, got %q", i, j, group, resultGroups[j])
+								}
+							}
 						}
 					}
 				}

@@ -96,10 +96,6 @@ func TestManifestAddonAgent(t *testing.T) {
 							Group:    "addon.open-cluster-management.io",
 							Resource: "addondeploymentconfigs",
 						},
-						ConfigReferent: addonapiv1beta1.ConfigReferent{
-							Namespace: "cluster1",
-							Name:      "config",
-						},
 						DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
 							ConfigReferent: addonapiv1beta1.ConfigReferent{
 								Namespace: "cluster1",

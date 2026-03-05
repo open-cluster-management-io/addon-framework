@@ -165,7 +165,7 @@ func (c *addonConfigController) sync(ctx context.Context, syncCtx factory.SyncCo
 	addonPatcher := patcher.NewPatcher[
 		*addonapiv1beta1.ManagedClusterAddOn,
 		addonapiv1beta1.ManagedClusterAddOnSpec,
-		addonapiv1beta1.ManagedClusterAddOnStatus](c.addonClient.AddonV1alpha1().ManagedClusterAddOns(addonNamespace))
+		addonapiv1beta1.ManagedClusterAddOnStatus](c.addonClient.AddonV1beta1().ManagedClusterAddOns(addonNamespace))
 
 	_, err = addonPatcher.PatchStatus(ctx, addonCopy, addonCopy.Status, addon.Status)
 	return err
@@ -187,12 +187,18 @@ func (c *addonConfigController) updateConfigSpecHashAndGenerations(addon *addona
 			continue
 		}
 
+		// In v1beta1, ConfigReference doesn't have Name/Namespace directly
+		// They are in DesiredConfig field
+		if configReference.DesiredConfig == nil {
+			continue
+		}
+
 		var config *unstructured.Unstructured
 		var err error
-		if configReference.Namespace == "" {
-			config, err = lister.Get(configReference.Name)
+		if configReference.DesiredConfig.Namespace == "" {
+			config, err = lister.Get(configReference.DesiredConfig.Name)
 		} else {
-			config, err = lister.Namespace(configReference.Namespace).Get(configReference.Name)
+			config, err = lister.Namespace(configReference.DesiredConfig.Namespace).Get(configReference.DesiredConfig.Name)
 		}
 
 		if errors.IsNotFound(err) {

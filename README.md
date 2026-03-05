@@ -20,8 +20,8 @@ Open Cluster Management (OCM) is a Kubernetes-native solution for managing multi
 
 The framework is built around several key Kubernetes custom resources:
 
-- **[ClusterManagementAddOn](https://github.com/open-cluster-management-io/api/blob/main/addon/v1alpha1/types_clustermanagementaddon.go)**: Hub cluster resource that defines addon metadata and installation strategy
-- **[ManagedClusterAddOn](https://github.com/open-cluster-management-io/api/blob/main/addon/v1alpha1/types_managedclusteraddon.go)**: Managed cluster resource that represents addon installation state
+- **[ClusterManagementAddOn](https://github.com/open-cluster-management-io/api/blob/main/addon/v1beta1/types_clustermanagementaddon.go)**: Hub cluster resource that defines addon metadata and installation strategy
+- **[ManagedClusterAddOn](https://github.com/open-cluster-management-io/api/blob/main/addon/v1beta1/types_managedclusteraddon.go)**: Managed cluster resource that represents addon installation state
 - **AddOnTemplate**: Template-based addon deployment without dedicated controllers
 
 ## Getting Started

@@ -16,7 +16,7 @@ import (
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	clusterv1apha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 )
 
 //go:embed testmanifests/chart
@@ -58,7 +58,7 @@ func getValues(cluster *clusterv1.ManagedCluster,
 
 func TestChartAgentAddon_Manifests(t *testing.T) {
 	testScheme := runtime.NewScheme()
-	_ = clusterv1apha1.Install(testScheme)
+	_ = clusterv1alpha1.Install(testScheme)
 	_ = apiextensionsv1.AddToScheme(testScheme)
 	_ = scheme.AddToScheme(testScheme)
 
@@ -277,7 +277,7 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 					if !reflect.DeepEqual(&object.Spec.Template.Spec.Containers[0].Resources, c.expectedResourceRequirements) {
 						t.Errorf("expected resource requirements is %v, but got %v", c.expectedResourceRequirements, object.Spec.Template.Spec.Containers[0].Resources)
 					}
-				case *clusterv1apha1.ClusterClaim:
+				case *clusterv1alpha1.ClusterClaim:
 					if object.Spec.Value != c.clusterName {
 						t.Errorf("expected clusterName is %s, but got %s", c.clusterName, object.Spec.Value)
 					}

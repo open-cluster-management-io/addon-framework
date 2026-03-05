@@ -116,7 +116,7 @@ func TestSignReconcile(t *testing.T) {
 				}
 			}
 			for _, obj := range c.addon {
-				if err := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore().Add(obj); err != nil {
+				if err := addonInformers.Addon().V1beta1().ManagedClusterAddOns().Informer().GetStore().Add(obj); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -130,7 +130,7 @@ func TestSignReconcile(t *testing.T) {
 				kubeClient:                fakeKubeClient,
 				agentAddons:               map[string]agent.AgentAddon{c.testaddon.name: c.testaddon},
 				managedClusterLister:      clusterInformers.Cluster().V1().ManagedClusters().Lister(),
-				managedClusterAddonLister: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
+				managedClusterAddonLister: addonInformers.Addon().V1beta1().ManagedClusterAddOns().Lister(),
 				csrLister:                 kubeInfomers.Certificates().V1().CertificateSigningRequests().Lister(),
 			}
 

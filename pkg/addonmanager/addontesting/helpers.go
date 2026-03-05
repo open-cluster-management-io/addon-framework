@@ -143,10 +143,6 @@ func NewClusterManagementAddon(name, crd, cr string) *clusterManagementAddonBuil
 				Name: name,
 			},
 			Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
-				AddOnConfiguration: addonapiv1beta1.ConfigCoordinates{
-					CRDName: crd,
-					CRName:  cr,
-				},
 				InstallStrategy: addonapiv1beta1.InstallStrategy{
 					Type: addonapiv1beta1.AddonInstallStrategyManual,
 				},
@@ -155,8 +151,8 @@ func NewClusterManagementAddon(name, crd, cr string) *clusterManagementAddonBuil
 	}
 }
 
-func (b *clusterManagementAddonBuilder) WithSupportedConfigs(supportedConfigs ...addonapiv1beta1.ConfigMeta) *clusterManagementAddonBuilder {
-	b.clusterManagementAddOn.Spec.SupportedConfigs = supportedConfigs
+func (b *clusterManagementAddonBuilder) WithDefaultConfigs(defaultConfigs ...addonapiv1beta1.AddOnConfig) *clusterManagementAddonBuilder {
+	b.clusterManagementAddOn.Spec.DefaultConfigs = defaultConfigs
 	return b
 }
 

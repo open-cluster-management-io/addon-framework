@@ -11,6 +11,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
+	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
@@ -67,7 +68,7 @@ func TestReconcile(t *testing.T) {
 			name: "no patch annotation if managed by is not self",
 			cma: []runtime.Object{newClusterManagementAddonWithAnnotation("test", map[string]string{
 				"test": "test",
-				addonapiv1beta1.AddonLifecycleAnnotationKey: "xxx",
+				addonapiv1alpha1.AddonLifecycleAnnotationKey: "xxx",
 			})},
 			validateAddonActions: addontesting.AssertNoActions,
 			testaddons: map[string]agent.AgentAddon{
@@ -78,7 +79,7 @@ func TestReconcile(t *testing.T) {
 			name: "patch annotation if managed by self",
 			cma: []runtime.Object{newClusterManagementAddonWithAnnotation("test", map[string]string{
 				"test": "test",
-				addonapiv1beta1.AddonLifecycleAnnotationKey: addonapiv1beta1.AddonLifecycleSelfManageAnnotationValue,
+				addonapiv1alpha1.AddonLifecycleAnnotationKey: addonapiv1alpha1.AddonLifecycleSelfManageAnnotationValue,
 			})},
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "patch")
@@ -89,8 +90,8 @@ func TestReconcile(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				if len(cma.Annotations) != 1 || cma.Annotations[addonapiv1beta1.AddonLifecycleAnnotationKey] != "" {
-					t.Errorf("cma annotation is not correct, expected self but got %s", cma.Annotations[addonapiv1beta1.AddonLifecycleAnnotationKey])
+				if len(cma.Annotations) != 1 || cma.Annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey] != "" {
+					t.Errorf("cma annotation is not correct, expected self but got %s", cma.Annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey])
 				}
 			},
 			testaddons: map[string]agent.AgentAddon{
@@ -105,19 +106,19 @@ func TestReconcile(t *testing.T) {
 			addonInformers := addoninformers.NewSharedInformerFactory(fakeAddonClient, 10*time.Minute)
 
 			for _, obj := range c.cma {
-				if err := addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Informer().GetStore().Add(obj); err != nil {
+				if err := addonInformers.Addon().V1beta1().ClusterManagementAddOns().Informer().GetStore().Add(obj); err != nil {
 					t.Fatal(err)
 				}
 			}
 
 			controller := cmaManagedByController{
 				addonClient:                  fakeAddonClient,
-				clusterManagementAddonLister: addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
+				clusterManagementAddonLister: addonInformers.Addon().V1beta1().ClusterManagementAddOns().Lister(),
 				agentAddons:                  c.testaddons,
 				cmaFilterFunc:                utils.FilterByAddonName(c.testaddons),
 				addonPatcher: patcher.NewPatcher[*addonapiv1beta1.ClusterManagementAddOn,
 					addonapiv1beta1.ClusterManagementAddOnSpec,
-					addonapiv1beta1.ClusterManagementAddOnStatus](fakeAddonClient.AddonV1alpha1().ClusterManagementAddOns()),
+					addonapiv1beta1.ClusterManagementAddOnStatus](fakeAddonClient.AddonV1beta1().ClusterManagementAddOns()),
 			}
 
 			for _, obj := range c.cma {

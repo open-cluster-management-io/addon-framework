@@ -236,7 +236,7 @@ func TestSync(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			fakeAddonClient := fakeaddon.NewSimpleClientset(c.clusterManagementAddon...)
 			addonInformers := addoninformers.NewSharedInformerFactory(fakeAddonClient, 10*time.Minute)
-			addonStore := addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Informer().GetStore()
+			addonStore := addonInformers.Addon().V1beta1().ClusterManagementAddOns().Informer().GetStore()
 			for _, addon := range c.clusterManagementAddon {
 				if err := addonStore.Add(addon); err != nil {
 					t.Fatal(err)
@@ -257,13 +257,13 @@ func TestSync(t *testing.T) {
 
 			ctrl := &cmaConfigController{
 				addonClient:                  fakeAddonClient,
-				clusterManagementAddonLister: addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
+				clusterManagementAddonLister: addonInformers.Addon().V1beta1().ClusterManagementAddOns().Lister(),
 				configListers:                map[schema.GroupResource]dynamiclister.Lister{},
 				cmaFilterFunc:                func(obj interface{}) bool { return true },
 				configGVRs:                   map[schema.GroupVersionResource]bool{fakeGVR: true},
 				addonPatcher: patcher.NewPatcher[*addonapiv1beta1.ClusterManagementAddOn,
 					addonapiv1beta1.ClusterManagementAddOnSpec,
-					addonapiv1beta1.ClusterManagementAddOnStatus](fakeAddonClient.AddonV1alpha1().ClusterManagementAddOns()),
+					addonapiv1beta1.ClusterManagementAddOnStatus](fakeAddonClient.AddonV1beta1().ClusterManagementAddOns()),
 			}
 
 			ctrl.buildConfigInformers(configInformerFactory, map[schema.GroupVersionResource]bool{fakeGVR: true})
@@ -346,7 +346,7 @@ func TestEnqueue(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			fakeAddonClient := fakeaddon.NewSimpleClientset(c.cmas...)
 			addonInformers := addoninformers.NewSharedInformerFactory(fakeAddonClient, 10*time.Minute)
-			addonInformer := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer()
+			addonInformer := addonInformers.Addon().V1beta1().ManagedClusterAddOns().Informer()
 
 			ctrl := &cmaConfigController{
 				clusterManagementAddonIndexer: addonInformer.GetIndexer(),

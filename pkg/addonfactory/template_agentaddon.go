@@ -123,10 +123,14 @@ func (a *TemplateAgentAddon) getBuiltinValues(
 	builtinValues := templateBuiltinValues{}
 	builtinValues.ClusterName = cluster.GetName()
 
-	installNamespace := addon.Spec.InstallNamespace
+	// In v1beta1, InstallNamespace field is removed from ManagedClusterAddOnSpec
+	// First try to get from annotation
+	installNamespace := addon.Annotations[addonapiv1beta1.InstallNamespaceAnnotation]
 	if len(installNamespace) == 0 {
 		installNamespace = AddonDefaultInstallNamespace
 	}
+
+	// If agentInstallNamespace function is provided, use it (may get from AddOnDeploymentConfig)
 	if a.agentInstallNamespace != nil {
 		ns, err := a.agentInstallNamespace(addon)
 		if err != nil {

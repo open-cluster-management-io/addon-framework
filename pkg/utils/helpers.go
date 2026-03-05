@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	coreclientv1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
@@ -257,12 +258,12 @@ func ManagedByAddonManager(obj interface{}) bool {
 		return true
 	}
 
-	value, ok := annotations[addonapiv1beta1.AddonLifecycleAnnotationKey]
+	value, ok := annotations[addonapiv1alpha1.AddonLifecycleAnnotationKey]
 	if !ok {
 		return true
 	}
 
-	return value == addonapiv1beta1.AddonLifecycleAddonManagerAnnotationValue
+	return value == addonapiv1alpha1.AddonLifecycleAddonManagerAnnotationValue
 }
 
 func FilterByAddonName(agentAddons map[string]agent.AgentAddon) func(obj interface{}) bool {
