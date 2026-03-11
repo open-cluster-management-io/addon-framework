@@ -140,12 +140,27 @@ func TestCheckAddonPodFunc(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "running state",
+			name: "running but not ready",
+			pods: []runtime.Object{
+				&corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Namespace: "test", Labels: map[string]string{"addon": "test"}},
+					Status:     corev1.PodStatus{Phase: corev1.PodRunning},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "running and ready",
 			pods: []runtime.Object{
 				&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Namespace: "test", Labels: map[string]string{"addon": "test"}}},
 				&corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-2", Namespace: "test", Labels: map[string]string{"addon": "test"}},
-					Status:     corev1.PodStatus{Phase: corev1.PodRunning},
+					Status: corev1.PodStatus{
+						Phase: corev1.PodRunning,
+						Conditions: []corev1.PodCondition{
+							{Type: corev1.PodReady, Status: corev1.ConditionTrue},
+						},
+					},
 				},
 			},
 			expected: true,

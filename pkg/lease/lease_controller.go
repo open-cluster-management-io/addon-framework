@@ -128,7 +128,10 @@ func (r *leaseUpdater) reconcile(ctx context.Context) {
 	}
 }
 
-// CheckAddonPodFunc checks whether the agent pod is running
+// CheckAddonPodFunc checks whether the agent pod is running and ready.
+// A pod must be both in the Running phase and have the Ready condition set to True
+// to be considered healthy. This prevents the lease from being updated when the pod
+// is running but not yet ready to serve (e.g., readiness probe is failing).
 func CheckAddonPodFunc(podGetter corev1client.PodsGetter, namespace, labelSelector string) func() bool {
 	return func() bool {
 		pods, err := podGetter.Pods(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
@@ -137,16 +140,25 @@ func CheckAddonPodFunc(podGetter corev1client.PodsGetter, namespace, labelSelect
 			return false
 		}
 
-		// If one of the pods is running, we think the agent is serving.
-		for _, pod := range pods.Items {
-			if pod.Status.Phase == corev1.PodRunning {
+		// If one of the pods is running and ready, we think the agent is serving.
+		for i := range pods.Items {
+			if pods.Items[i].Status.Phase == corev1.PodRunning && isPodReady(&pods.Items[i]) {
 				return true
 			}
 		}
 
 		return false
 	}
+}
 
+// isPodReady checks whether a pod has the Ready condition set to True.
+func isPodReady(pod *corev1.Pod) bool {
+	for _, cond := range pod.Status.Conditions {
+		if cond.Type == corev1.PodReady {
+			return cond.Status == corev1.ConditionTrue
+		}
+	}
+	return false
 }
 
 // CheckManagedClusterHealthFunc checks the health status of the cluster api server
