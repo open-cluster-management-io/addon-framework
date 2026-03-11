@@ -35,7 +35,7 @@ func (g *defaultAddOnDeploymentConfigGetter) Get(
 // namespace from the addon deployment config. If the addon does not support addon deployment config or there is no
 // matched addon deployment config, it will return an empty string.
 func AgentInstallNamespaceFromDeploymentConfigFunc(
-	adcgetter AddOnDeploymentConfigGetter,
+	adcgetter AddOnDeploymentConfigGetter, defaultNs ...string,
 ) func(*addonapiv1alpha1.ManagedClusterAddOn) (string, error) {
 	return func(addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error) {
 		if addon == nil {
@@ -58,6 +58,9 @@ func AgentInstallNamespaceFromDeploymentConfigFunc(
 			return "", nil
 		}
 
+		if config.Spec.AgentInstallNamespace == "" && len(defaultNs) > 0 {
+			return defaultNs[0], nil
+		}
 		return config.Spec.AgentInstallNamespace, nil
 	}
 }
