@@ -182,7 +182,7 @@ func DefaultCSRApprover(agentName string) agent.CSRApproveFunc {
 			return true
 		}
 
-		klog.Infof("CSR %q for cluster %q not approved due to illegal requester %q", csr.Name, cluster.Name, csr.Spec.Username)
+		klog.Infof("CSR %q for cluster %q not approved due to illegal requester %q", csr.Name, cluster.Name, username)
 		return false
 	}
 }
