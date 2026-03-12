@@ -11,9 +11,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"open-cluster-management.io/addon-framework/pkg/agent"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	clusterv1apha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 )
 
 //go:embed testmanifests
@@ -31,7 +31,7 @@ func TestTemplateAddon_Manifests(t *testing.T) {
 	}
 
 	scheme := runtime.NewScheme()
-	_ = clusterv1apha1.Install(scheme)
+	_ = clusterv1alpha1.Install(scheme)
 
 	cases := []struct {
 		name                            string
@@ -58,7 +58,7 @@ func TestTemplateAddon_Manifests(t *testing.T) {
 			installNamespace: "myNs",
 			scheme:           scheme,
 			getValuesFunc: func(cluster *clusterv1.ManagedCluster,
-				addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
+				addon *addonapiv1beta1.ManagedClusterAddOn) (Values, error) {
 				config := config{Image: "quay.io/helloworld:latest"}
 				return StructToValues(config), nil
 			},
@@ -76,7 +76,7 @@ func TestTemplateAddon_Manifests(t *testing.T) {
 			addonName:   "helloworld",
 			scheme:      scheme,
 			getValuesFunc: func(cluster *clusterv1.ManagedCluster,
-				addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
+				addon *addonapiv1beta1.ManagedClusterAddOn) (Values, error) {
 				config := config{Image: "quay.io/helloworld:latest"}
 				return StructToValues(config), nil
 			},
@@ -133,7 +133,7 @@ func TestTemplateAddon_Manifests(t *testing.T) {
 			scheme:           scheme,
 			annotationConfig: `{"Image":"quay.io/helloworld:2.4"}`,
 			getValuesFunc: func(cluster *clusterv1.ManagedCluster,
-				addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
+				addon *addonapiv1beta1.ManagedClusterAddOn) (Values, error) {
 				config := secretConfig{
 					HubKubeConfigSecret:     "external-hub-kubeconfig",
 					ManagedKubeConfigSecret: "external-managed-kubeconfig",
@@ -156,7 +156,7 @@ func TestTemplateAddon_Manifests(t *testing.T) {
 			scheme:           scheme,
 			annotationConfig: `{"Image":"quay.io/helloworld:2.4"}`,
 			getValuesFunc: func(cluster *clusterv1.ManagedCluster,
-				addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
+				addon *addonapiv1beta1.ManagedClusterAddOn) (Values, error) {
 				return Values{
 					"ResourceRequirements": []RegexResourceRequirements{
 						{
@@ -236,7 +236,7 @@ func TestTemplateAddon_Manifests(t *testing.T) {
 					if !reflect.DeepEqual(&object.Spec.Template.Spec.Containers[0].Resources, c.expectedResourceRequirements) {
 						t.Errorf("expected resource requirements is %v, but got %v", c.expectedResourceRequirements, object.Spec.Template.Spec.Containers[0].Resources)
 					}
-				case *clusterv1apha1.ClusterClaim:
+				case *clusterv1alpha1.ClusterClaim:
 					if object.GetName() != c.expectedInstallNamespace {
 						t.Errorf("expected name is %s, but got %s", c.expectedInstallNamespace, object.GetName())
 					}

@@ -17,7 +17,7 @@ import (
 	utilflag "k8s.io/component-base/cli/flag"
 	logs "k8s.io/component-base/logs/api/v1"
 	"k8s.io/klog/v2"
-	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addonv1beta1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 
 	"open-cluster-management.io/addon-framework/examples/helloworld"
 	"open-cluster-management.io/addon-framework/examples/helloworld_agent"
@@ -84,7 +84,7 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 		return err
 	}
 
-	addonClient, err := addonv1alpha1client.NewForConfig(kubeConfig)
+	addonClient, err := addonv1beta1client.NewForConfig(kubeConfig)
 	if err != nil {
 		return err
 	}

@@ -10,7 +10,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
@@ -25,7 +25,7 @@ const AnnotationValuesName string = "addon.open-cluster-management.io/values"
 type Values map[string]interface{}
 
 type GetValuesFunc func(cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error)
+	addon *addonapiv1beta1.ManagedClusterAddOn) (Values, error)
 
 // AgentAddonFactory includes the common fields for building different agentAddon instances.
 type AgentAddonFactory struct {
@@ -39,7 +39,7 @@ type AgentAddonFactory struct {
 	// Deprecated: use clusterClient to get the hosting cluster.
 	hostingCluster        *clusterv1.ManagedCluster
 	clusterClient         clusterclientset.Interface
-	agentInstallNamespace func(addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error)
+	agentInstallNamespace func(addon *addonapiv1beta1.ManagedClusterAddOn) (string, error)
 	helmEngineStrict      bool
 }
 
@@ -102,7 +102,7 @@ func (f *AgentAddonFactory) WithAgentHostedModeEnabledOption() *AgentAddonFactor
 
 // WithAgentHostedInfoFn sets the function to get the hosting cluster of an addon in the hosted mode.
 func (f *AgentAddonFactory) WithAgentHostedInfoFn(
-	infoFn func(*addonapiv1alpha1.ManagedClusterAddOn, *clusterv1.ManagedCluster) (string, string)) *AgentAddonFactory {
+	infoFn func(*addonapiv1beta1.ManagedClusterAddOn, *clusterv1.ManagedCluster) (string, string)) *AgentAddonFactory {
 	f.agentAddonOptions.HostedModeInfoFunc = infoFn
 	return f
 }
@@ -173,7 +173,7 @@ func (f *AgentAddonFactory) WithAgentDeployTriggerClusterFilter(
 // override the default built-in namespace value; And if the registrationOption is not nil but the
 // registrationOption.AgentInstallNamespace is nil, this will also set it to this.
 func (f *AgentAddonFactory) WithAgentInstallNamespace(
-	nsFunc func(addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error),
+	nsFunc func(addon *addonapiv1beta1.ManagedClusterAddOn) (string, error),
 ) *AgentAddonFactory {
 	f.agentInstallNamespace = nsFunc
 	return f

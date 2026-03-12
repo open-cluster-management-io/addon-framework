@@ -10,7 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/klog/v2"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
@@ -28,7 +28,7 @@ func TestManifestAddonAgent(t *testing.T) {
 	cases := []struct {
 		name                string
 		managedCluster      *clusterv1.ManagedCluster
-		managedClusterAddOn *addonapiv1alpha1.ManagedClusterAddOn
+		managedClusterAddOn *addonapiv1beta1.ManagedClusterAddOn
 		configs             []runtime.Object
 		verifyDeployment    func(t *testing.T, objs []runtime.Object)
 	}{
@@ -59,7 +59,7 @@ func TestManifestAddonAgent(t *testing.T) {
 		{
 			name:           "override image with annotation",
 			managedCluster: addontesting.NewManagedCluster("cluster1"),
-			managedClusterAddOn: func() *addonapiv1alpha1.ManagedClusterAddOn {
+			managedClusterAddOn: func() *addonapiv1beta1.ManagedClusterAddOn {
 				addon := addontesting.NewAddon("test", "cluster1")
 				addon.Annotations = map[string]string{
 					"addon.open-cluster-management.io/values": `{"Image":"quay.io/test:test"}`}
@@ -88,20 +88,16 @@ func TestManifestAddonAgent(t *testing.T) {
 		{
 			name:           "with addon deployment config",
 			managedCluster: addontesting.NewManagedCluster("cluster1"),
-			managedClusterAddOn: func() *addonapiv1alpha1.ManagedClusterAddOn {
+			managedClusterAddOn: func() *addonapiv1beta1.ManagedClusterAddOn {
 				addon := addontesting.NewAddon("test", "cluster1")
-				addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+				addon.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 					{
-						ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+						ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 							Group:    "addon.open-cluster-management.io",
 							Resource: "addondeploymentconfigs",
 						},
-						ConfigReferent: addonapiv1alpha1.ConfigReferent{
-							Namespace: "cluster1",
-							Name:      "config",
-						},
-						DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+						DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+							ConfigReferent: addonapiv1beta1.ConfigReferent{
 								Namespace: "cluster1",
 								Name:      "config",
 							},
@@ -112,13 +108,13 @@ func TestManifestAddonAgent(t *testing.T) {
 				return addon
 			}(),
 			configs: []runtime.Object{
-				&addonapiv1alpha1.AddOnDeploymentConfig{
+				&addonapiv1beta1.AddOnDeploymentConfig{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "config",
 						Namespace: "cluster1",
 					},
-					Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-						NodePlacement: &addonapiv1alpha1.NodePlacement{
+					Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+						NodePlacement: &addonapiv1beta1.NodePlacement{
 							Tolerations:  tolerations,
 							NodeSelector: nodeSelector,
 						},
