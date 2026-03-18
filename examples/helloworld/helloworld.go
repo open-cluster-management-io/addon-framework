@@ -10,7 +10,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
@@ -33,7 +33,7 @@ func NewRegistrationOption(kubeConfig *rest.Config, addonName, agentName string)
 }
 
 func GetDefaultValues(cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) (addonfactory.Values, error) {
+	addon *addonapiv1beta1.ManagedClusterAddOn) (addonfactory.Values, error) {
 
 	image := os.Getenv("EXAMPLE_IMAGE_NAME")
 	if len(image) == 0 {

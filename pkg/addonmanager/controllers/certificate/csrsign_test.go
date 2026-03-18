@@ -13,7 +13,7 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/agent"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	fakecluster "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
@@ -26,7 +26,7 @@ type testSignAgent struct {
 	cert []byte
 }
 
-func (t *testSignAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
+func (t *testSignAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error) {
 	return []runtime.Object{}, nil
 }
 
@@ -34,7 +34,7 @@ func (t *testSignAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
 	return agent.AgentAddonOptions{
 		AddonName: t.name,
 		Registration: &agent.RegistrationOption{
-			CSRSign: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn,
+			CSRSign: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn,
 				csr *certv1.CertificateSigningRequest) ([]byte, error) {
 				return t.cert, nil
 			},
@@ -116,7 +116,7 @@ func TestSignReconcile(t *testing.T) {
 				}
 			}
 			for _, obj := range c.addon {
-				if err := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer().GetStore().Add(obj); err != nil {
+				if err := addonInformers.Addon().V1beta1().ManagedClusterAddOns().Informer().GetStore().Add(obj); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -130,7 +130,7 @@ func TestSignReconcile(t *testing.T) {
 				kubeClient:                fakeKubeClient,
 				agentAddons:               map[string]agent.AgentAddon{c.testaddon.name: c.testaddon},
 				managedClusterLister:      clusterInformers.Cluster().V1().ManagedClusters().Lister(),
-				managedClusterAddonLister: addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Lister(),
+				managedClusterAddonLister: addonInformers.Addon().V1beta1().ManagedClusterAddOns().Lister(),
 				csrLister:                 kubeInfomers.Certificates().V1().CertificateSigningRequests().Lister(),
 			}
 

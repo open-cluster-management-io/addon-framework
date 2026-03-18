@@ -21,7 +21,7 @@ import (
 	cmdfactory "open-cluster-management.io/addon-framework/pkg/cmd/factory"
 	"open-cluster-management.io/addon-framework/pkg/lease"
 	"open-cluster-management.io/addon-framework/pkg/version"
-	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addonv1beta1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 )
 
@@ -93,7 +93,7 @@ func (o *AgentOptions) RunAgent(ctx context.Context, kubeconfig *rest.Config) er
 	if err != nil {
 		return err
 	}
-	addonClient, err := addonv1alpha1client.NewForConfig(hubRestConfig)
+	addonClient, err := addonv1beta1client.NewForConfig(hubRestConfig)
 	if err != nil {
 		return err
 	}
@@ -125,7 +125,7 @@ func (o *AgentOptions) RunAgent(ctx context.Context, kubeconfig *rest.Config) er
 
 type agentController struct {
 	spokeKubeClient    kubernetes.Interface
-	addonClient        addonv1alpha1client.Interface
+	addonClient        addonv1beta1client.Interface
 	hubConfigMapLister corev1lister.ConfigMapLister
 	clusterName        string
 	addonName          string
@@ -134,7 +134,7 @@ type agentController struct {
 
 func newAgentController(
 	spokeKubeClient kubernetes.Interface,
-	addonClient addonv1alpha1client.Interface,
+	addonClient addonv1beta1client.Interface,
 	configmapInformers corev1informers.ConfigMapInformer,
 	clusterName string,
 	addonName string,
@@ -173,7 +173,7 @@ func (c *agentController) sync(ctx context.Context, syncCtx factory.SyncContext,
 		return err
 	}
 
-	addon, err := c.addonClient.AddonV1alpha1().ManagedClusterAddOns(clusterName).Get(ctx, c.addonName, metav1.GetOptions{})
+	addon, err := c.addonClient.AddonV1beta1().ManagedClusterAddOns(clusterName).Get(ctx, c.addonName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
