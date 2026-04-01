@@ -1626,7 +1626,7 @@ open-cluster-management.io/api/operator/v1
 open-cluster-management.io/api/utils/work/v1/workapplier
 open-cluster-management.io/api/work/v1
 open-cluster-management.io/api/work/v1alpha1
-# open-cluster-management.io/sdk-go v1.2.1-0.20260306024852-c0938d15158a
+# open-cluster-management.io/sdk-go v1.2.1-0.20260331032456-0cc72e52e4f2
 ## explicit; go 1.25.0
 open-cluster-management.io/sdk-go/pkg/apis/work/v1/applier
 open-cluster-management.io/sdk-go/pkg/apis/work/v1/builder
@@ -1667,6 +1667,7 @@ open-cluster-management.io/sdk-go/pkg/cloudevents/generic/utils
 open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/heartbeat
 open-cluster-management.io/sdk-go/pkg/logging
 open-cluster-management.io/sdk-go/pkg/patcher
+open-cluster-management.io/sdk-go/pkg/tls
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.2
 ## explicit; go 1.21
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client
