@@ -9,7 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
-	addonv1beta1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	"open-cluster-management.io/addon-framework/pkg/utils"
@@ -191,7 +191,7 @@ type AddOnDeploymentConfigToValuesFunc func(config addonapiv1beta1.AddOnDeployme
 
 // NewAddOnDeploymentConfigGetter returns a AddOnDeploymentConfigGetter with addon client
 // Deprecated: use NewAddOnDeploymentConfigGetter in pkg/utils package instead.
-func NewAddOnDeploymentConfigGetter(addonClient addonv1beta1client.Interface) utils.AddOnDeploymentConfigGetter {
+func NewAddOnDeploymentConfigGetter(addonClient addonclient.Interface) utils.AddOnDeploymentConfigGetter {
 	return utils.NewAddOnDeploymentConfigGetter(addonClient)
 }
 

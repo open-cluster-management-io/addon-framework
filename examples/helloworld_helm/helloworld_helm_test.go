@@ -1,6 +1,7 @@
 package helloworld_helm
 
 import (
+	"context"
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -173,7 +174,7 @@ func TestManifestAddonAgent(t *testing.T) {
 			WithGetValuesFuncs(
 				GetDefaultValues,
 				addonfactory.GetAddOnDeploymentConfigValues(
-					addonfactory.NewAddOnDeploymentConfigGetter(fakeAddonClient),
+					utils.NewAddOnDeploymentConfigGetter(fakeAddonClient),
 					addonfactory.ToAddOnNodePlacementValues,
 				),
 				GetImageValues(fakeKubeClient),
@@ -185,7 +186,7 @@ func TestManifestAddonAgent(t *testing.T) {
 			klog.Fatalf("failed to build agent %v", err)
 		}
 
-		objects, err := agentAddon.Manifests(c.managedCluster, c.managedClusterAddOn)
+		objects, err := agentAddon.Manifests(context.TODO(), c.managedCluster, c.managedClusterAddOn)
 		if err != nil {
 			t.Fatalf("failed to get manifests %v", err)
 		}

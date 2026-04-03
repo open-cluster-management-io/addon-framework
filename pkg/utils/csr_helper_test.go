@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"crypto/x509/pkix"
 	"net"
 	"testing"
@@ -64,7 +65,7 @@ func TestDefaultSigner(t *testing.T) {
 
 	signer := DefaultSignerWithExpiry(key, ca, 24*time.Hour)
 
-	cert, err := signer(nil, nil, newCSR("test", "cluster1"))
+	cert, err := signer(context.TODO(), nil, nil, newCSR("test", "cluster1"))
 	if err != nil {
 		t.Errorf("Failed to sign the csr, %v", err)
 	}
@@ -141,7 +142,7 @@ func TestDefaultCSRApprover(t *testing.T) {
 	approver := DefaultCSRApprover("test")
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			approved := approver(c.cluster, c.addon, c.csr)
+			approved := approver(context.TODO(), c.cluster, c.addon, c.csr)
 			if approved != c.approved {
 				t.Errorf("Expected approve is %t, but got %t", c.approved, approved)
 			}
@@ -150,11 +151,11 @@ func TestDefaultCSRApprover(t *testing.T) {
 }
 
 func TestUnionApprover(t *testing.T) {
-	approveAll := func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool {
+	approveAll := func(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool {
 		return true
 	}
 
-	approveNone := func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool {
+	approveNone := func(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool {
 		return false
 	}
 
@@ -179,6 +180,7 @@ func TestUnionApprover(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			approver := UnionCSRApprover(c.approveFunc...)
 			approved := approver(
+				context.TODO(),
 				newCluster("cluster1"),
 				newAddon("addon1", "cluster1"),
 				newCSR(agent.DefaultUser("cluster1", "addon1", "test"), "cluster1", "group1"),

@@ -117,7 +117,7 @@ func (s *hostedSyncer) sync(ctx context.Context,
 		return addon, err
 	}
 
-	deployWorks, deleteWorks, err := s.buildWorks(hostingClusterName, cluster, currentWorks, addon)
+	deployWorks, deleteWorks, err := s.buildWorks(ctx, hostingClusterName, cluster, currentWorks, addon)
 	if err != nil {
 		return addon, err
 	}

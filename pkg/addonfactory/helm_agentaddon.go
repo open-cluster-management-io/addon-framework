@@ -52,28 +52,24 @@ type HelmAgentAddon struct {
 	getValuesFuncs     []GetValuesFunc
 	agentAddonOptions  agent.AgentAddonOptions
 	trimCRDDescription bool
-	// Deprecated: use clusterClient to get the hosting cluster.
-	hostingCluster        *clusterv1.ManagedCluster
-	clusterClient         clusterclientset.Interface
-	agentInstallNamespace func(addon *addonapiv1beta1.ManagedClusterAddOn) (string, error)
-	helmEngineStrict      bool
+	clusterClient      clusterclientset.Interface
+	helmEngineStrict   bool
 }
 
 func newHelmAgentAddon(factory *AgentAddonFactory, chart *chart.Chart) *HelmAgentAddon {
 	return &HelmAgentAddon{
-		decoder:               serializer.NewCodecFactory(factory.scheme).UniversalDeserializer(),
-		chart:                 chart,
-		getValuesFuncs:        factory.getValuesFuncs,
-		agentAddonOptions:     factory.agentAddonOptions,
-		trimCRDDescription:    factory.trimCRDDescription,
-		hostingCluster:        factory.hostingCluster,
-		clusterClient:         factory.clusterClient,
-		agentInstallNamespace: factory.agentInstallNamespace,
-		helmEngineStrict:      factory.helmEngineStrict,
+		decoder:            serializer.NewCodecFactory(factory.scheme).UniversalDeserializer(),
+		chart:              chart,
+		getValuesFuncs:     factory.getValuesFuncs,
+		agentAddonOptions:  factory.agentAddonOptions,
+		trimCRDDescription: factory.trimCRDDescription,
+		clusterClient:      factory.clusterClient,
+		helmEngineStrict:   factory.helmEngineStrict,
 	}
 }
 
 func (a *HelmAgentAddon) Manifests(
+	ctx context.Context,
 	cluster *clusterv1.ManagedCluster,
 	addon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error) {
 	objects, err := a.renderManifests(cluster, addon)
@@ -228,8 +224,8 @@ func (a *HelmAgentAddon) getValueAgentInstallNamespace(addon *addonapiv1beta1.Ma
 	}
 
 	// If agentInstallNamespace function is provided, use it (may get from AddOnDeploymentConfig)
-	if a.agentInstallNamespace != nil {
-		ns, err := a.agentInstallNamespace(addon)
+	if a.agentAddonOptions.AgentInstallNamespace != nil {
+		ns, err := a.agentAddonOptions.AgentInstallNamespace(context.TODO(), addon)
 		if err != nil {
 			klog.Errorf("failed to get agentInstallNamespace from addon %s. err: %v", addon.Name, err)
 			return "", err
@@ -262,12 +258,6 @@ func (a *HelmAgentAddon) getBuiltinValues(
 	return helmBuiltinValues, nil
 }
 
-// Deprecated: use "WithManagedClusterClient" in AgentAddonFactory to set a cluster client that
-// can be used to get the hosting cluster.
-func (a *HelmAgentAddon) SetHostingCluster(hostingCluster *clusterv1.ManagedCluster) {
-	a.hostingCluster = hostingCluster
-}
-
 func (a *HelmAgentAddon) getDefaultValues(
 	cluster *clusterv1.ManagedCluster,
 	addon *addonapiv1beta1.ManagedClusterAddOn) (Values, error) {
@@ -279,10 +269,7 @@ func (a *HelmAgentAddon) getDefaultValues(
 	}
 
 	defaultValues.ManagedKubeConfigSecret = fmt.Sprintf("%s-managed-kubeconfig", addon.Name)
-
-	if a.hostingCluster != nil {
-		defaultValues.HostingClusterCapabilities = *a.capabilities(a.hostingCluster, addon)
-	} else if a.clusterClient != nil {
+	if a.clusterClient != nil {
 		_, hostingClusterName := a.agentAddonOptions.HostedModeInfoFunc(addon, cluster)
 		if len(hostingClusterName) > 0 {
 			hostingCluster, err := a.clusterClient.ClusterV1().ManagedClusters().

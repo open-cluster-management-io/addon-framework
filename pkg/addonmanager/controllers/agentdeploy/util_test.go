@@ -1,6 +1,7 @@
 package agentdeploy
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -267,47 +268,6 @@ func TestGetManifestConfigOption(t *testing.T) {
 			},
 		},
 		{
-			name: "set updater",
-			agentAddon: &testAgent{
-				name: "test",
-				objects: []runtime.Object{
-					NewFakeDeployment("test-deployment", "default"),
-				},
-				Updaters: []agent.Updater{
-					{
-						ResourceIdentifier: workapiv1.ResourceIdentifier{
-							Group:     "apps",
-							Resource:  "deployments",
-							Name:      "test-deployment",
-							Namespace: "default",
-						},
-						UpdateStrategy: workapiv1.UpdateStrategy{
-							Type: workapiv1.UpdateStrategyTypeServerSideApply,
-							ServerSideApply: &workapiv1.ServerSideApplyConfig{
-								FieldManager: "work-agent-test",
-							},
-						},
-					},
-				},
-			},
-			expectedManifestConfigOption: []workapiv1.ManifestConfigOption{
-				{
-					ResourceIdentifier: workapiv1.ResourceIdentifier{
-						Group:     "apps",
-						Resource:  "deployments",
-						Name:      "test-deployment",
-						Namespace: "default",
-					},
-					UpdateStrategy: &workapiv1.UpdateStrategy{
-						Type: workapiv1.UpdateStrategyTypeServerSideApply,
-						ServerSideApply: &workapiv1.ServerSideApplyConfig{
-							FieldManager: "work-agent-test",
-						},
-					},
-				},
-			},
-		},
-		{
 			name: "merge feedback rules",
 			agentAddon: &testAgent{
 				name: "test",
@@ -400,115 +360,11 @@ func TestGetManifestConfigOption(t *testing.T) {
 				},
 			},
 		},
-		{
-			name: "merge update strategy",
-			agentAddon: &testAgent{
-				name: "test",
-				objects: []runtime.Object{
-					NewFakeDeployment("test-deployment", "default"),
-				},
-				Updaters: []agent.Updater{
-					{
-						ResourceIdentifier: workapiv1.ResourceIdentifier{
-							Group:     "apps",
-							Resource:  "deployments",
-							Name:      "test-deployment",
-							Namespace: "default",
-						},
-						UpdateStrategy: workapiv1.UpdateStrategy{
-							Type: workapiv1.UpdateStrategyTypeCreateOnly,
-						},
-					},
-					{
-						ResourceIdentifier: workapiv1.ResourceIdentifier{
-							Group:     "apps",
-							Resource:  "deployments",
-							Name:      "test-deployment-2",
-							Namespace: "default",
-						},
-						UpdateStrategy: workapiv1.UpdateStrategy{
-							Type: workapiv1.UpdateStrategyTypeCreateOnly,
-						},
-					},
-				},
-				ManifestConfigs: []workapiv1.ManifestConfigOption{
-					{
-						ResourceIdentifier: workapiv1.ResourceIdentifier{
-							Group:     "apps",
-							Resource:  "deployments",
-							Name:      "test-deployment",
-							Namespace: "default",
-						},
-						UpdateStrategy: &workapiv1.UpdateStrategy{
-							Type: workapiv1.UpdateStrategyTypeServerSideApply,
-							ServerSideApply: &workapiv1.ServerSideApplyConfig{
-								FieldManager: "work-agent-test",
-							},
-						},
-					},
-					{
-						ResourceIdentifier: workapiv1.ResourceIdentifier{
-							Group:     "apps",
-							Resource:  "deployments",
-							Name:      "test-deployment-1",
-							Namespace: "default",
-						},
-						UpdateStrategy: &workapiv1.UpdateStrategy{
-							Type: workapiv1.UpdateStrategyTypeServerSideApply,
-							ServerSideApply: &workapiv1.ServerSideApplyConfig{
-								FieldManager: "work-agent-test",
-							},
-						},
-					},
-				},
-			},
-			expectedManifestConfigOption: []workapiv1.ManifestConfigOption{
-				{
-					ResourceIdentifier: workapiv1.ResourceIdentifier{
-						Group:     "apps",
-						Resource:  "deployments",
-						Name:      "test-deployment",
-						Namespace: "default",
-					},
-					UpdateStrategy: &workapiv1.UpdateStrategy{
-						Type: workapiv1.UpdateStrategyTypeServerSideApply,
-						ServerSideApply: &workapiv1.ServerSideApplyConfig{
-							FieldManager: "work-agent-test",
-						},
-					},
-				},
-				{
-					ResourceIdentifier: workapiv1.ResourceIdentifier{
-						Group:     "apps",
-						Resource:  "deployments",
-						Name:      "test-deployment-2",
-						Namespace: "default",
-					},
-					UpdateStrategy: &workapiv1.UpdateStrategy{
-						Type: workapiv1.UpdateStrategyTypeCreateOnly,
-					},
-				},
-				{
-					ResourceIdentifier: workapiv1.ResourceIdentifier{
-						Group:     "apps",
-						Resource:  "deployments",
-						Name:      "test-deployment-1",
-						Namespace: "default",
-					},
-					UpdateStrategy: &workapiv1.UpdateStrategy{
-						Type: workapiv1.UpdateStrategyTypeServerSideApply,
-						ServerSideApply: &workapiv1.ServerSideApplyConfig{
-							FieldManager: "work-agent-test",
-						},
-					},
-				},
-			},
-		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			manifestConfigOptions, err := getManifestConfigOption(c.agentAddon, nil, nil)
+			manifestConfigOptions, err := getManifestConfigOption(context.TODO(), c.agentAddon, nil, nil)
 			assert.Nil(t, err)
 			assert.Equal(t, c.expectedManifestConfigOption, manifestConfigOptions)
 		})

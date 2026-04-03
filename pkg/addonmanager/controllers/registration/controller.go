@@ -13,7 +13,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
-	addonv1beta1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1beta1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1beta1"
 	addonlisterv1beta1 "open-cluster-management.io/api/client/addon/listers/addon/v1beta1"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
@@ -27,7 +27,7 @@ import (
 
 // addonRegistrationController reconciles instances of ManagedClusterAddon on the hub.
 type addonRegistrationController struct {
-	addonClient               addonv1beta1client.Interface
+	addonClient               addonclient.Interface
 	managedClusterLister      clusterlister.ManagedClusterLister
 	managedClusterAddonLister addonlisterv1beta1.ManagedClusterAddOnLister
 	agentAddons               map[string]agent.AgentAddon
@@ -35,7 +35,7 @@ type addonRegistrationController struct {
 }
 
 func NewAddonRegistrationController(
-	addonClient addonv1beta1client.Interface,
+	addonClient addonclient.Interface,
 	clusterInformers clusterinformers.ManagedClusterInformer,
 	addonInformers addoninformerv1beta1.ManagedClusterAddOnInformer,
 	agentAddons map[string]agent.AgentAddon,
@@ -72,13 +72,13 @@ func NewAddonRegistrationController(
 // For KubeClient type, we match by index (assuming order is stable).
 // For CustomSigner type, we match by SignerName.
 func findExistingRegistration(config *addonapiv1beta1.RegistrationConfig, index int,
-	newConfigs, existingRegistrations []addonapiv1beta1.RegistrationConfig) *addonapiv1beta1.RegistrationConfig {
+	newConfigs []agent.RegistrationConfig, existingRegistrations []addonapiv1beta1.RegistrationConfig) *addonapiv1beta1.RegistrationConfig {
 	if config.Type == addonapiv1beta1.KubeClient {
 		// For KubeClient, try to match by index first
 		// Count how many KubeClient configs we've seen so far
 		kubeClientIndex := 0
 		for i := 0; i < index; i++ {
-			if newConfigs[i].Type == addonapiv1beta1.KubeClient {
+			if _, ok := newConfigs[i].(*agent.KubeClientRegistration); ok {
 				kubeClientIndex++
 			}
 		}
@@ -114,16 +114,16 @@ func findExistingRegistration(config *addonapiv1beta1.RegistrationConfig, index 
 //   - "csr": uses subject from newConfigs, or sets default if empty
 //
 // For CustomSigner type, always uses subject from newConfigs.
-func buildRegistrationConfigs(newConfigs, existingRegistrations []addonapiv1beta1.RegistrationConfig,
+func buildRegistrationConfigs(newConfigs []agent.RegistrationConfig, existingRegistrations []addonapiv1beta1.RegistrationConfig,
 	clusterName, addonName string) []addonapiv1beta1.RegistrationConfig {
 	result := []addonapiv1beta1.RegistrationConfig{}
 
 	for i := range newConfigs {
-		config := newConfigs[i].DeepCopy()
+		config := newConfigs[i].RegistrationAPI()
 
 		// Only apply special handling for KubeClient type
 		if config.Type != addonapiv1beta1.KubeClient {
-			result = append(result, *config)
+			result = append(result, config)
 			continue
 		}
 
@@ -133,7 +133,7 @@ func buildRegistrationConfigs(newConfigs, existingRegistrations []addonapiv1beta
 		}
 
 		// Find matching existing registration
-		existingReg := findExistingRegistration(config, i, newConfigs, existingRegistrations)
+		existingReg := findExistingRegistration(&config, i, newConfigs, existingRegistrations)
 
 		// Get driver from existing registration if available, otherwise use driver from newConfig
 		driver := config.KubeClient.Driver
@@ -146,7 +146,7 @@ func buildRegistrationConfigs(newConfigs, existingRegistrations []addonapiv1beta
 
 		// If driver is empty, use config as-is (subject from newConfigs)
 		if driver == "" {
-			result = append(result, *config)
+			result = append(result, config)
 			continue
 		}
 
@@ -171,7 +171,7 @@ func buildRegistrationConfigs(newConfigs, existingRegistrations []addonapiv1beta
 		}
 		// For other drivers, use subject from newConfigs
 
-		result = append(result, *config)
+		result = append(result, config)
 	}
 
 	return result
@@ -263,7 +263,7 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 	permissionReady := true
 
 	if registrationOption.PermissionConfig != nil {
-		err = registrationOption.PermissionConfig(managedCluster, managedClusterAddonCopy)
+		err = registrationOption.PermissionConfig(ctx, managedCluster, managedClusterAddonCopy)
 		if err != nil {
 			// Check if this is a subject not ready error
 			var subjectErr *agent.SubjectNotReadyError
@@ -287,7 +287,7 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 		}
 	}
 
-	if registrationOption.CSRConfigurations == nil {
+	if registrationOption.Configurations == nil {
 		meta.SetStatusCondition(&managedClusterAddonCopy.Status.Conditions, metav1.Condition{
 			Type:    addonapiv1beta1.ManagedClusterAddOnRegistrationApplied,
 			Status:  metav1.ConditionTrue,
@@ -301,7 +301,7 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 		return nil
 	}
 
-	configs, err := registrationOption.CSRConfigurations(managedCluster, managedClusterAddonCopy)
+	configs, err := registrationOption.Configurations(ctx, managedCluster, managedClusterAddonCopy)
 	if err != nil {
 		return fmt.Errorf("failed to get csr configurations: %w", err)
 	}
@@ -319,14 +319,9 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 		managedClusterAddonCopy.Status.Namespace = installNs
 	}
 
-	// Override with registrationOption.Namespace if set (higher priority than annotation)
-	if len(registrationOption.Namespace) > 0 {
-		managedClusterAddonCopy.Status.Namespace = registrationOption.Namespace
-	}
-
 	// Override with AgentInstallNamespace function if provided (highest priority)
-	if registrationOption.AgentInstallNamespace != nil {
-		ns, err := registrationOption.AgentInstallNamespace(managedClusterAddonCopy)
+	if agentAddon.GetAgentAddonOptions().AgentInstallNamespace != nil {
+		ns, err := agentAddon.GetAgentAddonOptions().AgentInstallNamespace(ctx, managedClusterAddonCopy)
 		if err != nil {
 			return err
 		}

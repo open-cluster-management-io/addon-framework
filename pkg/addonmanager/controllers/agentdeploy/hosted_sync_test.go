@@ -36,7 +36,7 @@ type testHostedAgent struct {
 	ConfigCheckEnabled bool
 }
 
-func (t *testHostedAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) (
+func (t *testHostedAgent) Manifests(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) (
 	[]runtime.Object, error) {
 	return t.objects, t.err
 }
