@@ -1,6 +1,7 @@
 package agentdeploy
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -479,7 +480,7 @@ func newAddonWorkObjectMeta(namePrefix, addonName, addonNamespace, workNamespace
 	}
 }
 
-func getManifestConfigOption(agentAddon agent.AgentAddon,
+func getManifestConfigOption(ctx context.Context, agentAddon agent.AgentAddon,
 	cluster *clusterv1.ManagedCluster,
 	addon *addonapiv1beta1.ManagedClusterAddOn) ([]workapiv1.ManifestConfigOption, error) {
 	manifestConfigs := []workapiv1.ManifestConfigOption{}
@@ -499,7 +500,7 @@ func getManifestConfigOption(agentAddon agent.AgentAddon,
 	if agentAddon.GetAgentAddonOptions().HealthProber != nil &&
 		agentAddon.GetAgentAddonOptions().HealthProber.Type == agent.HealthProberTypeDeploymentAvailability {
 
-		manifests, err := agentAddon.Manifests(cluster, addon)
+		manifests, err := agentAddon.Manifests(ctx, cluster, addon)
 		if err != nil {
 			return manifestConfigs, fmt.Errorf("get all deployments error: %v", err)
 		}
@@ -514,7 +515,7 @@ func getManifestConfigOption(agentAddon agent.AgentAddon,
 	if agentAddon.GetAgentAddonOptions().HealthProber != nil &&
 		agentAddon.GetAgentAddonOptions().HealthProber.Type == agent.HealthProberTypeWorkloadAvailability {
 
-		manifests, err := agentAddon.Manifests(cluster, addon)
+		manifests, err := agentAddon.Manifests(ctx, cluster, addon)
 		if err != nil {
 			return manifestConfigs, fmt.Errorf("get all workloads error: %v", err)
 		}
@@ -523,16 +524,6 @@ func getManifestConfigOption(agentAddon agent.AgentAddon,
 			manifestConfig := utils.WellKnowManifestConfig(workload.Group, workload.Resource,
 				workload.Namespace, workload.Name)
 			manifestConfigs = append(manifestConfigs, manifestConfig)
-		}
-	}
-
-	if updaters := agentAddon.GetAgentAddonOptions().Updaters; updaters != nil {
-		for _, updater := range updaters {
-			strategy := updater.UpdateStrategy
-			manifestConfigs = append(manifestConfigs, workapiv1.ManifestConfigOption{
-				ResourceIdentifier: updater.ResourceIdentifier,
-				UpdateStrategy:     &strategy,
-			})
 		}
 	}
 

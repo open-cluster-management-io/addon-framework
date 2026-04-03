@@ -9,6 +9,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net"
+	"open-cluster-management.io/addon-framework/pkg/agent"
 	"time"
 
 	mathrand "math/rand"
@@ -54,10 +55,8 @@ var _ = ginkgo.Describe("Addon CSR", func() {
 		_, err = hubKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-		testAddonImpl.registrations[managedClusterName] = []addonapiv1beta1.RegistrationConfig{
-			{
-				Type: addonapiv1beta1.KubeClient,
-			},
+		testAddonImpl.registrations[managedClusterName] = []agent.RegistrationConfig{
+			&agent.KubeClientRegistration{},
 		}
 
 		addon := &addonapiv1beta1.ManagedClusterAddOn{

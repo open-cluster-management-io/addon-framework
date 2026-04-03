@@ -16,7 +16,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/index"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
-	addonv1beta1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1beta1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1beta1"
 	addonlisterv1beta1 "open-cluster-management.io/api/client/addon/listers/addon/v1beta1"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
@@ -31,7 +31,7 @@ type enqueueFunc func(obj interface{})
 
 // addonConfigController reconciles all interested addon config types (GroupVersionResource) on the hub.
 type addonConfigController struct {
-	addonClient                  addonv1beta1client.Interface
+	addonClient                  addonclient.Interface
 	addonLister                  addonlisterv1beta1.ManagedClusterAddOnLister
 	addonIndexer                 cache.Indexer
 	configListers                map[schema.GroupResource]dynamiclister.Lister
@@ -42,7 +42,7 @@ type addonConfigController struct {
 }
 
 func NewAddonConfigController(
-	addonClient addonv1beta1client.Interface,
+	addonClient addonclient.Interface,
 	addonInformers addoninformerv1beta1.ManagedClusterAddOnInformer,
 	clusterManagementAddonInformers addoninformerv1beta1.ClusterManagementAddOnInformer,
 	configInformerFactory dynamicinformer.DynamicSharedInformerFactory,

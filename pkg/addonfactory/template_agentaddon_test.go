@@ -1,6 +1,7 @@
 package addonfactory
 
 import (
+	"context"
 	"embed"
 	"fmt"
 	"reflect"
@@ -203,7 +204,7 @@ func TestTemplateAddon_Manifests(t *testing.T) {
 			if err != nil {
 				t.Errorf("expected no error, got err %v", err)
 			}
-			objects, err := agentAddon.Manifests(cluster, clusterAddon)
+			objects, err := agentAddon.Manifests(context.TODO(), cluster, clusterAddon)
 			if err != nil {
 				t.Errorf("expected no error, got err %v", err)
 			}

@@ -48,7 +48,7 @@ func TestPermissionBuilder(t *testing.T) {
 		WithStaticRole(updatingRole2).
 		Build()
 
-	assert.NoError(t, permissionConfigFn(testCluster, testAddon))
+	assert.NoError(t, permissionConfigFn(context.TODO(), testCluster, testAddon))
 
 	actualClusterRole1, err := fakeKubeClient.RbacV1().ClusterRoles().Get(context.TODO(), "foo1", metav1.GetOptions{})
 	assert.NoError(t, err)
@@ -222,7 +222,7 @@ func TestBindKubeClientClusterRole_PendingError(t *testing.T) {
 				BindKubeClientClusterRole(clusterRole).
 				Build()
 
-			err := permissionConfigFn(testCluster, tt.addon)
+			err := permissionConfigFn(context.TODO(), testCluster, tt.addon)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -397,7 +397,7 @@ func TestBindKubeClientRole_PendingError(t *testing.T) {
 				BindKubeClientRole(role).
 				Build()
 
-			err := permissionConfigFn(testCluster, tt.addon)
+			err := permissionConfigFn(context.TODO(), testCluster, tt.addon)
 
 			if tt.expectError {
 				assert.Error(t, err)

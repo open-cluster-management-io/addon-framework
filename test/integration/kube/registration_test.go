@@ -3,6 +3,7 @@ package kube
 import (
 	"context"
 	"fmt"
+	"open-cluster-management.io/addon-framework/pkg/agent"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -65,21 +66,14 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 	})
 
 	ginkgo.It("Should setup registration successfully", func() {
-		testAddonImpl.registrations[managedClusterName] = []addonapiv1beta1.RegistrationConfig{
-			{
-				Type: addonapiv1beta1.KubeClient,
-				KubeClient: &addonapiv1beta1.KubeClientConfig{
-					Subject: addonapiv1beta1.KubeClientSubject{
-						BaseSubject: addonapiv1beta1.BaseSubject{
-							User: fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s:agent:%s",
-								managedClusterName, testAddonImpl.name, testAddonImpl.name),
-							Groups: []string{
-								fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s",
-									managedClusterName, testAddonImpl.name),
-								fmt.Sprintf("system:open-cluster-management:addon:%s", testAddonImpl.name),
-							},
-						},
-					},
+		testAddonImpl.registrations[managedClusterName] = []agent.RegistrationConfig{
+			&agent.KubeClientRegistration{
+				User: fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s:agent:%s",
+					managedClusterName, testAddonImpl.name, testAddonImpl.name),
+				Groups: []string{
+					fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s",
+						managedClusterName, testAddonImpl.name),
+					fmt.Sprintf("system:open-cluster-management:addon:%s", testAddonImpl.name),
 				},
 			},
 		}
@@ -106,7 +100,7 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 			// Create expected with driver for comparison
 			expected := make([]addonapiv1beta1.RegistrationConfig, len(testAddonImpl.registrations[managedClusterName]))
 			for i, reg := range testAddonImpl.registrations[managedClusterName] {
-				expected[i] = *reg.DeepCopy()
+				expected[i] = reg.RegistrationAPI()
 				if expected[i].Type == addonapiv1beta1.KubeClient && expected[i].KubeClient != nil {
 					expected[i].KubeClient.Driver = "csr"
 				}
@@ -119,28 +113,18 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 	})
 
 	ginkgo.It("Should update registration successfully", func() {
-		testAddonImpl.registrations[managedClusterName] = []addonapiv1beta1.RegistrationConfig{
-			{
-				Type: addonapiv1beta1.KubeClient,
-				KubeClient: &addonapiv1beta1.KubeClientConfig{
-					Subject: addonapiv1beta1.KubeClientSubject{
-						BaseSubject: addonapiv1beta1.BaseSubject{
-							User: fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s:agent:%s",
-								managedClusterName, testAddonImpl.name, testAddonImpl.name),
-							Groups: []string{
-								fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s",
-									managedClusterName, testAddonImpl.name),
-								fmt.Sprintf("system:open-cluster-management:addon:%s", testAddonImpl.name),
-							},
-						},
-					},
+		testAddonImpl.registrations[managedClusterName] = []agent.RegistrationConfig{
+			&agent.KubeClientRegistration{
+				User: fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s:agent:%s",
+					managedClusterName, testAddonImpl.name, testAddonImpl.name),
+				Groups: []string{
+					fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s",
+						managedClusterName, testAddonImpl.name),
+					fmt.Sprintf("system:open-cluster-management:addon:%s", testAddonImpl.name),
 				},
 			},
-			{
-				Type: addonapiv1beta1.CustomSigner,
-				CustomSigner: &addonapiv1beta1.CustomSignerConfig{
-					SignerName: "open-cluster-management.io/test-signer",
-				},
+			&agent.CustomSignerRegistration{
+				SignerName: "open-cluster-management.io/test-signer",
 			},
 		}
 
@@ -186,7 +170,7 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 			// Create expected with driver for comparison
 			expected := make([]addonapiv1beta1.RegistrationConfig, len(testAddonImpl.registrations[managedClusterName]))
 			for i, reg := range testAddonImpl.registrations[managedClusterName] {
-				expected[i] = *reg.DeepCopy()
+				expected[i] = reg.RegistrationAPI()
 				if expected[i].Type == addonapiv1beta1.KubeClient && expected[i].KubeClient != nil {
 					expected[i].KubeClient.Driver = "csr"
 				}

@@ -151,7 +151,7 @@ func (p *permissionBuilder) BindRoleToGroup(role *rbacv1.Role, userGroup string)
 func (p *permissionBuilder) BindKubeClientClusterRole(clusterRole *rbacv1.ClusterRole) RBACPermissionBuilder {
 	p.WithStaticClusterRole(clusterRole)
 
-	p.u.fns = append(p.u.fns, func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
+	p.u.fns = append(p.u.fns, func(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 		// Build subjects from the registration status
 		subjects := BuildSubjectsFromRegistration(addon, certificatesv1.KubeAPIServerClientSignerName)
 
@@ -172,7 +172,7 @@ func (p *permissionBuilder) BindKubeClientClusterRole(clusterRole *rbacv1.Cluste
 			Subjects: subjects,
 		}
 
-		_, _, err := ApplyClusterRoleBinding(context.TODO(), p.kubeClient.RbacV1(), binding)
+		_, _, err := ApplyClusterRoleBinding(ctx, p.kubeClient.RbacV1(), binding)
 		return err
 	})
 
@@ -182,7 +182,7 @@ func (p *permissionBuilder) BindKubeClientClusterRole(clusterRole *rbacv1.Cluste
 func (p *permissionBuilder) BindKubeClientRole(role *rbacv1.Role) RBACPermissionBuilder {
 	p.WithStaticRole(role)
 
-	p.u.fns = append(p.u.fns, func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
+	p.u.fns = append(p.u.fns, func(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 		// Build subjects from the registration status
 		subjects := BuildSubjectsFromRegistration(addon, certificatesv1.KubeAPIServerClientSignerName)
 
@@ -205,7 +205,7 @@ func (p *permissionBuilder) BindKubeClientRole(role *rbacv1.Role) RBACPermission
 		}
 
 		ensureAddonOwnerReference(&binding.ObjectMeta, addon)
-		_, _, err := ApplyRoleBinding(context.TODO(), p.kubeClient.RbacV1(), binding)
+		_, _, err := ApplyRoleBinding(ctx, p.kubeClient.RbacV1(), binding)
 		return err
 	})
 
@@ -213,36 +213,36 @@ func (p *permissionBuilder) BindKubeClientRole(role *rbacv1.Role) RBACPermission
 }
 
 func (p *permissionBuilder) WithStaticClusterRole(clusterRole *rbacv1.ClusterRole) RBACPermissionBuilder {
-	p.u.fns = append(p.u.fns, func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
-		_, _, err := ApplyClusterRole(context.TODO(), p.kubeClient.RbacV1(), clusterRole)
+	p.u.fns = append(p.u.fns, func(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
+		_, _, err := ApplyClusterRole(ctx, p.kubeClient.RbacV1(), clusterRole)
 		return err
 	})
 	return p
 }
 
 func (p *permissionBuilder) WithStaticClusterRoleBinding(binding *rbacv1.ClusterRoleBinding) RBACPermissionBuilder {
-	p.u.fns = append(p.u.fns, func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
-		_, _, err := ApplyClusterRoleBinding(context.TODO(), p.kubeClient.RbacV1(), binding)
+	p.u.fns = append(p.u.fns, func(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
+		_, _, err := ApplyClusterRoleBinding(ctx, p.kubeClient.RbacV1(), binding)
 		return err
 	})
 	return p
 }
 
 func (p *permissionBuilder) WithStaticRole(role *rbacv1.Role) RBACPermissionBuilder {
-	p.u.fns = append(p.u.fns, func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
+	p.u.fns = append(p.u.fns, func(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 		role.Namespace = cluster.Name
 		ensureAddonOwnerReference(&role.ObjectMeta, addon)
-		_, _, err := ApplyRole(context.TODO(), p.kubeClient.RbacV1(), role)
+		_, _, err := ApplyRole(ctx, p.kubeClient.RbacV1(), role)
 		return err
 	})
 	return p
 }
 
 func (p *permissionBuilder) WithStaticRoleBinding(binding *rbacv1.RoleBinding) RBACPermissionBuilder {
-	p.u.fns = append(p.u.fns, func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
+	p.u.fns = append(p.u.fns, func(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 		binding.Namespace = cluster.Name
 		ensureAddonOwnerReference(&binding.ObjectMeta, addon)
-		_, _, err := ApplyRoleBinding(context.TODO(), p.kubeClient.RbacV1(), binding)
+		_, _, err := ApplyRoleBinding(ctx, p.kubeClient.RbacV1(), binding)
 		return err
 	})
 	return p
@@ -257,9 +257,9 @@ type unionPermissionBuilder struct {
 }
 
 func (b *unionPermissionBuilder) build() agent.PermissionConfigFunc {
-	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
+	return func(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 		for _, fn := range b.fns {
-			if err := fn(cluster, addon); err != nil {
+			if err := fn(ctx, cluster, addon); err != nil {
 				return err
 			}
 		}

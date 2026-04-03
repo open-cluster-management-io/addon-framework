@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -30,7 +31,7 @@ var serialNumberLimit = new(big.Int).Lsh(big.NewInt(1), 128)
 
 // DefaultSignerWithExpiry generates a signer func for addon agent to sign the csr using caKey and caData with expiry date.
 func DefaultSignerWithExpiry(caKey, caData []byte, duration time.Duration) agent.CSRSignerFunc {
-	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn,
+	return func(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn,
 		csr *certificatesv1.CertificateSigningRequest) ([]byte, error) {
 		blockTlsCrt, _ := pem.Decode(caData)
 		if blockTlsCrt == nil {
@@ -130,6 +131,7 @@ func parseCSR(pemBytes []byte) (*x509.CertificateRequest, error) {
 // DefaultCSRApprover approve the csr when addon agent uses default group and default user to sign csr.
 func DefaultCSRApprover(agentName string) agent.CSRApproveFunc {
 	return func(
+		ctx context.Context,
 		cluster *clusterv1.ManagedCluster,
 		addon *addonapiv1beta1.ManagedClusterAddOn,
 		csr *certificatesv1.CertificateSigningRequest) bool {
@@ -189,9 +191,13 @@ func DefaultCSRApprover(agentName string) agent.CSRApproveFunc {
 
 // UnionCSRApprover is a union func for multiple approvers
 func UnionCSRApprover(approvers ...agent.CSRApproveFunc) agent.CSRApproveFunc {
-	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool {
+	return func(
+		ctx context.Context,
+		cluster *clusterv1.ManagedCluster,
+		addon *addonapiv1beta1.ManagedClusterAddOn,
+		csr *certificatesv1.CertificateSigningRequest) bool {
 		for _, approver := range approvers {
-			if !approver(cluster, addon, csr) {
+			if !approver(ctx, cluster, addon, csr) {
 				return false
 			}
 		}

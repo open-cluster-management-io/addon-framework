@@ -3,6 +3,7 @@ package kube
 import (
 	"context"
 	"fmt"
+	"open-cluster-management.io/addon-framework/pkg/agent"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -38,10 +39,8 @@ var _ = ginkgo.Describe("ClusterManagementAddon", func() {
 		_, err = hubKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-		testAddonImpl.registrations[managedClusterName] = []addonapiv1beta1.RegistrationConfig{
-			{
-				Type: addonapiv1beta1.KubeClient,
-			},
+		testAddonImpl.registrations[managedClusterName] = []agent.RegistrationConfig{
+			&agent.KubeClientRegistration{},
 		}
 
 	})

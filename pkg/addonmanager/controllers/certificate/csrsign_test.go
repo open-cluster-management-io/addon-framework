@@ -26,7 +26,7 @@ type testSignAgent struct {
 	cert []byte
 }
 
-func (t *testSignAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error) {
+func (t *testSignAgent) Manifests(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error) {
 	return []runtime.Object{}, nil
 }
 
@@ -34,7 +34,7 @@ func (t *testSignAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
 	return agent.AgentAddonOptions{
 		AddonName: t.name,
 		Registration: &agent.RegistrationOption{
-			CSRSign: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn,
+			CSRSign: func(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn,
 				csr *certv1.CertificateSigningRequest) ([]byte, error) {
 				return t.cert, nil
 			},

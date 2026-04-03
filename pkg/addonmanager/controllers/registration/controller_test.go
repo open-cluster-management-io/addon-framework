@@ -25,12 +25,12 @@ import (
 type testAgent struct {
 	name                  string
 	namespace             string
-	registrations         []addonapiv1beta1.RegistrationConfig
-	agentInstallNamespace func(addon *addonapiv1beta1.ManagedClusterAddOn) (string, error)
+	registrations         []agent.RegistrationConfig
+	agentInstallNamespace func(ctx context.Context, addon *addonapiv1beta1.ManagedClusterAddOn) (string, error)
 	permissionConfig      agent.PermissionConfigFunc
 }
 
-func (t *testAgent) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error) {
+func (t *testAgent) Manifests(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error) {
 	return []runtime.Object{}, nil
 }
 
@@ -43,16 +43,19 @@ func (t *testAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
 	agentOption := agent.AgentAddonOptions{
 		AddonName: t.name,
 		Registration: &agent.RegistrationOption{
-			CSRConfigurations: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) ([]addonapiv1beta1.RegistrationConfig, error) {
+			Configurations: func(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) ([]agent.RegistrationConfig, error) {
 				return t.registrations, nil
 			},
 			PermissionConfig: t.permissionConfig,
-			Namespace:        t.namespace,
 		},
 	}
 
 	if t.agentInstallNamespace != nil {
-		agentOption.Registration.AgentInstallNamespace = t.agentInstallNamespace
+		agentOption.AgentInstallNamespace = t.agentInstallNamespace
+	} else {
+		agentOption.AgentInstallNamespace = func(ctx context.Context, addon *addonapiv1beta1.ManagedClusterAddOn) (string, error) {
+			return t.namespace, nil
+		}
 	}
 	return agentOption
 }
@@ -71,13 +74,13 @@ func TestReconcile(t *testing.T) {
 			addon:                []runtime.Object{addontesting.NewAddon("test", "cluster1")},
 			cluster:              []runtime.Object{},
 			validateAddonActions: addontesting.AssertNoActions,
-			testaddon:            &testAgent{name: "test", registrations: []addonapiv1beta1.RegistrationConfig{}},
+			testaddon:            &testAgent{name: "test", registrations: []agent.RegistrationConfig{}},
 		},
 		{
 			name:                 "no addon",
 			cluster:              []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 			validateAddonActions: addontesting.AssertNoActions,
-			testaddon:            &testAgent{name: "test", registrations: []addonapiv1beta1.RegistrationConfig{}},
+			testaddon:            &testAgent{name: "test", registrations: []agent.RegistrationConfig{}},
 		},
 		{
 			name:    "no registrations",
@@ -97,7 +100,7 @@ func TestReconcile(t *testing.T) {
 					t.Errorf("Unexpected status condition patch, got %s", string(actual))
 				}
 			},
-			testaddon: &testAgent{name: "test", registrations: []addonapiv1beta1.RegistrationConfig{}},
+			testaddon: &testAgent{name: "test", registrations: []agent.RegistrationConfig{}},
 		},
 		{
 			name:    "no owner",
@@ -108,12 +111,9 @@ func TestReconcile(t *testing.T) {
 					return addon
 				}(),
 			},
-			testaddon: &testAgent{name: "test", namespace: "default", registrations: []addonapiv1beta1.RegistrationConfig{
-				{
-					Type: addonapiv1beta1.CustomSigner,
-					CustomSigner: &addonapiv1beta1.CustomSignerConfig{
-						SignerName: "test",
-					},
+			testaddon: &testAgent{name: "test", namespace: "default", registrations: []agent.RegistrationConfig{
+				&agent.CustomSignerRegistration{
+					SignerName: "test",
 				},
 			}},
 			validateAddonActions: addontesting.AssertNoActions,
@@ -145,12 +145,9 @@ func TestReconcile(t *testing.T) {
 					t.Errorf("Namespace in status is not correct")
 				}
 			},
-			testaddon: &testAgent{name: "test", namespace: "default", registrations: []addonapiv1beta1.RegistrationConfig{
-				{
-					Type: addonapiv1beta1.CustomSigner,
-					CustomSigner: &addonapiv1beta1.CustomSignerConfig{
-						SignerName: "test",
-					},
+			testaddon: &testAgent{name: "test", namespace: "default", registrations: []agent.RegistrationConfig{
+				&agent.CustomSignerRegistration{
+					SignerName: "test",
 				},
 			}},
 		},
@@ -182,12 +179,9 @@ func TestReconcile(t *testing.T) {
 					t.Errorf("Namespace %s in status is not correct, expected default", addOn.Status.Namespace)
 				}
 			},
-			testaddon: &testAgent{name: "test", namespace: "default", registrations: []addonapiv1beta1.RegistrationConfig{
-				{
-					Type: addonapiv1beta1.CustomSigner,
-					CustomSigner: &addonapiv1beta1.CustomSignerConfig{
-						SignerName: "test",
-					},
+			testaddon: &testAgent{name: "test", namespace: "default", registrations: []agent.RegistrationConfig{
+				&agent.CustomSignerRegistration{
+					SignerName: "test",
 				},
 			}},
 		},
@@ -220,13 +214,12 @@ func TestReconcile(t *testing.T) {
 				}
 			},
 			testaddon: &testAgent{name: "test", namespace: "default",
-				registrations: []addonapiv1beta1.RegistrationConfig{{
-					Type: addonapiv1beta1.CustomSigner,
-					CustomSigner: &addonapiv1beta1.CustomSignerConfig{
+				registrations: []agent.RegistrationConfig{
+					&agent.CustomSignerRegistration{
 						SignerName: "test",
 					},
-				}},
-				agentInstallNamespace: func(addon *addonapiv1beta1.ManagedClusterAddOn) (string, error) {
+				},
+				agentInstallNamespace: func(ctx context.Context, addon *addonapiv1beta1.ManagedClusterAddOn) (string, error) {
 					return "default3", nil
 				},
 			},
@@ -258,12 +251,9 @@ func TestReconcile(t *testing.T) {
 					t.Errorf("Namespace %s in status is not correct, expected open-cluster-management-agent-addon", addOn.Status.Namespace)
 				}
 			},
-			testaddon: &testAgent{name: "test", namespace: "", registrations: []addonapiv1beta1.RegistrationConfig{
-				{
-					Type: addonapiv1beta1.CustomSigner,
-					CustomSigner: &addonapiv1beta1.CustomSignerConfig{
-						SignerName: "test",
-					},
+			testaddon: &testAgent{name: "test", namespace: "", registrations: []agent.RegistrationConfig{
+				&agent.CustomSignerRegistration{
+					SignerName: "test",
 				},
 			}},
 		},
@@ -301,15 +291,12 @@ func TestReconcile(t *testing.T) {
 			testaddon: &testAgent{
 				name:      "test",
 				namespace: "default",
-				registrations: []addonapiv1beta1.RegistrationConfig{
-					{
-						Type: addonapiv1beta1.CustomSigner,
-						CustomSigner: &addonapiv1beta1.CustomSignerConfig{
-							SignerName: "test",
-						},
+				registrations: []agent.RegistrationConfig{
+					&agent.CustomSignerRegistration{
+						SignerName: "test",
 					},
 				},
-				permissionConfig: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
+				permissionConfig: func(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 					return &agent.SubjectNotReadyError{}
 				},
 			},
@@ -350,12 +337,10 @@ func TestReconcile(t *testing.T) {
 			testaddon: &testAgent{
 				name:      "test",
 				namespace: "default",
-				registrations: []addonapiv1beta1.RegistrationConfig{
-					{
-						Type: addonapiv1beta1.KubeClient,
-					},
+				registrations: []agent.RegistrationConfig{
+					&agent.KubeClientRegistration{},
 				},
-				permissionConfig: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
+				permissionConfig: func(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 					return nil
 				},
 			},
@@ -388,12 +373,10 @@ func TestReconcile(t *testing.T) {
 			testaddon: &testAgent{
 				name:      "test",
 				namespace: "default",
-				registrations: []addonapiv1beta1.RegistrationConfig{
-					{
-						Type: addonapiv1beta1.KubeClient,
-					},
+				registrations: []agent.RegistrationConfig{
+					&agent.KubeClientRegistration{},
 				},
-				permissionConfig: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
+				permissionConfig: func(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 					return nil
 				},
 			},
@@ -431,12 +414,10 @@ func TestReconcile(t *testing.T) {
 			testaddon: &testAgent{
 				name:      "test",
 				namespace: "default",
-				registrations: []addonapiv1beta1.RegistrationConfig{
-					{
-						Type: addonapiv1beta1.KubeClient,
-					},
+				registrations: []agent.RegistrationConfig{
+					&agent.KubeClientRegistration{},
 				},
-				permissionConfig: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
+				permissionConfig: func(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 					return &agent.SubjectNotReadyError{}
 				},
 			},
@@ -474,15 +455,12 @@ func TestReconcile(t *testing.T) {
 			testaddon: &testAgent{
 				name:      "test",
 				namespace: "default",
-				registrations: []addonapiv1beta1.RegistrationConfig{
-					{
-						Type: addonapiv1beta1.CustomSigner,
-						CustomSigner: &addonapiv1beta1.CustomSignerConfig{
-							SignerName: "test",
-						},
+				registrations: []agent.RegistrationConfig{
+					&agent.CustomSignerRegistration{
+						SignerName: "test",
 					},
 				},
-				permissionConfig: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
+				permissionConfig: func(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 					return fmt.Errorf("permission config failed")
 				},
 			},
@@ -553,29 +531,22 @@ func TestBuildRegistrationConfigs(t *testing.T) {
 
 	tests := []struct {
 		name                  string
-		newConfigs            []addonapiv1beta1.RegistrationConfig
+		newConfigs            []agent.RegistrationConfig
 		existingRegistrations []addonapiv1beta1.RegistrationConfig
 		expectedRegistrations []addonapiv1beta1.RegistrationConfig
 	}{
 		{
 			name:                  "empty new configs",
-			newConfigs:            []addonapiv1beta1.RegistrationConfig{},
+			newConfigs:            []agent.RegistrationConfig{},
 			existingRegistrations: []addonapiv1beta1.RegistrationConfig{},
 			expectedRegistrations: []addonapiv1beta1.RegistrationConfig{},
 		},
 		{
 			name: "no existing registrations - kubeClientDriver empty",
-			newConfigs: []addonapiv1beta1.RegistrationConfig{
-				{
-					Type: addonapiv1beta1.KubeClient,
-					KubeClient: &addonapiv1beta1.KubeClientConfig{
-						Subject: addonapiv1beta1.KubeClientSubject{
-							BaseSubject: addonapiv1beta1.BaseSubject{
-								User:   testSubject.User,
-								Groups: testSubject.Groups,
-							},
-						},
-					},
+			newConfigs: []agent.RegistrationConfig{
+				&agent.KubeClientRegistration{
+					User:   testSubject.User,
+					Groups: testSubject.Groups,
 				},
 			},
 			existingRegistrations: []addonapiv1beta1.RegistrationConfig{},
@@ -595,13 +566,12 @@ func TestBuildRegistrationConfigs(t *testing.T) {
 		},
 		{
 			name: "non-kubeclient type - use subject from newConfigs",
-			newConfigs: []addonapiv1beta1.RegistrationConfig{
-				{
-					Type: addonapiv1beta1.CustomSigner,
-					CustomSigner: &addonapiv1beta1.CustomSignerConfig{
-						SignerName: customSignerName,
-						Subject:    testSubject,
-					},
+			newConfigs: []agent.RegistrationConfig{
+				&agent.CustomSignerRegistration{
+					SignerName:        customSignerName,
+					User:              testSubject.User,
+					Groups:            testSubject.Groups,
+					OrganizationUnits: testSubject.OrganizationUnits,
 				},
 			},
 			existingRegistrations: []addonapiv1beta1.RegistrationConfig{},
@@ -617,21 +587,20 @@ func TestBuildRegistrationConfigs(t *testing.T) {
 		},
 		{
 			name: "kubeclient with csr driver - use subject from newConfigs",
-			newConfigs: []addonapiv1beta1.RegistrationConfig{
+			newConfigs: []agent.RegistrationConfig{
+				&agent.KubeClientRegistration{
+					User:   testSubject.User,
+					Groups: testSubject.Groups,
+				},
+			},
+			existingRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
 					Type: addonapiv1beta1.KubeClient,
 					KubeClient: &addonapiv1beta1.KubeClientConfig{
-						Subject: addonapiv1beta1.KubeClientSubject{
-							BaseSubject: addonapiv1beta1.BaseSubject{
-								User:   testSubject.User,
-								Groups: testSubject.Groups,
-							},
-						},
 						Driver: "csr",
 					},
 				},
 			},
-			existingRegistrations: []addonapiv1beta1.RegistrationConfig{},
 			expectedRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
 					Type: addonapiv1beta1.KubeClient,
@@ -649,18 +618,10 @@ func TestBuildRegistrationConfigs(t *testing.T) {
 		},
 		{
 			name: "kubeclient with token driver - preserve existing subject",
-			newConfigs: []addonapiv1beta1.RegistrationConfig{
-				{
-					Type: addonapiv1beta1.KubeClient,
-					KubeClient: &addonapiv1beta1.KubeClientConfig{
-						Subject: addonapiv1beta1.KubeClientSubject{
-							BaseSubject: addonapiv1beta1.BaseSubject{
-								User:   testSubject.User,
-								Groups: testSubject.Groups,
-							},
-						},
-						Driver: "token",
-					},
+			newConfigs: []agent.RegistrationConfig{
+				&agent.KubeClientRegistration{
+					User:   testSubject.User,
+					Groups: testSubject.Groups,
 				},
 			},
 			existingRegistrations: []addonapiv1beta1.RegistrationConfig{
@@ -673,6 +634,7 @@ func TestBuildRegistrationConfigs(t *testing.T) {
 								Groups: existingSubject.Groups,
 							},
 						},
+						Driver: "token",
 					},
 				},
 			},
@@ -693,17 +655,10 @@ func TestBuildRegistrationConfigs(t *testing.T) {
 		},
 		{
 			name: "kubeclient with empty driver - use subject from newConfigs",
-			newConfigs: []addonapiv1beta1.RegistrationConfig{
-				{
-					Type: addonapiv1beta1.KubeClient,
-					KubeClient: &addonapiv1beta1.KubeClientConfig{
-						Subject: addonapiv1beta1.KubeClientSubject{
-							BaseSubject: addonapiv1beta1.BaseSubject{
-								User:   testSubject.User,
-								Groups: testSubject.Groups,
-							},
-						},
-					},
+			newConfigs: []agent.RegistrationConfig{
+				&agent.KubeClientRegistration{
+					User:   testSubject.User,
+					Groups: testSubject.Groups,
 				},
 			},
 			existingRegistrations: []addonapiv1beta1.RegistrationConfig{
@@ -735,24 +690,17 @@ func TestBuildRegistrationConfigs(t *testing.T) {
 		},
 		{
 			name: "kubeclient with token driver and empty existing subject",
-			newConfigs: []addonapiv1beta1.RegistrationConfig{
-				{
-					Type: addonapiv1beta1.KubeClient,
-					KubeClient: &addonapiv1beta1.KubeClientConfig{
-						Subject: addonapiv1beta1.KubeClientSubject{
-							BaseSubject: addonapiv1beta1.BaseSubject{
-								User:   testSubject.User,
-								Groups: testSubject.Groups,
-							},
-						},
-						Driver: "token",
-					},
+			newConfigs: []agent.RegistrationConfig{
+				&agent.KubeClientRegistration{
+					User:   testSubject.User,
+					Groups: testSubject.Groups,
 				},
 			},
 			existingRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
 					Type: addonapiv1beta1.KubeClient,
 					KubeClient: &addonapiv1beta1.KubeClientConfig{
+						Driver:  "token",
 						Subject: addonapiv1beta1.KubeClientSubject{}, // empty subject
 					},
 				},
@@ -768,46 +716,11 @@ func TestBuildRegistrationConfigs(t *testing.T) {
 			},
 		},
 		{
-			name: "kubeclient with token driver - no existing registration",
-			newConfigs: []addonapiv1beta1.RegistrationConfig{
-				{
-					Type: addonapiv1beta1.KubeClient,
-					KubeClient: &addonapiv1beta1.KubeClientConfig{
-						Subject: addonapiv1beta1.KubeClientSubject{
-							BaseSubject: addonapiv1beta1.BaseSubject{
-								User:   testSubject.User,
-								Groups: testSubject.Groups,
-							},
-						},
-						Driver: "token",
-					},
-				},
-			},
-			existingRegistrations: []addonapiv1beta1.RegistrationConfig{}, // no existing registration
-			expectedRegistrations: []addonapiv1beta1.RegistrationConfig{
-				{
-					Type: addonapiv1beta1.KubeClient,
-					KubeClient: &addonapiv1beta1.KubeClientConfig{
-						Driver:  "token",
-						Subject: addonapiv1beta1.KubeClientSubject{}, // cleared, waiting for agent to set
-					},
-				},
-			},
-		},
-		{
 			name: "kubeclient with csr driver - existing registrations ignored",
-			newConfigs: []addonapiv1beta1.RegistrationConfig{
-				{
-					Type: addonapiv1beta1.KubeClient,
-					KubeClient: &addonapiv1beta1.KubeClientConfig{
-						Subject: addonapiv1beta1.KubeClientSubject{
-							BaseSubject: addonapiv1beta1.BaseSubject{
-								User:   testSubject.User,
-								Groups: testSubject.Groups,
-							},
-						},
-						Driver: "csr",
-					},
+			newConfigs: []agent.RegistrationConfig{
+				&agent.KubeClientRegistration{
+					User:   testSubject.User,
+					Groups: testSubject.Groups,
 				},
 			},
 			existingRegistrations: []addonapiv1beta1.RegistrationConfig{
@@ -820,6 +733,7 @@ func TestBuildRegistrationConfigs(t *testing.T) {
 								Groups: existingSubject.Groups,
 							},
 						},
+						Driver: "csr",
 					},
 				},
 			},
@@ -840,25 +754,16 @@ func TestBuildRegistrationConfigs(t *testing.T) {
 		},
 		{
 			name: "multiple configs - mixed signer types",
-			newConfigs: []addonapiv1beta1.RegistrationConfig{
-				{
-					Type: addonapiv1beta1.KubeClient,
-					KubeClient: &addonapiv1beta1.KubeClientConfig{
-						Subject: addonapiv1beta1.KubeClientSubject{
-							BaseSubject: addonapiv1beta1.BaseSubject{
-								User:   testSubject.User,
-								Groups: testSubject.Groups,
-							},
-						},
-						Driver: "token",
-					},
+			newConfigs: []agent.RegistrationConfig{
+				&agent.KubeClientRegistration{
+					User:   testSubject.User,
+					Groups: testSubject.Groups,
 				},
-				{
-					Type: addonapiv1beta1.CustomSigner,
-					CustomSigner: &addonapiv1beta1.CustomSignerConfig{
-						SignerName: customSignerName,
-						Subject:    testSubject,
-					},
+				&agent.CustomSignerRegistration{
+					SignerName:        customSignerName,
+					User:              testSubject.User,
+					Groups:            testSubject.Groups,
+					OrganizationUnits: testSubject.OrganizationUnits,
 				},
 			},
 			existingRegistrations: []addonapiv1beta1.RegistrationConfig{
@@ -871,6 +776,7 @@ func TestBuildRegistrationConfigs(t *testing.T) {
 								Groups: existingSubject.Groups,
 							},
 						},
+						Driver: "token",
 					},
 				},
 			},
@@ -898,18 +804,10 @@ func TestBuildRegistrationConfigs(t *testing.T) {
 		},
 		{
 			name: "kubeclient with token driver - mismatched signer in existing",
-			newConfigs: []addonapiv1beta1.RegistrationConfig{
-				{
-					Type: addonapiv1beta1.KubeClient,
-					KubeClient: &addonapiv1beta1.KubeClientConfig{
-						Subject: addonapiv1beta1.KubeClientSubject{
-							BaseSubject: addonapiv1beta1.BaseSubject{
-								User:   testSubject.User,
-								Groups: testSubject.Groups,
-							},
-						},
-						Driver: "token",
-					},
+			newConfigs: []agent.RegistrationConfig{
+				&agent.KubeClientRegistration{
+					User:   testSubject.User,
+					Groups: testSubject.Groups,
 				},
 			},
 			existingRegistrations: []addonapiv1beta1.RegistrationConfig{
@@ -920,6 +818,12 @@ func TestBuildRegistrationConfigs(t *testing.T) {
 						Subject:    existingSubject,
 					},
 				},
+				{
+					Type: addonapiv1beta1.KubeClient,
+					KubeClient: &addonapiv1beta1.KubeClientConfig{
+						Driver: "token",
+					},
+				},
 			},
 			expectedRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
@@ -927,23 +831,23 @@ func TestBuildRegistrationConfigs(t *testing.T) {
 					KubeClient: &addonapiv1beta1.KubeClientConfig{
 						Driver:  "token",
 						Subject: addonapiv1beta1.KubeClientSubject{}, // cleared, no matching existing
-
 					},
 				},
 			},
 		},
 		{
 			name: "kubeclient with csr driver - empty subject gets default",
-			newConfigs: []addonapiv1beta1.RegistrationConfig{
+			newConfigs: []agent.RegistrationConfig{
+				&agent.KubeClientRegistration{},
+			},
+			existingRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
 					Type: addonapiv1beta1.KubeClient,
 					KubeClient: &addonapiv1beta1.KubeClientConfig{
-						Subject: addonapiv1beta1.KubeClientSubject{}, // empty subject
-						Driver:  "csr",
+						Driver: "csr",
 					},
 				},
 			},
-			existingRegistrations: []addonapiv1beta1.RegistrationConfig{},
 			expectedRegistrations: []addonapiv1beta1.RegistrationConfig{
 				{
 					Type: addonapiv1beta1.KubeClient,
@@ -955,7 +859,6 @@ func TestBuildRegistrationConfigs(t *testing.T) {
 								Groups: []string{"system:open-cluster-management:cluster:cluster1:addon:test-addon", "system:open-cluster-management:addon:test-addon"},
 							},
 						}, // default subject set
-
 					},
 				},
 			},

@@ -128,11 +128,6 @@ func (c *addManagerConfig) runController(ctx context.Context, kubeConfig *rest.C
 		utilrand.String(5),
 	)
 
-	// Set agent install namespace from addon deployment config if it exists
-	registrationOption.AgentInstallNamespace = utils.AgentInstallNamespaceFromDeploymentConfigFunc(
-		utils.NewAddOnDeploymentConfigGetter(addonClient),
-	)
-
 	agentAddon, err := addonfactory.NewAgentAddonFactory(helloworld.AddonName, helloworld.FS, "manifests/templates").
 		WithConfigGVRs(utils.AddOnDeploymentConfigGVR).
 		WithGetValuesFuncs(

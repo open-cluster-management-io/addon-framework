@@ -143,7 +143,7 @@ func (c *csrSignController) sync(ctx context.Context, syncCtx factory.SyncContex
 		return nil
 	}
 
-	csr.Status.Certificate, err = registrationOption.CSRSign(cluster, addon, csr)
+	csr.Status.Certificate, err = registrationOption.CSRSign(ctx, cluster, addon, csr)
 	if err != nil {
 		return fmt.Errorf("failed to sign addon csr %q: %v", csr.Name, err)
 	}

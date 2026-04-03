@@ -8,7 +8,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
-	addonv1beta1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1beta1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1beta1"
 	addonlisterv1beta1 "open-cluster-management.io/api/client/addon/listers/addon/v1beta1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
@@ -27,7 +27,7 @@ const (
 // the installation and upgrade of addon will no longer be managed by addon itself.
 // Once removed, the value will be set to "addon-manager" by the general addon manager.
 type cmaManagedByController struct {
-	addonClient                  addonv1beta1client.Interface
+	addonClient                  addonclient.Interface
 	clusterManagementAddonLister addonlisterv1beta1.ClusterManagementAddOnLister
 	agentAddons                  map[string]agent.AgentAddon
 	cmaFilterFunc                factory.EventFilterFunc
@@ -37,7 +37,7 @@ type cmaManagedByController struct {
 }
 
 func NewCMAManagedByController(
-	addonClient addonv1beta1client.Interface,
+	addonClient addonclient.Interface,
 	clusterManagementAddonInformers addoninformerv1beta1.ClusterManagementAddOnInformer,
 	agentAddons map[string]agent.AgentAddon,
 	cmaFilterFunc factory.EventFilterFunc,

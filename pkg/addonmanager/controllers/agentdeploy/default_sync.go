@@ -52,7 +52,7 @@ func (s *defaultSyncer) sync(ctx context.Context,
 		return addon, err
 	}
 
-	deployWorks, deleteWorks, err := s.buildWorks(deployWorkNamespace, cluster, currentWorks, addon)
+	deployWorks, deleteWorks, err := s.buildWorks(ctx, deployWorkNamespace, cluster, currentWorks, addon)
 	if err != nil {
 		return addon, err
 	}
