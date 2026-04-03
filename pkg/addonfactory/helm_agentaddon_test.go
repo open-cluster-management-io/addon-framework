@@ -1,6 +1,7 @@
 package addonfactory
 
 import (
+	"context"
 	"embed"
 	"fmt"
 	"reflect"
@@ -160,19 +161,6 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 			expectedResourceRequirements:    &defaultResourceReqirements,
 		},
 		{
-			name:                         "template render ok with newer hosting cluster",
-			scheme:                       testScheme,
-			clusterName:                  "cluster1",
-			hostingCluster:               NewFakeManagedCluster("hosting-cluster", "1.25.0"),
-			addonName:                    "helloworld",
-			installNamespace:             "myNs",
-			expectedInstallNamespace:     "myNs",
-			expectedImage:                "quay.io/testimage:test",
-			expectedObjCnt:               5,
-			expectedNamespace:            true,
-			expectedResourceRequirements: &defaultResourceReqirements,
-		},
-		{
 			name:                         "template render ok, getting hosting cluster with client",
 			scheme:                       testScheme,
 			clusterName:                  "cluster1",
@@ -241,14 +229,11 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 				factory = factory.WithManagedClusterClient(clusterClient)
 				clusterAddon.Annotations[addonapiv1beta1.HostingClusterNameAnnotationKey] = c.hostingCluster.Name
 			}
-			if !c.getHostingClusterWithClient && c.hostingCluster != nil {
-				factory = factory.WithHostingCluster(c.hostingCluster)
-			}
 			agentAddon, err := factory.BuildHelmAgentAddon()
 			if err != nil {
 				t.Errorf("expected no error, got err %v", err)
 			}
-			objects, err := agentAddon.Manifests(cluster, clusterAddon)
+			objects, err := agentAddon.Manifests(context.TODO(), cluster, clusterAddon)
 			if err != nil {
 				t.Errorf("expected no error, got err %v", err)
 			}

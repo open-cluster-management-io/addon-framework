@@ -40,7 +40,7 @@ type healthCheckTestAgent struct {
 	health *agent.HealthProber
 }
 
-func (t *healthCheckTestAgent) Manifests(cluster *clusterv1.ManagedCluster,
+func (t *healthCheckTestAgent) Manifests(ctx context.Context, cluster *clusterv1.ManagedCluster,
 	addon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error) {
 
 	return []runtime.Object{

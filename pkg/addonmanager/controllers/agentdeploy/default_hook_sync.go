@@ -27,7 +27,7 @@ func (s *defaultHookSyncer) sync(ctx context.Context,
 	addon *addonapiv1beta1.ManagedClusterAddOn) (*addonapiv1beta1.ManagedClusterAddOn, error) {
 	deployWorkNamespace := addon.Namespace
 
-	hookWork, err := s.buildWorks(deployWorkNamespace, cluster, addon)
+	hookWork, err := s.buildWorks(ctx, deployWorkNamespace, cluster, addon)
 	if err != nil {
 		return addon, err
 	}

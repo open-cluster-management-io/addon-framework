@@ -14,7 +14,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
-	addonv1beta1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1beta1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1beta1"
 	addonlisterv1beta1 "open-cluster-management.io/api/client/addon/listers/addon/v1beta1"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
@@ -32,7 +32,7 @@ type enqueueFunc func(obj interface{})
 
 // cmaConfigController reconciles all interested addon config types (GroupVersionResource) on the hub.
 type cmaConfigController struct {
-	addonClient                   addonv1beta1client.Interface
+	addonClient                   addonclient.Interface
 	clusterManagementAddonLister  addonlisterv1beta1.ClusterManagementAddOnLister
 	clusterManagementAddonIndexer cache.Indexer
 	configListers                 map[schema.GroupResource]dynamiclister.Lister
@@ -45,7 +45,7 @@ type cmaConfigController struct {
 }
 
 func NewCMAConfigController(
-	addonClient addonv1beta1client.Interface,
+	addonClient addonclient.Interface,
 	clusterManagementAddonInformers addoninformerv1beta1.ClusterManagementAddOnInformer,
 	configInformerFactory dynamicinformer.DynamicSharedInformerFactory,
 	configGVRs map[schema.GroupVersionResource]bool,

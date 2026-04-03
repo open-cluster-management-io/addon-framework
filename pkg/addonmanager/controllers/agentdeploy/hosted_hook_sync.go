@@ -72,7 +72,7 @@ func (s *hostedHookSyncer) sync(ctx context.Context,
 		addonRemoveFinalizer(addon, addonapiv1beta1.AddonHostingPreDeleteHookFinalizer)
 		return addon, nil
 	}
-	hookWork, err := s.buildWorks(hostingClusterName, cluster, addon)
+	hookWork, err := s.buildWorks(ctx, hostingClusterName, cluster, addon)
 	if err != nil {
 		return addon, err
 	}

@@ -9,7 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
-	addonv1beta1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 )
 
 // AddOnDeploymentConfigGetter has a method to return a AddOnDeploymentConfig object
@@ -18,11 +18,11 @@ type AddOnDeploymentConfigGetter interface {
 }
 
 type defaultAddOnDeploymentConfigGetter struct {
-	addonClient addonv1beta1client.Interface
+	addonClient addonclient.Interface
 }
 
 // NewAddOnDeploymentConfigGetter returns a AddOnDeploymentConfigGetter with addon client
-func NewAddOnDeploymentConfigGetter(addonClient addonv1beta1client.Interface) AddOnDeploymentConfigGetter {
+func NewAddOnDeploymentConfigGetter(addonClient addonclient.Interface) AddOnDeploymentConfigGetter {
 	return &defaultAddOnDeploymentConfigGetter{addonClient: addonClient}
 }
 
@@ -36,8 +36,8 @@ func (g *defaultAddOnDeploymentConfigGetter) Get(
 // matched addon deployment config, it will return an empty string.
 func AgentInstallNamespaceFromDeploymentConfigFunc(
 	adcgetter AddOnDeploymentConfigGetter,
-) func(*addonapiv1beta1.ManagedClusterAddOn) (string, error) {
-	return func(addon *addonapiv1beta1.ManagedClusterAddOn) (string, error) {
+) func(ctx context.Context, addon *addonapiv1beta1.ManagedClusterAddOn) (string, error) {
+	return func(ctx context.Context, addon *addonapiv1beta1.ManagedClusterAddOn) (string, error) {
 		if addon == nil {
 			return "", fmt.Errorf("failed to get addon install namespace, addon is nil")
 		}

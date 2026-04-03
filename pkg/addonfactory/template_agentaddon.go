@@ -1,6 +1,7 @@
 package addonfactory
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -36,30 +37,29 @@ type templateFile struct {
 }
 
 type TemplateAgentAddon struct {
-	decoder               runtime.Decoder
-	templateFiles         []templateFile
-	getValuesFuncs        []GetValuesFunc
-	agentAddonOptions     agent.AgentAddonOptions
-	trimCRDDescription    bool
-	agentInstallNamespace func(addon *addonapiv1beta1.ManagedClusterAddOn) (string, error)
+	decoder            runtime.Decoder
+	templateFiles      []templateFile
+	getValuesFuncs     []GetValuesFunc
+	agentAddonOptions  agent.AgentAddonOptions
+	trimCRDDescription bool
 }
 
 func newTemplateAgentAddon(factory *AgentAddonFactory) *TemplateAgentAddon {
 	return &TemplateAgentAddon{
-		decoder:               serializer.NewCodecFactory(factory.scheme).UniversalDeserializer(),
-		getValuesFuncs:        factory.getValuesFuncs,
-		agentAddonOptions:     factory.agentAddonOptions,
-		trimCRDDescription:    factory.trimCRDDescription,
-		agentInstallNamespace: factory.agentInstallNamespace,
+		decoder:            serializer.NewCodecFactory(factory.scheme).UniversalDeserializer(),
+		getValuesFuncs:     factory.getValuesFuncs,
+		agentAddonOptions:  factory.agentAddonOptions,
+		trimCRDDescription: factory.trimCRDDescription,
 	}
 }
 
 func (a *TemplateAgentAddon) Manifests(
+	ctx context.Context,
 	cluster *clusterv1.ManagedCluster,
 	addon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error) {
 	var objects []runtime.Object
 
-	configValues, err := a.getValues(cluster, addon)
+	configValues, err := a.getValues(ctx, cluster, addon)
 	if err != nil {
 		return objects, err
 	}
@@ -92,6 +92,7 @@ func (a *TemplateAgentAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 }
 
 func (a *TemplateAgentAddon) getValues(
+	ctx context.Context,
 	cluster *clusterv1.ManagedCluster,
 	addon *addonapiv1beta1.ManagedClusterAddOn) (Values, error) {
 	overrideValues := map[string]interface{}{}
@@ -108,7 +109,7 @@ func (a *TemplateAgentAddon) getValues(
 			overrideValues = MergeValues(overrideValues, userValues)
 		}
 	}
-	builtinValues, err := a.getBuiltinValues(cluster, addon)
+	builtinValues, err := a.getBuiltinValues(ctx, cluster, addon)
 	if err != nil {
 		return overrideValues, err
 	}
@@ -118,6 +119,7 @@ func (a *TemplateAgentAddon) getValues(
 }
 
 func (a *TemplateAgentAddon) getBuiltinValues(
+	ctx context.Context,
 	cluster *clusterv1.ManagedCluster,
 	addon *addonapiv1beta1.ManagedClusterAddOn) (Values, error) {
 	builtinValues := templateBuiltinValues{}
@@ -131,8 +133,8 @@ func (a *TemplateAgentAddon) getBuiltinValues(
 	}
 
 	// If agentInstallNamespace function is provided, use it (may get from AddOnDeploymentConfig)
-	if a.agentInstallNamespace != nil {
-		ns, err := a.agentInstallNamespace(addon)
+	if a.agentAddonOptions.AgentInstallNamespace != nil {
+		ns, err := a.agentAddonOptions.AgentInstallNamespace(ctx, addon)
 		if err != nil {
 			klog.Errorf("failed to get agent install namespace for addon %s: %v", addon.Name, err)
 			return nil, err

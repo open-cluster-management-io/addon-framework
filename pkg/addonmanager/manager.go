@@ -12,7 +12,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
-	addonv1beta1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
@@ -44,7 +44,7 @@ func (a *addonManager) Start(ctx context.Context) error {
 		return err
 	}
 
-	addonClient, err := addonv1beta1client.NewForConfig(a.GetConfig())
+	addonClient, err := addonclient.NewForConfig(a.GetConfig())
 	if err != nil {
 		return err
 	}

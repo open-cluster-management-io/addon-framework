@@ -9,6 +9,7 @@ import (
 	"github.com/onsi/gomega"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -19,7 +20,7 @@ import (
 	certificatesv1 "k8s.io/api/certificates/v1"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
-	addonv1beta1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	clusterv1client "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -39,7 +40,7 @@ var addOnDeploymentConfigGVR = schema.GroupVersionResource{
 var testEnv *envtest.Environment
 var hubWorkClient workclientset.Interface
 var hubClusterClient clusterv1client.Interface
-var hubAddonClient addonv1beta1client.Interface
+var hubAddonClient addonclient.Interface
 var hubKubeClient kubernetes.Interface
 var testAddonImpl *testAddon
 var testHostedAddonImpl *testAddon
@@ -75,11 +76,30 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	gomega.Expect(cfg).ToNot(gomega.BeNil())
 
+	// Update the stored versions of addon CRDs to v1beta1
+	apiExtensionsClient, err := apiextensionsclient.NewForConfig(cfg)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	for _, crdName := range []string{
+		"managedclusteraddons.addon.open-cluster-management.io",
+		"clustermanagementaddons.addon.open-cluster-management.io",
+	} {
+		crd, err := apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), crdName, metav1.GetOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		for i, v := range crd.Spec.Versions {
+			crd.Spec.Versions[i].Storage = v.Name == "v1beta1"
+		}
+		crd, err = apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		crd.Status.StoredVersions = []string{"v1beta1"}
+		_, err = apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().UpdateStatus(context.TODO(), crd, metav1.UpdateOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	}
+
 	hubWorkClient, err = workclientset.NewForConfig(cfg)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	hubClusterClient, err = clusterv1client.NewForConfig(cfg)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	hubAddonClient, err = addonv1beta1client.NewForConfig(cfg)
+	hubAddonClient, err = addonclient.NewForConfig(cfg)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	hubKubeClient, err = kubernetes.NewForConfig(cfg)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -87,14 +107,14 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	testAddonImpl = &testAddon{
 		name:          "test",
 		manifests:     map[string][]runtime.Object{},
-		registrations: map[string][]addonapiv1beta1.RegistrationConfig{},
+		registrations: map[string][]agent.RegistrationConfig{},
 		hostInfoFn:    constants.GetHostedModeInfo,
 	}
 
 	testHostedAddonImpl = &testAddon{
 		name:              "test-hosted",
 		manifests:         map[string][]runtime.Object{},
-		registrations:     map[string][]addonapiv1beta1.RegistrationConfig{},
+		registrations:     map[string][]agent.RegistrationConfig{},
 		hostedModeEnabled: true,
 		hostInfoFn:        constants.GetHostedModeInfo,
 	}
@@ -102,14 +122,14 @@ var _ = ginkgo.BeforeSuite(func(done ginkgo.Done) {
 	testInstallByLableAddonImpl = &testAddon{
 		name:          "test-install-all",
 		manifests:     map[string][]runtime.Object{},
-		registrations: map[string][]addonapiv1beta1.RegistrationConfig{},
+		registrations: map[string][]agent.RegistrationConfig{},
 		hostInfoFn:    constants.GetHostedModeInfo,
 	}
 
 	testMultiWorksAddonImpl = &testAddon{
 		name:          "test-multi-works",
 		manifests:     map[string][]runtime.Object{},
-		registrations: map[string][]addonapiv1beta1.RegistrationConfig{},
+		registrations: map[string][]agent.RegistrationConfig{},
 		hostInfoFn:    constants.GetHostedModeInfo,
 	}
 
@@ -144,7 +164,7 @@ var _ = ginkgo.AfterSuite(func() {
 type testAddon struct {
 	name                string
 	manifests           map[string][]runtime.Object
-	registrations       map[string][]addonapiv1beta1.RegistrationConfig
+	registrations       map[string][]agent.RegistrationConfig
 	approveCSR          bool
 	cert                []byte
 	prober              *agent.HealthProber
@@ -153,7 +173,7 @@ type testAddon struct {
 	supportedConfigGVRs []schema.GroupVersionResource
 }
 
-func (t *testAddon) Manifests(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error) {
+func (t *testAddon) Manifests(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error) {
 	return t.manifests[cluster.Name], nil
 }
 
@@ -168,14 +188,14 @@ func (t *testAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 
 	if len(t.registrations) > 0 {
 		option.Registration = &agent.RegistrationOption{
-			CSRConfigurations: func(cluster *clusterv1.ManagedCluster,
-				addon *addonapiv1beta1.ManagedClusterAddOn) ([]addonapiv1beta1.RegistrationConfig, error) {
+			Configurations: func(ctx context.Context, cluster *clusterv1.ManagedCluster,
+				addon *addonapiv1beta1.ManagedClusterAddOn) ([]agent.RegistrationConfig, error) {
 				return t.registrations[cluster.Name], nil
 			},
-			CSRApproveCheck: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool {
+			CSRApproveCheck: func(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn, csr *certificatesv1.CertificateSigningRequest) bool {
 				return t.approveCSR
 			},
-			CSRSign: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn,
+			CSRSign: func(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn,
 				csr *certificatesv1.CertificateSigningRequest) ([]byte, error) {
 				return t.cert, nil
 			},

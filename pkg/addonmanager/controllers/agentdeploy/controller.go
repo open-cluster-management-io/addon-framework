@@ -16,7 +16,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
-	addonv1beta1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformerv1beta1 "open-cluster-management.io/api/client/addon/informers/externalversions/addon/v1beta1"
 	addonlisterv1beta1 "open-cluster-management.io/api/client/addon/listers/addon/v1beta1"
 	clusterinformers "open-cluster-management.io/api/client/cluster/informers/externalversions/cluster/v1"
@@ -44,7 +44,7 @@ const (
 type addonDeployController struct {
 	workApplier                *workapplier.WorkApplier
 	workBuilder                *workbuilder.WorkBuilder
-	addonClient                addonv1beta1client.Interface
+	addonClient                addonclient.Interface
 	managedClusterLister       clusterlister.ManagedClusterLister
 	managedClusterAddonLister  addonlisterv1beta1.ManagedClusterAddOnLister
 	managedClusterAddonIndexer cache.Indexer
@@ -56,7 +56,7 @@ type addonDeployController struct {
 
 func NewAddonDeployController(
 	workClient workv1client.Interface,
-	addonClient addonv1beta1client.Interface,
+	addonClient addonclient.Interface,
 	clusterInformers clusterinformers.ManagedClusterInformer,
 	addonInformers addoninformerv1beta1.ManagedClusterAddOnInformer,
 	workInformers workinformers.ManifestWorkInformer,
@@ -390,12 +390,14 @@ func (c *addonDeployController) applyWork(ctx context.Context, appliedType strin
 }
 
 type buildDeployWorkFunc func(
+	ctx context.Context,
 	workNamespace string,
 	cluster *clusterv1.ManagedCluster, existingWorks []*workapiv1.ManifestWork,
 	addon *addonapiv1beta1.ManagedClusterAddOn) (appliedWorks, deleteWorks []*workapiv1.ManifestWork, err error)
 
 func (c *addonDeployController) buildDeployManifestWorksFunc(addonWorkBuilder *addonWorksBuilder, appliedType string) buildDeployWorkFunc {
 	return func(
+		ctx context.Context,
 		workNamespace string,
 		cluster *clusterv1.ManagedCluster, existingWorks []*workapiv1.ManifestWork,
 		addon *addonapiv1beta1.ManagedClusterAddOn) (appliedWorks, deleteWorks []*workapiv1.ManifestWork, err error) {
@@ -410,7 +412,7 @@ func (c *addonDeployController) buildDeployManifestWorksFunc(addonWorkBuilder *a
 			return nil, nil, nil
 		}
 
-		objects, err := agentAddon.Manifests(cluster, addon)
+		objects, err := agentAddon.Manifests(ctx, cluster, addon)
 		if err != nil {
 			meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
 				Type:    appliedType,
@@ -429,7 +431,7 @@ func (c *addonDeployController) buildDeployManifestWorksFunc(addonWorkBuilder *a
 			mode, _ = agentAddon.GetAgentAddonOptions().HostedModeInfoFunc(addon, cluster)
 		}
 
-		manifestOptions, err := getManifestConfigOption(agentAddon, cluster, addon)
+		manifestOptions, err := getManifestConfigOption(ctx, agentAddon, cluster, addon)
 		if err != nil {
 			return nil, nil, fmt.Errorf("get manifest config option error: %v", err)
 		}
@@ -462,12 +464,14 @@ func (c *addonDeployController) buildDeployManifestWorksFunc(addonWorkBuilder *a
 }
 
 type buildDeployHookFunc func(
+	ctx context.Context,
 	workNamespace string,
 	cluster *clusterv1.ManagedCluster,
 	addon *addonapiv1beta1.ManagedClusterAddOn) (*workapiv1.ManifestWork, error)
 
 func (c *addonDeployController) buildHookManifestWorkFunc(addonWorkBuilder *addonWorksBuilder, appliedType string) buildDeployHookFunc {
 	return func(
+		ctx context.Context,
 		workNamespace string,
 		cluster *clusterv1.ManagedCluster,
 		addon *addonapiv1beta1.ManagedClusterAddOn) (*workapiv1.ManifestWork, error) {
@@ -482,7 +486,7 @@ func (c *addonDeployController) buildHookManifestWorkFunc(addonWorkBuilder *addo
 			return nil, nil
 		}
 
-		objects, err := agentAddon.Manifests(cluster, addon)
+		objects, err := agentAddon.Manifests(ctx, cluster, addon)
 		if err != nil {
 			meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
 				Type:    appliedType,

@@ -26,9 +26,9 @@ var FS embed.FS
 
 func NewRegistrationOption(kubeConfig *rest.Config, addonName, agentName string) *agent.RegistrationOption {
 	return &agent.RegistrationOption{
-		CSRConfigurations: agent.KubeClientSignerConfigurations(addonName, agentName),
-		CSRApproveCheck:   utils.DefaultCSRApprover(agentName),
-		PermissionConfig:  rbac.AddonRBAC(kubeConfig),
+		Configurations:   agent.KubeClientSignerConfigurations(addonName, agentName),
+		CSRApproveCheck:  utils.DefaultCSRApprover(agentName),
+		PermissionConfig: rbac.AddonRBAC(kubeConfig),
 	}
 }
 

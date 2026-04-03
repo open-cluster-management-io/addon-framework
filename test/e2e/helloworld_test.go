@@ -530,7 +530,7 @@ var _ = ginkgo.Describe("install/uninstall helloworld addons", func() {
 func prepareAddOnDeploymentConfig(namespace string) error {
 	_, err := hubAddOnClient.AddonV1beta1().AddOnDeploymentConfigs(namespace).Get(context.Background(), deployConfigName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		if _, err := hubAddOnClient.AddonV1beta1().AddOnDeploymentConfigs(managedClusterName).Create(
+		if _, err := hubAddOnClient.AddonV1beta1().AddOnDeploymentConfigs(namespace).Create(
 			context.Background(),
 			&addonapiv1beta1.AddOnDeploymentConfig{
 				ObjectMeta: metav1.ObjectMeta{
