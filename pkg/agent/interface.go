@@ -131,8 +131,9 @@ type AgentInstallNamespaceFunc func(ctx context.Context, addon *addonapiv1beta1.
 // 3. the RBAC setting of agent on the hub
 // 4. how csr is signed if the customized signer is used.
 type RegistrationOption struct {
-	// CSRConfigurations returns a list of csr configuration for the adddon agent in a managed cluster.
+	// Configurations returns a list of csr configuration for the addon agent in a managed cluster.
 	// A csr will be created from the managed cluster for addon agent with each CSRConfiguration.
+	// This replaces the previous CSRConfigurations field from RegistrationOption.
 	// +required
 	Configurations RegistrationConfigurationsFunc
 

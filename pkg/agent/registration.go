@@ -16,6 +16,7 @@ type RegistrationConfig interface {
 }
 
 // KubeClientRegistration configures kubeClient-type registration.
+// Note: User and Groups might be overridden when the platform uses token as the driver.
 type KubeClientRegistration struct {
 	User   string
 	Groups []string

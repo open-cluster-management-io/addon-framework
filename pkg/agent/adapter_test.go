@@ -69,7 +69,7 @@ func TestToV1beta1Addon(t *testing.T) {
 	if out.Name != in.Name || out.Namespace != in.Namespace {
 		t.Errorf("ObjectMeta not copied: got %v/%v", out.Namespace, out.Name)
 	}
-	if _, ok := out.Annotations[v1alpha1InstallNamespaceAnnotation]; ok {
+	if _, ok := out.Annotations[addonv1beta1.InstallNamespaceAnnotation]; ok {
 		t.Error("annotation should not be set when InstallNamespace is empty")
 	}
 }
@@ -85,7 +85,7 @@ func TestToV1beta1Addon_InstallNamespace(t *testing.T) {
 	if out == nil {
 		t.Fatal("expected non-nil result")
 	}
-	if got := out.Annotations[v1alpha1InstallNamespaceAnnotation]; got != "custom-ns" {
+	if got := out.Annotations[addonv1beta1.InstallNamespaceAnnotation]; got != "custom-ns" {
 		t.Errorf("expected annotation %q, got %q", "custom-ns", got)
 	}
 }
@@ -332,7 +332,7 @@ func TestAdapter_GetAgentAddonOptions_StaticNamespace_AnnotationOverride(t *test
 	addon := &addonv1beta1.ManagedClusterAddOn{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
-				v1alpha1InstallNamespaceAnnotation: "annotation-ns",
+				addonv1beta1.InstallNamespaceAnnotation: "annotation-ns",
 			},
 		},
 	}

@@ -10,6 +10,8 @@ clean-integration-test:
 	$(RM) ./integration.test
 	$(RM) ./kube-integration.test
 	$(RM) ./cloudevents-integration.test
+	$(RM) ./v1alpha1-kube-integration.test
+	$(RM) ./v1alpha1-cloudevents-integration.test
 .PHONY: clean-integration-test
 
 clean: clean-integration-test
@@ -24,5 +26,15 @@ test-cloudevents-integration: envtest-setup
 	./cloudevents-integration.test -ginkgo.slowSpecThreshold=15 -ginkgo.v -ginkgo.failFast
 .PHONY: test-cloudevents-integration
 
-test-integration: test-kube-integration
+test-v1alpha1-kube-integration: envtest-setup
+	go test -c ./test/integration/v1alpha1_kube -o ./v1alpha1-kube-integration.test
+	./v1alpha1-kube-integration.test -ginkgo.slowSpecThreshold=15 -ginkgo.v -ginkgo.failFast
+.PHONY: test-v1alpha1-kube
+
+test-v1alpha1-cloudevents-integration: envtest-setup
+	go test -c ./test/integration/v1alpha1_cloudevents -o ./v1alpha1-cloudevents-integration.test
+	./v1alpha1-cloudevents-integration.test -ginkgo.slowSpecThreshold=15 -ginkgo.v -ginkgo.failFast
+.PHONY: test-v1alpha1-cloudevents
+
+test-integration: test-kube-integration test-cloudevents-integration test-v1alpha1-kube-integration test-v1alpha1-cloudevents-integration
 .PHONY: test-integration

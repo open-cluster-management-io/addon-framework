@@ -14,12 +14,6 @@ import (
 	agentv1alpha1 "open-cluster-management.io/addon-framework/pkg/agent/v1alpha1"
 )
 
-// v1alpha1InstallNamespaceAnnotation is the annotation key used by ToV1beta1Addon
-// to encode the v1alpha1 Spec.InstallNamespace field (which is deprecated and has no
-// counterpart in v1beta1) so that the v1alpha1 adapter can honor the v1alpha1 priority
-// rules: Spec.InstallNamespace > Registration.Namespace.
-const v1alpha1InstallNamespaceAnnotation = "internal.addon.open-cluster-management.io/v1alpha1-install-namespace"
-
 // WrapV1alpha1 adapts a v1alpha1 AgentAddon so it satisfies the v1beta1 AgentAddon
 // interface and all applicable optional interfaces (AddonConfigurer, Registrar,
 // CSRApprover, HubPermitter).
@@ -68,6 +62,7 @@ func (a *v1alpha1Adapter) GetAgentAddonOptions() AgentAddonOptions {
 	manifestConfigs = append(manifestConfigs, opts.ManifestConfigs...)
 
 	cfg := AgentAddonOptions{
+		AddonName:                       opts.AddonName,
 		SupportedConfigGVRs:             opts.SupportedConfigGVRs,
 		ManifestConfigs:                 manifestConfigs,
 		AgentDeployTriggerClusterFilter: opts.AgentDeployTriggerClusterFilter,
@@ -84,6 +79,10 @@ func (a *v1alpha1Adapter) GetAgentAddonOptions() AgentAddonOptions {
 	}
 
 	if reg := opts.Registration; reg != nil {
+		// Create v1beta1 Registration option to signal that registration is configured.
+		// The actual configuration is exposed via the Registrar/CSRApprover/HubPermitter interfaces.
+		cfg.Registration = &RegistrationOption{}
+
 		switch {
 		case reg.AgentInstallNamespace != nil:
 			fn := reg.AgentInstallNamespace
@@ -97,7 +96,7 @@ func (a *v1alpha1Adapter) GetAgentAddonOptions() AgentAddonOptions {
 				// supported) takes priority over the static Registration.Namespace.
 				// Spec.InstallNamespace is encoded in a well-known annotation by ToV1beta1Addon.
 				if addon != nil {
-					if v, ok := addon.Annotations[v1alpha1InstallNamespaceAnnotation]; ok && len(v) > 0 {
+					if v, ok := addon.Annotations[addonv1beta1.InstallNamespaceAnnotation]; ok && len(v) > 0 {
 						return v, nil
 					}
 				}
@@ -229,7 +228,7 @@ func ToV1beta1Addon(in *addonv1alpha1.ManagedClusterAddOn) *addonv1beta1.Managed
 			out.Annotations = make(map[string]string)
 		}
 		//nolint:staticcheck
-		out.Annotations[v1alpha1InstallNamespaceAnnotation] = in.Spec.InstallNamespace
+		out.Annotations[addonv1beta1.InstallNamespaceAnnotation] = in.Spec.InstallNamespace
 	}
 
 	// nil scope is safe: none of the reachable Convert_* functions dereference it.
