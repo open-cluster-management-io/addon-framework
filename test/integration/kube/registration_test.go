@@ -3,22 +3,22 @@ package kube
 import (
 	"context"
 	"fmt"
+	"open-cluster-management.io/addon-framework/pkg/agent"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/util/rand"
 
-	certificatesv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
 var _ = ginkgo.Describe("Addon Registration", func() {
 	var managedClusterName string
-	var cma *addonapiv1alpha1.ClusterManagementAddOn
+	var cma *addonapiv1beta1.ClusterManagementAddOn
 	var err error
 
 	ginkgo.BeforeEach(func() {
@@ -41,17 +41,17 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		// Create clustermanagement addon
-		cma = &addonapiv1alpha1.ClusterManagementAddOn{
+		cma = &addonapiv1beta1.ClusterManagementAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testAddonImpl.name,
 			},
-			Spec: addonapiv1alpha1.ClusterManagementAddOnSpec{
-				InstallStrategy: addonapiv1alpha1.InstallStrategy{
-					Type: addonapiv1alpha1.AddonInstallStrategyManual,
+			Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
+				InstallStrategy: addonapiv1beta1.InstallStrategy{
+					Type: addonapiv1beta1.AddonInstallStrategyManual,
 				},
 			},
 		}
-		cma, err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Create(context.Background(), cma, metav1.CreateOptions{})
+		cma, err = hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Create(context.Background(), cma, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 
@@ -61,33 +61,31 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 		err = hubClusterClient.ClusterV1().ManagedClusters().Delete(context.Background(), managedClusterName, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		delete(testAddonImpl.registrations, managedClusterName)
-		err = hubAddonClient.AddonV1alpha1().ClusterManagementAddOns().Delete(context.Background(), testAddonImpl.name, metav1.DeleteOptions{})
+		err = hubAddonClient.AddonV1beta1().ClusterManagementAddOns().Delete(context.Background(), testAddonImpl.name, metav1.DeleteOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 	})
 
 	ginkgo.It("Should setup registration successfully", func() {
-		testAddonImpl.registrations[managedClusterName] = []addonapiv1alpha1.RegistrationConfig{
-			{
-				SignerName: certificatesv1.KubeAPIServerClientSignerName,
-				Subject: addonapiv1alpha1.Subject{
-					User: fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s:agent:%s",
-						managedClusterName, testAddonImpl.name, testAddonImpl.name),
-					Groups: []string{
-						fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s",
-							managedClusterName, testAddonImpl.name),
-						fmt.Sprintf("system:open-cluster-management:addon:%s", testAddonImpl.name),
-					},
+		testAddonImpl.registrations[managedClusterName] = []agent.RegistrationConfig{
+			&agent.KubeClientRegistration{
+				User: fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s:agent:%s",
+					managedClusterName, testAddonImpl.name, testAddonImpl.name),
+				Groups: []string{
+					fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s",
+						managedClusterName, testAddonImpl.name),
+					fmt.Sprintf("system:open-cluster-management:addon:%s", testAddonImpl.name),
 				},
 			},
 		}
 
-		addon := &addonapiv1alpha1.ManagedClusterAddOn{
+		addon := &addonapiv1beta1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testAddonImpl.name,
+				Annotations: map[string]string{
+					addonapiv1beta1.InstallNamespaceAnnotation: "test",
+				},
 			},
-			Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
-				InstallNamespace: "test",
-			},
+			Spec: addonapiv1beta1.ManagedClusterAddOnSpec{},
 		}
 		createManagedClusterAddOnwithOwnerRefs(managedClusterName, addon, cma)
 
@@ -95,43 +93,49 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 		setKubeClientDriver(managedClusterName, testAddonImpl.name, "csr")
 
 		gomega.Eventually(func() error {
-			actual, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testAddonImpl.name, metav1.GetOptions{})
+			actual, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testAddonImpl.name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
-			if !apiequality.Semantic.DeepEqual(testAddonImpl.registrations[managedClusterName], actual.Status.Registrations) {
-				return fmt.Errorf("Expected registration is not correct, actual: %v", actual.Status.Registrations)
+			// Create expected with driver for comparison
+			expected := make([]addonapiv1beta1.RegistrationConfig, len(testAddonImpl.registrations[managedClusterName]))
+			for i, reg := range testAddonImpl.registrations[managedClusterName] {
+				expected[i] = reg.RegistrationAPI()
+				if expected[i].Type == addonapiv1beta1.KubeClient && expected[i].KubeClient != nil {
+					expected[i].KubeClient.Driver = "csr"
+				}
+			}
+			if !apiequality.Semantic.DeepEqual(expected, actual.Status.Registrations) {
+				return fmt.Errorf("Expected registration is not correct\nExpected: %+v\nActual: %+v", expected, actual.Status.Registrations)
 			}
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 	})
 
 	ginkgo.It("Should update registration successfully", func() {
-		testAddonImpl.registrations[managedClusterName] = []addonapiv1alpha1.RegistrationConfig{
-			{
-				SignerName: certificatesv1.KubeAPIServerClientSignerName,
-				Subject: addonapiv1alpha1.Subject{
-					User: fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s:agent:%s",
-						managedClusterName, testAddonImpl.name, testAddonImpl.name),
-					Groups: []string{
-						fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s",
-							managedClusterName, testAddonImpl.name),
-						fmt.Sprintf("system:open-cluster-management:addon:%s", testAddonImpl.name),
-					},
+		testAddonImpl.registrations[managedClusterName] = []agent.RegistrationConfig{
+			&agent.KubeClientRegistration{
+				User: fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s:agent:%s",
+					managedClusterName, testAddonImpl.name, testAddonImpl.name),
+				Groups: []string{
+					fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s",
+						managedClusterName, testAddonImpl.name),
+					fmt.Sprintf("system:open-cluster-management:addon:%s", testAddonImpl.name),
 				},
 			},
-			{
+			&agent.CustomSignerRegistration{
 				SignerName: "open-cluster-management.io/test-signer",
 			},
 		}
 
-		addon := &addonapiv1alpha1.ManagedClusterAddOn{
+		addon := &addonapiv1beta1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testAddonImpl.name,
+				Annotations: map[string]string{
+					addonapiv1beta1.InstallNamespaceAnnotation: "test",
+				},
 			},
-			Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
-				InstallNamespace: "test",
-			},
+			Spec: addonapiv1beta1.ManagedClusterAddOnSpec{},
 		}
 		createManagedClusterAddOnwithOwnerRefs(managedClusterName, addon, cma)
 
@@ -139,30 +143,40 @@ var _ = ginkgo.Describe("Addon Registration", func() {
 		setKubeClientDriver(managedClusterName, testAddonImpl.name, "csr")
 
 		gomega.Eventually(func() error {
-			actual, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testAddonImpl.name, metav1.GetOptions{})
+			actual, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testAddonImpl.name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
-			actual.Status = addonapiv1alpha1.ManagedClusterAddOnStatus{
-				Registrations: []addonapiv1alpha1.RegistrationConfig{
+			actual.Status = addonapiv1beta1.ManagedClusterAddOnStatus{
+				Registrations: []addonapiv1beta1.RegistrationConfig{
 					{
-						SignerName: certificatesv1.KubeAPIServerClientSignerName,
+						Type: addonapiv1beta1.KubeClient,
+						KubeClient: &addonapiv1beta1.KubeClientConfig{
+							Driver: "csr",
+						},
 					},
 				},
-				KubeClientDriver: "csr",
-				Conditions:       []metav1.Condition{},
+				Conditions: []metav1.Condition{},
 			}
-			_, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).UpdateStatus(context.Background(), actual, metav1.UpdateOptions{})
+			_, err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).UpdateStatus(context.Background(), actual, metav1.UpdateOptions{})
 			return err
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
-			actual, err := hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testAddonImpl.name, metav1.GetOptions{})
+			actual, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(context.Background(), testAddonImpl.name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
-			if !apiequality.Semantic.DeepEqual(testAddonImpl.registrations[managedClusterName], actual.Status.Registrations) {
-				return fmt.Errorf("Expected registration is not correct, actual: %v", actual.Status.Registrations)
+			// Create expected with driver for comparison
+			expected := make([]addonapiv1beta1.RegistrationConfig, len(testAddonImpl.registrations[managedClusterName]))
+			for i, reg := range testAddonImpl.registrations[managedClusterName] {
+				expected[i] = reg.RegistrationAPI()
+				if expected[i].Type == addonapiv1beta1.KubeClient && expected[i].KubeClient != nil {
+					expected[i].KubeClient.Driver = "csr"
+				}
+			}
+			if !apiequality.Semantic.DeepEqual(expected, actual.Status.Registrations) {
+				return fmt.Errorf("Expected registration is not correct\nExpected: %+v\nActual: %+v", expected, actual.Status.Registrations)
 			}
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())

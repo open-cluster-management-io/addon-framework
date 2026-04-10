@@ -1,12 +1,13 @@
 package addonfactory
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/klog/v2"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
 	"open-cluster-management.io/addon-framework/pkg/agent"
@@ -36,30 +37,29 @@ type templateFile struct {
 }
 
 type TemplateAgentAddon struct {
-	decoder               runtime.Decoder
-	templateFiles         []templateFile
-	getValuesFuncs        []GetValuesFunc
-	agentAddonOptions     agent.AgentAddonOptions
-	trimCRDDescription    bool
-	agentInstallNamespace func(addon *addonapiv1alpha1.ManagedClusterAddOn) (string, error)
+	decoder            runtime.Decoder
+	templateFiles      []templateFile
+	getValuesFuncs     []GetValuesFunc
+	agentAddonOptions  agent.AgentAddonOptions
+	trimCRDDescription bool
 }
 
 func newTemplateAgentAddon(factory *AgentAddonFactory) *TemplateAgentAddon {
 	return &TemplateAgentAddon{
-		decoder:               serializer.NewCodecFactory(factory.scheme).UniversalDeserializer(),
-		getValuesFuncs:        factory.getValuesFuncs,
-		agentAddonOptions:     factory.agentAddonOptions,
-		trimCRDDescription:    factory.trimCRDDescription,
-		agentInstallNamespace: factory.agentInstallNamespace,
+		decoder:            serializer.NewCodecFactory(factory.scheme).UniversalDeserializer(),
+		getValuesFuncs:     factory.getValuesFuncs,
+		agentAddonOptions:  factory.agentAddonOptions,
+		trimCRDDescription: factory.trimCRDDescription,
 	}
 }
 
 func (a *TemplateAgentAddon) Manifests(
+	ctx context.Context,
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) ([]runtime.Object, error) {
+	addon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error) {
 	var objects []runtime.Object
 
-	configValues, err := a.getValues(cluster, addon)
+	configValues, err := a.getValues(ctx, cluster, addon)
 	if err != nil {
 		return objects, err
 	}
@@ -92,8 +92,9 @@ func (a *TemplateAgentAddon) GetAgentAddonOptions() agent.AgentAddonOptions {
 }
 
 func (a *TemplateAgentAddon) getValues(
+	ctx context.Context,
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
+	addon *addonapiv1beta1.ManagedClusterAddOn) (Values, error) {
 	overrideValues := map[string]interface{}{}
 
 	defaultValues := a.getDefaultValues(cluster, addon)
@@ -108,7 +109,7 @@ func (a *TemplateAgentAddon) getValues(
 			overrideValues = MergeValues(overrideValues, userValues)
 		}
 	}
-	builtinValues, err := a.getBuiltinValues(cluster, addon)
+	builtinValues, err := a.getBuiltinValues(ctx, cluster, addon)
 	if err != nil {
 		return overrideValues, err
 	}
@@ -118,17 +119,22 @@ func (a *TemplateAgentAddon) getValues(
 }
 
 func (a *TemplateAgentAddon) getBuiltinValues(
+	ctx context.Context,
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
+	addon *addonapiv1beta1.ManagedClusterAddOn) (Values, error) {
 	builtinValues := templateBuiltinValues{}
 	builtinValues.ClusterName = cluster.GetName()
 
-	installNamespace := addon.Spec.InstallNamespace
+	// In v1beta1, InstallNamespace field is removed from ManagedClusterAddOnSpec
+	// First try to get from annotation
+	installNamespace := addon.Annotations[addonapiv1beta1.InstallNamespaceAnnotation]
 	if len(installNamespace) == 0 {
 		installNamespace = AddonDefaultInstallNamespace
 	}
-	if a.agentInstallNamespace != nil {
-		ns, err := a.agentInstallNamespace(addon)
+
+	// If agentInstallNamespace function is provided, use it (may get from AddOnDeploymentConfig)
+	if a.agentAddonOptions.AgentInstallNamespace != nil {
+		ns, err := a.agentAddonOptions.AgentInstallNamespace(ctx, addon)
 		if err != nil {
 			klog.Errorf("failed to get agent install namespace for addon %s: %v", addon.Name, err)
 			return nil, err
@@ -146,7 +152,7 @@ func (a *TemplateAgentAddon) getBuiltinValues(
 
 func (a *TemplateAgentAddon) getDefaultValues(
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) Values {
+	addon *addonapiv1beta1.ManagedClusterAddOn) Values {
 	defaultValues := templateDefaultValues{}
 
 	// TODO: hubKubeConfigSecret depends on the signer configuration in registration, and the registration is an array.
