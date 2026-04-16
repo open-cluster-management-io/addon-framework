@@ -2,6 +2,7 @@ package helloworld_agent
 
 import (
 	"context"
+	"os"
 	"reflect"
 	"time"
 
@@ -23,6 +24,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/version"
 	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
+	sdktls "open-cluster-management.io/sdk-go/pkg/tls"
 )
 
 func NewAgentCommand(addonName string) *cobra.Command {
@@ -118,6 +120,14 @@ func (o *AgentOptions) RunAgent(ctx context.Context, kubeconfig *rest.Config) er
 	go hubKubeInformerFactory.Start(ctx.Done())
 	go agent.Run(ctx, 1)
 	go leaseUpdater.Start(ctx)
+
+	// Watch the ocm-tls-profile ConfigMap. When it changes the agent restarts so the
+	// new TLS settings take effect.
+	if _, err := sdktls.StartTLSConfigMapWatcher(ctx, spokeKubeClient, o.AddonNamespace,
+		func() { os.Exit(0) },
+	); err != nil {
+		klog.Errorf("TLS ConfigMap watcher failed to start: %v", err)
+	}
 
 	<-ctx.Done()
 	return nil

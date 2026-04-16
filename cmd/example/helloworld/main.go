@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	utilflag "k8s.io/component-base/cli/flag"
 	logs "k8s.io/component-base/logs/api/v1"
@@ -25,6 +26,7 @@ import (
 	cmdfactory "open-cluster-management.io/addon-framework/pkg/cmd/factory"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	"open-cluster-management.io/addon-framework/pkg/version"
+	sdktls "open-cluster-management.io/sdk-go/pkg/tls"
 )
 
 func main() {
@@ -75,6 +77,8 @@ func newControllerCommand() *cobra.Command {
 	cmd.Use = "controller"
 	cmd.Short = "Start the addon controller"
 	o.AddFlags(cmd)
+	cmd.Flags().StringVar(&c.namespace, "addon-manager-namespace", c.namespace,
+		"Namespace where the addon manager runs. Used to watch the TLS profile ConfigMap.")
 
 	return cmd
 }
@@ -82,9 +86,24 @@ func newControllerCommand() *cobra.Command {
 // addManagerConfig holds cloudevents configuration for addon manager
 type addManagerConfig struct {
 	cloudeventsOptions *cloudevents.CloudEventsOptions
+	namespace          string
 }
 
 func (c *addManagerConfig) runController(ctx context.Context, kubeConfig *rest.Config) error {
+	// Watch the ocm-tls-profile ConfigMap in the addon manager namespace on the hub.
+	// When it changes the manager restarts so the new TLS settings take effect.
+	if c.namespace != "" {
+		kubeClient, err := kubernetes.NewForConfig(kubeConfig)
+		if err != nil {
+			return err
+		}
+		if _, err := sdktls.StartTLSConfigMapWatcher(ctx, kubeClient, c.namespace, func() {
+			os.Exit(0)
+		}); err != nil {
+			klog.Errorf("Failed to start TLS ConfigMap watcher: %v", err)
+		}
+	}
+
 	addonClient, err := addonv1alpha1client.NewForConfig(kubeConfig)
 	if err != nil {
 		return err
