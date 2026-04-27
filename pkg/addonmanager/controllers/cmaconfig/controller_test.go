@@ -16,7 +16,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
 	"open-cluster-management.io/addon-framework/pkg/index"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
 	"open-cluster-management.io/sdk-go/pkg/patcher"
@@ -58,16 +58,16 @@ func TestSync(t *testing.T) {
 			name:    "no configs",
 			syncKey: "test",
 			clusterManagementAddon: []runtime.Object{
-				func() *addonapiv1alpha1.ClusterManagementAddOn {
+				func() *addonapiv1beta1.ClusterManagementAddOn {
 					cma := addontesting.NewClusterManagementAddon("test", "", "").Build()
-					cma.Status.DefaultConfigReferences = []addonapiv1alpha1.DefaultConfigReference{
+					cma.Status.DefaultConfigReferences = []addonapiv1beta1.DefaultConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    "other",
 								Resource: "other",
 							},
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
 									Namespace: "cluster1",
 									Name:      "test",
 								},
@@ -87,16 +87,16 @@ func TestSync(t *testing.T) {
 			name:    "update default config spec hash",
 			syncKey: "test",
 			clusterManagementAddon: []runtime.Object{
-				func() *addonapiv1alpha1.ClusterManagementAddOn {
+				func() *addonapiv1beta1.ClusterManagementAddOn {
 					cma := addontesting.NewClusterManagementAddon("test", "", "").Build()
-					cma.Status.DefaultConfigReferences = []addonapiv1alpha1.DefaultConfigReference{
+					cma.Status.DefaultConfigReferences = []addonapiv1beta1.DefaultConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    fakeGVR.Group,
 								Resource: fakeGVR.Resource,
 							},
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
 									Namespace: "cluster1",
 									Name:      "test",
 								},
@@ -110,7 +110,7 @@ func TestSync(t *testing.T) {
 			configs: []runtime.Object{newTestConfing("test", "cluster1", 2)},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				patch := actions[0].(clienttesting.PatchActionImpl).Patch
-				cma := &addonapiv1alpha1.ClusterManagementAddOn{}
+				cma := &addonapiv1beta1.ClusterManagementAddOn{}
 				err := json.Unmarshal(patch, cma)
 				if err != nil {
 					t.Fatal(err)
@@ -125,20 +125,20 @@ func TestSync(t *testing.T) {
 			name:    "update install progression config spec hash",
 			syncKey: "test",
 			clusterManagementAddon: []runtime.Object{
-				func() *addonapiv1alpha1.ClusterManagementAddOn {
+				func() *addonapiv1beta1.ClusterManagementAddOn {
 					cma := addontesting.NewClusterManagementAddon("test", "", "").Build()
-					cma.Status.InstallProgressions = []addonapiv1alpha1.InstallProgression{{
-						PlacementRef: addonapiv1alpha1.PlacementRef{
+					cma.Status.InstallProgressions = []addonapiv1beta1.InstallProgression{{
+						PlacementRef: addonapiv1beta1.PlacementRef{
 							Name:      "test",
 							Namespace: "test",
 						},
-						ConfigReferences: []addonapiv1alpha1.InstallConfigReference{{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+						ConfigReferences: []addonapiv1beta1.InstallConfigReference{{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    fakeGVR.Group,
 								Resource: fakeGVR.Resource,
 							},
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
 									Namespace: "cluster1",
 									Name:      "test",
 								},
@@ -152,7 +152,7 @@ func TestSync(t *testing.T) {
 			configs: []runtime.Object{newTestConfing("test", "cluster1", 2)},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				patch := actions[0].(clienttesting.PatchActionImpl).Patch
-				cma := &addonapiv1alpha1.ClusterManagementAddOn{}
+				cma := &addonapiv1beta1.ClusterManagementAddOn{}
 				err := json.Unmarshal(patch, cma)
 				if err != nil {
 					t.Fatal(err)
@@ -167,22 +167,22 @@ func TestSync(t *testing.T) {
 			name:    "config has same spec hash when spec are same",
 			syncKey: "test",
 			clusterManagementAddon: []runtime.Object{
-				func() *addonapiv1alpha1.ClusterManagementAddOn {
+				func() *addonapiv1beta1.ClusterManagementAddOn {
 					cma := addontesting.NewClusterManagementAddon("test", "", "").Build()
-					cma.Status.InstallProgressions = []addonapiv1alpha1.InstallProgression{
+					cma.Status.InstallProgressions = []addonapiv1beta1.InstallProgression{
 						{
-							PlacementRef: addonapiv1alpha1.PlacementRef{
+							PlacementRef: addonapiv1beta1.PlacementRef{
 								Name:      "test",
 								Namespace: "test",
 							},
-							ConfigReferences: []addonapiv1alpha1.InstallConfigReference{
+							ConfigReferences: []addonapiv1beta1.InstallConfigReference{
 								{
-									ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+									ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 										Group:    fakeGVR.Group,
 										Resource: fakeGVR.Resource,
 									},
-									DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-										ConfigReferent: addonapiv1alpha1.ConfigReferent{
+									DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+										ConfigReferent: addonapiv1beta1.ConfigReferent{
 											Namespace: "cluster1",
 											Name:      "test1",
 										},
@@ -192,18 +192,18 @@ func TestSync(t *testing.T) {
 							},
 						},
 						{
-							PlacementRef: addonapiv1alpha1.PlacementRef{
+							PlacementRef: addonapiv1beta1.PlacementRef{
 								Name:      "test",
 								Namespace: "test",
 							},
-							ConfigReferences: []addonapiv1alpha1.InstallConfigReference{
+							ConfigReferences: []addonapiv1beta1.InstallConfigReference{
 								{
-									ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+									ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 										Group:    fakeGVR.Group,
 										Resource: fakeGVR.Resource,
 									},
-									DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-										ConfigReferent: addonapiv1alpha1.ConfigReferent{
+									DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+										ConfigReferent: addonapiv1beta1.ConfigReferent{
 											Namespace: "cluster1",
 											Name:      "test2",
 										},
@@ -219,7 +219,7 @@ func TestSync(t *testing.T) {
 			configs: []runtime.Object{newTestConfing("test1", "cluster1", 2), newTestConfing("test2", "cluster1", 2)},
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				patch := actions[0].(clienttesting.PatchActionImpl).Patch
-				cma := &addonapiv1alpha1.ClusterManagementAddOn{}
+				cma := &addonapiv1beta1.ClusterManagementAddOn{}
 				err := json.Unmarshal(patch, cma)
 				if err != nil {
 					t.Fatal(err)
@@ -236,7 +236,7 @@ func TestSync(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			fakeAddonClient := fakeaddon.NewSimpleClientset(c.clusterManagementAddon...)
 			addonInformers := addoninformers.NewSharedInformerFactory(fakeAddonClient, 10*time.Minute)
-			addonStore := addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Informer().GetStore()
+			addonStore := addonInformers.Addon().V1beta1().ClusterManagementAddOns().Informer().GetStore()
 			for _, addon := range c.clusterManagementAddon {
 				if err := addonStore.Add(addon); err != nil {
 					t.Fatal(err)
@@ -257,13 +257,13 @@ func TestSync(t *testing.T) {
 
 			ctrl := &cmaConfigController{
 				addonClient:                  fakeAddonClient,
-				clusterManagementAddonLister: addonInformers.Addon().V1alpha1().ClusterManagementAddOns().Lister(),
+				clusterManagementAddonLister: addonInformers.Addon().V1beta1().ClusterManagementAddOns().Lister(),
 				configListers:                map[schema.GroupResource]dynamiclister.Lister{},
 				cmaFilterFunc:                func(obj interface{}) bool { return true },
 				configGVRs:                   map[schema.GroupVersionResource]bool{fakeGVR: true},
-				addonPatcher: patcher.NewPatcher[*addonapiv1alpha1.ClusterManagementAddOn,
-					addonapiv1alpha1.ClusterManagementAddOnSpec,
-					addonapiv1alpha1.ClusterManagementAddOnStatus](fakeAddonClient.AddonV1alpha1().ClusterManagementAddOns()),
+				addonPatcher: patcher.NewPatcher[*addonapiv1beta1.ClusterManagementAddOn,
+					addonapiv1beta1.ClusterManagementAddOnSpec,
+					addonapiv1beta1.ClusterManagementAddOnStatus](fakeAddonClient.AddonV1beta1().ClusterManagementAddOns()),
 			}
 
 			ctrl.buildConfigInformers(configInformerFactory, map[schema.GroupVersionResource]bool{fakeGVR: true})
@@ -294,16 +294,16 @@ func TestEnqueue(t *testing.T) {
 		{
 			name: "has config reference",
 			cmas: []runtime.Object{
-				func() *addonapiv1alpha1.ClusterManagementAddOn {
+				func() *addonapiv1beta1.ClusterManagementAddOn {
 					cma := addontesting.NewClusterManagementAddon("test1", "", "").Build()
-					cma.Status.DefaultConfigReferences = []addonapiv1alpha1.DefaultConfigReference{
+					cma.Status.DefaultConfigReferences = []addonapiv1beta1.DefaultConfigReference{
 						{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    fakeGVR.Group,
 								Resource: fakeGVR.Resource,
 							},
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
 									Namespace: "cluster1",
 									Name:      "test",
 								},
@@ -313,20 +313,20 @@ func TestEnqueue(t *testing.T) {
 					}
 					return cma
 				}(),
-				func() *addonapiv1alpha1.ClusterManagementAddOn {
+				func() *addonapiv1beta1.ClusterManagementAddOn {
 					cma := addontesting.NewClusterManagementAddon("test2", "", "").Build()
-					cma.Status.InstallProgressions = []addonapiv1alpha1.InstallProgression{{
-						PlacementRef: addonapiv1alpha1.PlacementRef{
+					cma.Status.InstallProgressions = []addonapiv1beta1.InstallProgression{{
+						PlacementRef: addonapiv1beta1.PlacementRef{
 							Name:      "test",
 							Namespace: "test",
 						},
-						ConfigReferences: []addonapiv1alpha1.InstallConfigReference{{
-							ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+						ConfigReferences: []addonapiv1beta1.InstallConfigReference{{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 								Group:    fakeGVR.Group,
 								Resource: fakeGVR.Resource,
 							},
-							DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-								ConfigReferent: addonapiv1alpha1.ConfigReferent{
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
 									Namespace: "cluster1",
 									Name:      "test",
 								},
@@ -346,7 +346,7 @@ func TestEnqueue(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			fakeAddonClient := fakeaddon.NewSimpleClientset(c.cmas...)
 			addonInformers := addoninformers.NewSharedInformerFactory(fakeAddonClient, 10*time.Minute)
-			addonInformer := addonInformers.Addon().V1alpha1().ManagedClusterAddOns().Informer()
+			addonInformer := addonInformers.Addon().V1beta1().ManagedClusterAddOns().Informer()
 
 			ctrl := &cmaConfigController{
 				clusterManagementAddonIndexer: addonInformer.GetIndexer(),

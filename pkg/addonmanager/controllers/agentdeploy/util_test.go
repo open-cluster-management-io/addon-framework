@@ -1,6 +1,7 @@
 package agentdeploy
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -9,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/addontesting"
@@ -19,19 +21,19 @@ import (
 func TestConfigsToAnnotations(t *testing.T) {
 	cases := []struct {
 		name              string
-		configReference   []addonapiv1alpha1.ConfigReference
+		configReference   []addonapiv1beta1.ConfigReference
 		expectAnnotations map[string]string
 	}{
 		{
 			name: "generate annotaions",
-			configReference: []addonapiv1alpha1.ConfigReference{
+			configReference: []addonapiv1beta1.ConfigReference{
 				{
-					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 						Group:    "addon.open-cluster-management.io",
 						Resource: "addondeploymentconfigs",
 					},
-					DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-						ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
 							Name:      "test",
 							Namespace: "open-cluster-management",
 						},
@@ -39,11 +41,11 @@ func TestConfigsToAnnotations(t *testing.T) {
 					},
 				},
 				{
-					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 						Resource: "addonhubconfigs",
 					},
-					DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-						ConfigReferent: addonapiv1alpha1.ConfigReferent{
+					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{
 							Name: "test",
 						},
 						SpecHash: "hash2",
@@ -55,14 +57,14 @@ func TestConfigsToAnnotations(t *testing.T) {
 		},
 		{
 			name:              "generate annotaions without configReference",
-			configReference:   []addonapiv1alpha1.ConfigReference{},
+			configReference:   []addonapiv1beta1.ConfigReference{},
 			expectAnnotations: nil,
 		},
 		{
 			name: "generate annotaions without DesiredConfig",
-			configReference: []addonapiv1alpha1.ConfigReference{
+			configReference: []addonapiv1beta1.ConfigReference{
 				{
-					ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 						Group:    "addon.open-cluster-management.io",
 						Resource: "addondeploymentconfigs",
 					},
@@ -114,7 +116,7 @@ func TestAddonRemoveFinalizer(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			addon := &addonapiv1alpha1.ManagedClusterAddOn{
+			addon := &addonapiv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{Finalizers: c.existingFinalizers},
 			}
 			addonRemoveFinalizer(addon, c.finalizerToRemove)
@@ -149,7 +151,7 @@ func TestAddonAddFinalizer(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			addon := &addonapiv1alpha1.ManagedClusterAddOn{
+			addon := &addonapiv1beta1.ManagedClusterAddOn{
 				ObjectMeta: metav1.ObjectMeta{Finalizers: c.existingFinalizers},
 			}
 			addonAddFinalizer(addon, finalizerToAdd)
@@ -266,47 +268,6 @@ func TestGetManifestConfigOption(t *testing.T) {
 			},
 		},
 		{
-			name: "set updater",
-			agentAddon: &testAgent{
-				name: "test",
-				objects: []runtime.Object{
-					NewFakeDeployment("test-deployment", "default"),
-				},
-				Updaters: []agent.Updater{
-					{
-						ResourceIdentifier: workapiv1.ResourceIdentifier{
-							Group:     "apps",
-							Resource:  "deployments",
-							Name:      "test-deployment",
-							Namespace: "default",
-						},
-						UpdateStrategy: workapiv1.UpdateStrategy{
-							Type: workapiv1.UpdateStrategyTypeServerSideApply,
-							ServerSideApply: &workapiv1.ServerSideApplyConfig{
-								FieldManager: "work-agent-test",
-							},
-						},
-					},
-				},
-			},
-			expectedManifestConfigOption: []workapiv1.ManifestConfigOption{
-				{
-					ResourceIdentifier: workapiv1.ResourceIdentifier{
-						Group:     "apps",
-						Resource:  "deployments",
-						Name:      "test-deployment",
-						Namespace: "default",
-					},
-					UpdateStrategy: &workapiv1.UpdateStrategy{
-						Type: workapiv1.UpdateStrategyTypeServerSideApply,
-						ServerSideApply: &workapiv1.ServerSideApplyConfig{
-							FieldManager: "work-agent-test",
-						},
-					},
-				},
-			},
-		},
-		{
 			name: "merge feedback rules",
 			agentAddon: &testAgent{
 				name: "test",
@@ -399,115 +360,11 @@ func TestGetManifestConfigOption(t *testing.T) {
 				},
 			},
 		},
-		{
-			name: "merge update strategy",
-			agentAddon: &testAgent{
-				name: "test",
-				objects: []runtime.Object{
-					NewFakeDeployment("test-deployment", "default"),
-				},
-				Updaters: []agent.Updater{
-					{
-						ResourceIdentifier: workapiv1.ResourceIdentifier{
-							Group:     "apps",
-							Resource:  "deployments",
-							Name:      "test-deployment",
-							Namespace: "default",
-						},
-						UpdateStrategy: workapiv1.UpdateStrategy{
-							Type: workapiv1.UpdateStrategyTypeCreateOnly,
-						},
-					},
-					{
-						ResourceIdentifier: workapiv1.ResourceIdentifier{
-							Group:     "apps",
-							Resource:  "deployments",
-							Name:      "test-deployment-2",
-							Namespace: "default",
-						},
-						UpdateStrategy: workapiv1.UpdateStrategy{
-							Type: workapiv1.UpdateStrategyTypeCreateOnly,
-						},
-					},
-				},
-				ManifestConfigs: []workapiv1.ManifestConfigOption{
-					{
-						ResourceIdentifier: workapiv1.ResourceIdentifier{
-							Group:     "apps",
-							Resource:  "deployments",
-							Name:      "test-deployment",
-							Namespace: "default",
-						},
-						UpdateStrategy: &workapiv1.UpdateStrategy{
-							Type: workapiv1.UpdateStrategyTypeServerSideApply,
-							ServerSideApply: &workapiv1.ServerSideApplyConfig{
-								FieldManager: "work-agent-test",
-							},
-						},
-					},
-					{
-						ResourceIdentifier: workapiv1.ResourceIdentifier{
-							Group:     "apps",
-							Resource:  "deployments",
-							Name:      "test-deployment-1",
-							Namespace: "default",
-						},
-						UpdateStrategy: &workapiv1.UpdateStrategy{
-							Type: workapiv1.UpdateStrategyTypeServerSideApply,
-							ServerSideApply: &workapiv1.ServerSideApplyConfig{
-								FieldManager: "work-agent-test",
-							},
-						},
-					},
-				},
-			},
-			expectedManifestConfigOption: []workapiv1.ManifestConfigOption{
-				{
-					ResourceIdentifier: workapiv1.ResourceIdentifier{
-						Group:     "apps",
-						Resource:  "deployments",
-						Name:      "test-deployment",
-						Namespace: "default",
-					},
-					UpdateStrategy: &workapiv1.UpdateStrategy{
-						Type: workapiv1.UpdateStrategyTypeServerSideApply,
-						ServerSideApply: &workapiv1.ServerSideApplyConfig{
-							FieldManager: "work-agent-test",
-						},
-					},
-				},
-				{
-					ResourceIdentifier: workapiv1.ResourceIdentifier{
-						Group:     "apps",
-						Resource:  "deployments",
-						Name:      "test-deployment-2",
-						Namespace: "default",
-					},
-					UpdateStrategy: &workapiv1.UpdateStrategy{
-						Type: workapiv1.UpdateStrategyTypeCreateOnly,
-					},
-				},
-				{
-					ResourceIdentifier: workapiv1.ResourceIdentifier{
-						Group:     "apps",
-						Resource:  "deployments",
-						Name:      "test-deployment-1",
-						Namespace: "default",
-					},
-					UpdateStrategy: &workapiv1.UpdateStrategy{
-						Type: workapiv1.UpdateStrategyTypeServerSideApply,
-						ServerSideApply: &workapiv1.ServerSideApplyConfig{
-							FieldManager: "work-agent-test",
-						},
-					},
-				},
-			},
-		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			manifestConfigOptions, err := getManifestConfigOption(c.agentAddon, nil, nil)
+			manifestConfigOptions, err := getManifestConfigOption(context.TODO(), c.agentAddon, nil, nil)
 			assert.Nil(t, err)
 			assert.Equal(t, c.expectedManifestConfigOption, manifestConfigOptions)
 		})
