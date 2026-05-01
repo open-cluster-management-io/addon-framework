@@ -49,15 +49,6 @@ func AgentInstallNamespaceFromDeploymentConfigFunc(
 		}
 
 		if config == nil {
-			// If the addon declares support for addondeploymentconfigs but the Configured condition
-			// is not yet True, the addonconfiguration controller either hasn't processed this MCA
-			// or hasn't finished rolling out configs. In either case configReferences may be
-			// incomplete. Return an error to trigger a requeue rather than falling back to the
-			// default namespace, which would be wrong if a config with a custom namespace exists.
-			if addonSupportsDeploymentConfig(addon) && !addonConfiguredTrue(addon) {
-				return "", fmt.Errorf("addon %s supports addondeploymentconfigs but configuration has not been synced yet, need to retry.",
-					addon.Name)
-			}
 			klog.V(4).InfoS("Addon deployment config is nil, return an empty string for agent install namespace",
 				"addonNamespace", addon.Namespace, "addonName", addon.Name)
 			return "", nil
@@ -76,6 +67,14 @@ func GetDesiredAddOnDeploymentConfig(
 	ok, configRef := GetAddOnConfigRef(addon.Status.ConfigReferences,
 		AddOnDeploymentConfigGVR.Group, AddOnDeploymentConfigGVR.Resource)
 	if !ok {
+		// If the addon declares support for addondeploymentconfigs but the Configured condition
+		// is not yet True, the addonconfiguration controller either hasn't processed this MCA
+		// or hasn't finished rolling out configs. In either case configReferences may be
+		// incomplete. Return an error so callers retry rather than proceeding with no config.
+		if addonSupportsDeploymentConfig(addon) && !addonConfiguredTrue(addon) {
+			return nil, fmt.Errorf("addon %s supports addondeploymentconfigs but Configured condition is not True yet, need to retry",
+				addon.Name)
+		}
 		return nil, nil
 	}
 
