@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -47,12 +48,16 @@ func AgentInstallNamespaceFromDeploymentConfigFunc(
 			return "", fmt.Errorf("failed to get deployment config for addon %s: %v", addon.Name, err)
 		}
 
-		// For now, we have no way of knowing if the addon depleoyment config is not configured, or
-		// is configured but not yet been added to the managedclusteraddon status config references,
-		// we expect no error will be returned when the addon deployment config is not configured
-		// so we can use the default namespace.
-		// TODO: Find a way to distinguish between the above two cases
 		if config == nil {
+			// If the addon declares support for addondeploymentconfigs but the Configured condition
+			// is not yet True, the addonconfiguration controller either hasn't processed this MCA
+			// or hasn't finished rolling out configs. In either case configReferences may be
+			// incomplete. Return an error to trigger a requeue rather than falling back to the
+			// default namespace, which would be wrong if a config with a custom namespace exists.
+			if addonSupportsDeploymentConfig(addon) && !addonConfiguredTrue(addon) {
+				return "", fmt.Errorf("addon %s supports addondeploymentconfigs but configuration has not been synced yet, need to retry.",
+					addon.Name)
+			}
 			klog.V(4).InfoS("Addon deployment config is nil, return an empty string for agent install namespace",
 				"addonNamespace", addon.Namespace, "addonName", addon.Name)
 			return "", nil
@@ -133,4 +138,18 @@ func GetAddOnConfigRef(
 	}
 
 	return false, addonapiv1beta1.ConfigReference{}
+}
+
+func addonSupportsDeploymentConfig(addon *addonapiv1beta1.ManagedClusterAddOn) bool {
+	for _, sc := range addon.Status.SupportedConfigs {
+		if sc.Group == AddOnDeploymentConfigGVR.Group && sc.Resource == AddOnDeploymentConfigGVR.Resource {
+			return true
+		}
+	}
+	return false
+}
+
+func addonConfiguredTrue(addon *addonapiv1beta1.ManagedClusterAddOn) bool {
+	cond := meta.FindStatusCondition(addon.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnConditionConfigured)
+	return cond != nil && cond.Status == metav1.ConditionTrue
 }
