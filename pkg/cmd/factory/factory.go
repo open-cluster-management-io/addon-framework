@@ -3,7 +3,6 @@ package factory
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"net"
 	"os"
 	"strings"
@@ -41,11 +40,15 @@ type ControllerFlags struct {
 	EnableLeaderElection bool
 	// ComponentNamespace is the namespace to run component
 	ComponentNamespace string
+
+	servingOption *genericapiserveroptions.SecureServingOptions
 }
 
 // NewControllerFlags returns flags with default values set
 func NewControllerFlags() *ControllerFlags {
-	return &ControllerFlags{}
+	return &ControllerFlags{
+		servingOption: genericapiserveroptions.NewSecureServingOptions(),
+	}
 }
 
 // AddFlags register and binds the default flags
@@ -56,6 +59,8 @@ func (f *ControllerFlags) AddFlags(cmd *cobra.Command) {
 	flags.StringVar(&f.KubeConfigFile, "kubeconfig", f.KubeConfigFile, "Location of the master configuration file to run from.")
 	flags.StringVar(&f.ComponentNamespace, "component-namespace", f.ComponentNamespace, "Namespace of the component.")
 	flags.BoolVar(&f.EnableLeaderElection, "enable-leader-election", f.EnableLeaderElection, "Enables the leader election for the controller")
+
+	f.servingOption.AddFlags(flags)
 }
 
 // ControllerCommandConfig holds values required to construct a command to run.
@@ -92,8 +97,7 @@ func (c *ControllerCommandConfig) NewCommand() *cobra.Command {
 	ctx := context.TODO()
 	cmd := &cobra.Command{
 		Run: func(cmd *cobra.Command, args []string) {
-			// boiler plate for the "normal" command
-			rand.Seed(time.Now().UTC().UnixNano())
+			// boilerplate for the "normal" command
 			logs.InitLogs()
 
 			// handle SIGTERM and SIGINT by cancelling the context.
@@ -128,7 +132,7 @@ func (c *ControllerCommandConfig) StartController(ctx context.Context) error {
 	}
 
 	var server *genericapiserver.GenericAPIServer
-	serverConfig, err := toServerConfig()
+	serverConfig, err := toServerConfig(c.basicFlags.servingOption)
 	if err != nil {
 		return err
 	}
@@ -141,7 +145,7 @@ func (c *ControllerCommandConfig) StartController(ctx context.Context) error {
 	}
 
 	go func() {
-		if err := server.PrepareRun().Run(ctx.Done()); err != nil {
+		if err := server.PrepareRun().RunWithContext(ctx); err != nil {
 			klog.Fatal(err)
 		}
 		klog.Info("server exited")
@@ -260,26 +264,28 @@ func toLeaderElection(clientConfig *rest.Config, component, namespace string) (l
 	}, nil
 }
 
-func toServerConfig() (*genericapiserver.Config, error) {
+func toServerConfig(servingOptions *genericapiserveroptions.SecureServingOptions) (*genericapiserver.Config, error) {
 	scheme := runtime.NewScheme()
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
 	config := genericapiserver.NewConfig(serializer.NewCodecFactory(scheme))
 
-	servingOptions := genericapiserveroptions.NewSecureServingOptions()
-	servingOptions.BindPort = 8443
-	temporaryCertDir, err := os.MkdirTemp("", "serving-cert")
-	if err != nil {
-		return nil, err
+	if servingOptions.BindPort == 0 {
+		servingOptions.BindPort = 8443
 	}
-	servingOptions.ServerCert.CertDirectory = temporaryCertDir
+
+	if servingOptions.ServerCert.CertDirectory == "" {
+		temporaryCertDir, err := os.MkdirTemp("", "serving-cert")
+		if err != nil {
+			return nil, err
+		}
+		servingOptions.ServerCert.CertDirectory = temporaryCertDir
+	}
 	servingOptions.ServerCert.PairName = "tls"
 	if err := servingOptions.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
 		return nil, err
 	}
 
-	servingOptionsWithLoopback := servingOptions.WithLoopback()
-
-	if err := servingOptionsWithLoopback.ApplyTo(&config.SecureServing, &config.LoopbackClientConfig); err != nil {
+	if err := servingOptions.ApplyTo(&config.SecureServing); err != nil {
 		return nil, err
 	}
 
