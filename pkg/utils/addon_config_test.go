@@ -26,10 +26,11 @@ func newTestAddOnDeploymentConfigGetter(adc *addonapiv1beta1.AddOnDeploymentConf
 func TestAgentInstallNamespaceFromDeploymentConfigFunc(t *testing.T) {
 
 	cases := []struct {
-		name     string
-		getter   AddOnDeploymentConfigGetter
-		mca      *addonapiv1beta1.ManagedClusterAddOn
-		expected string
+		name        string
+		getter      AddOnDeploymentConfigGetter
+		mca         *addonapiv1beta1.ManagedClusterAddOn
+		expected    string
+		expectError bool
 	}{
 		{
 			name: "addon is nil",
@@ -40,8 +41,9 @@ func TestAgentInstallNamespaceFromDeploymentConfigFunc(t *testing.T) {
 					},
 					Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{},
 				}),
-			mca:      nil,
-			expected: "",
+			mca:         nil,
+			expected:    "",
+			expectError: true,
 		},
 		{
 			name: "addon no deployment config reference",
@@ -93,7 +95,8 @@ func TestAgentInstallNamespaceFromDeploymentConfigFunc(t *testing.T) {
 					},
 				},
 			},
-			expected: "",
+			expected:    "",
+			expectError: true,
 		},
 		// {
 		// 	name: "addon deployment config reference spec hash not match",
@@ -165,13 +168,294 @@ func TestAgentInstallNamespaceFromDeploymentConfigFunc(t *testing.T) {
 			},
 			expected: "testns",
 		},
+		{
+			name: "addon supports deployment config but Configured condition absent - should requeue",
+			getter: newTestAddOnDeploymentConfigGetter(
+				&addonapiv1beta1.AddOnDeploymentConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test1",
+					},
+					Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+						AgentInstallNamespace: "custom-ns",
+					},
+				}),
+			mca: &addonapiv1beta1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test1",
+					Namespace: "cluster1",
+				},
+				Status: addonapiv1beta1.ManagedClusterAddOnStatus{
+					SupportedConfigs: []addonapiv1beta1.ConfigGroupResource{
+						{
+							Group:    "addon.open-cluster-management.io",
+							Resource: "addondeploymentconfigs",
+						},
+					},
+					ConfigReferences: []addonapiv1beta1.ConfigReference{},
+				},
+			},
+			expected:    "",
+			expectError: true,
+		},
+		{
+			name: "addon supports deployment config but Configured condition is False - should requeue",
+			getter: newTestAddOnDeploymentConfigGetter(
+				&addonapiv1beta1.AddOnDeploymentConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test1",
+					},
+					Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+						AgentInstallNamespace: "custom-ns",
+					},
+				}),
+			mca: &addonapiv1beta1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test1",
+					Namespace: "cluster1",
+				},
+				Status: addonapiv1beta1.ManagedClusterAddOnStatus{
+					SupportedConfigs: []addonapiv1beta1.ConfigGroupResource{
+						{
+							Group:    "addon.open-cluster-management.io",
+							Resource: "addondeploymentconfigs",
+						},
+					},
+					ConfigReferences: []addonapiv1beta1.ConfigReference{},
+					Conditions: []metav1.Condition{
+						{
+							Type:   addonapiv1beta1.ManagedClusterAddOnConditionConfigured,
+							Status: metav1.ConditionFalse,
+							Reason: "ConfigurationsNotConfigured",
+						},
+					},
+				},
+			},
+			expected:    "",
+			expectError: true,
+		},
+		{
+			name: "addon supports deployment config and Configured=True but no config exists - use default",
+			getter: newTestAddOnDeploymentConfigGetter(
+				&addonapiv1beta1.AddOnDeploymentConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test1",
+					},
+					Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{},
+				}),
+			mca: &addonapiv1beta1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test1",
+					Namespace: "cluster1",
+				},
+				Status: addonapiv1beta1.ManagedClusterAddOnStatus{
+					SupportedConfigs: []addonapiv1beta1.ConfigGroupResource{
+						{
+							Group:    "addon.open-cluster-management.io",
+							Resource: "addondeploymentconfigs",
+						},
+					},
+					ConfigReferences: []addonapiv1beta1.ConfigReference{},
+					Conditions: []metav1.Condition{
+						{
+							Type:   addonapiv1beta1.ManagedClusterAddOnConditionConfigured,
+							Status: metav1.ConditionTrue,
+							Reason: "ConfigurationsConfigured",
+						},
+					},
+				},
+			},
+			expected:    "",
+			expectError: false,
+		},
+		{
+			name: "addon does not support deployment config and no config - use default",
+			getter: newTestAddOnDeploymentConfigGetter(
+				&addonapiv1beta1.AddOnDeploymentConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test1",
+					},
+					Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{},
+				}),
+			mca: &addonapiv1beta1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test1",
+					Namespace: "cluster1",
+				},
+				Status: addonapiv1beta1.ManagedClusterAddOnStatus{
+					SupportedConfigs: []addonapiv1beta1.ConfigGroupResource{},
+					ConfigReferences: []addonapiv1beta1.ConfigReference{},
+				},
+			},
+			expected:    "",
+			expectError: false,
+		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			nsFunc := AgentInstallNamespaceFromDeploymentConfigFunc(c.getter)
-			ns, _ := nsFunc(context.TODO(), c.mca)
-			assert.Equal(t, c.expected, ns, "should be equal")
+			ns, err := nsFunc(context.TODO(), c.mca)
+			assert.Equal(t, c.expected, ns, "namespace should be equal")
+			if c.expectError {
+				assert.Error(t, err, "should return error")
+			} else {
+				assert.NoError(t, err, "should not return error")
+			}
+		})
+	}
+}
+
+func TestGetDesiredAddOnDeploymentConfig(t *testing.T) {
+	cases := []struct {
+		name        string
+		getter      AddOnDeploymentConfigGetter
+		addon       *addonapiv1beta1.ManagedClusterAddOn
+		expectNil   bool
+		expectError bool
+	}{
+		{
+			name: "no config ref and addon does not support deployment config - return nil",
+			getter: newTestAddOnDeploymentConfigGetter(
+				&addonapiv1beta1.AddOnDeploymentConfig{}),
+			addon: &addonapiv1beta1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{Name: "test1", Namespace: "cluster1"},
+				Status: addonapiv1beta1.ManagedClusterAddOnStatus{
+					ConfigReferences: []addonapiv1beta1.ConfigReference{},
+				},
+			},
+			expectNil: true,
+		},
+		{
+			name: "no config ref, supports deployment config, Configured absent - error to retry",
+			getter: newTestAddOnDeploymentConfigGetter(
+				&addonapiv1beta1.AddOnDeploymentConfig{}),
+			addon: &addonapiv1beta1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{Name: "test1", Namespace: "cluster1"},
+				Status: addonapiv1beta1.ManagedClusterAddOnStatus{
+					SupportedConfigs: []addonapiv1beta1.ConfigGroupResource{
+						{Group: "addon.open-cluster-management.io", Resource: "addondeploymentconfigs"},
+					},
+					ConfigReferences: []addonapiv1beta1.ConfigReference{},
+				},
+			},
+			expectNil:   true,
+			expectError: true,
+		},
+		{
+			name: "no config ref, supports deployment config, Configured=False - error to retry",
+			getter: newTestAddOnDeploymentConfigGetter(
+				&addonapiv1beta1.AddOnDeploymentConfig{}),
+			addon: &addonapiv1beta1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{Name: "test1", Namespace: "cluster1"},
+				Status: addonapiv1beta1.ManagedClusterAddOnStatus{
+					SupportedConfigs: []addonapiv1beta1.ConfigGroupResource{
+						{Group: "addon.open-cluster-management.io", Resource: "addondeploymentconfigs"},
+					},
+					ConfigReferences: []addonapiv1beta1.ConfigReference{},
+					Conditions: []metav1.Condition{
+						{
+							Type:   addonapiv1beta1.ManagedClusterAddOnConditionConfigured,
+							Status: metav1.ConditionFalse,
+							Reason: "ConfigurationsNotConfigured",
+						},
+					},
+				},
+			},
+			expectNil:   true,
+			expectError: true,
+		},
+		{
+			name: "no config ref, supports deployment config, Configured=True - nil config is authoritative",
+			getter: newTestAddOnDeploymentConfigGetter(
+				&addonapiv1beta1.AddOnDeploymentConfig{}),
+			addon: &addonapiv1beta1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{Name: "test1", Namespace: "cluster1"},
+				Status: addonapiv1beta1.ManagedClusterAddOnStatus{
+					SupportedConfigs: []addonapiv1beta1.ConfigGroupResource{
+						{Group: "addon.open-cluster-management.io", Resource: "addondeploymentconfigs"},
+					},
+					ConfigReferences: []addonapiv1beta1.ConfigReference{},
+					Conditions: []metav1.Condition{
+						{
+							Type:   addonapiv1beta1.ManagedClusterAddOnConditionConfigured,
+							Status: metav1.ConditionTrue,
+							Reason: "ConfigurationsConfigured",
+						},
+					},
+				},
+			},
+			expectNil:   true,
+			expectError: false,
+		},
+		{
+			name: "config ref with valid spec hash - returns config",
+			getter: newTestAddOnDeploymentConfigGetter(
+				&addonapiv1beta1.AddOnDeploymentConfig{
+					ObjectMeta: metav1.ObjectMeta{Name: "test1"},
+					Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+						AgentInstallNamespace: "custom-ns",
+					},
+				}),
+			addon: &addonapiv1beta1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{Name: "test1", Namespace: "cluster1"},
+				Status: addonapiv1beta1.ManagedClusterAddOnStatus{
+					ConfigReferences: []addonapiv1beta1.ConfigReference{
+						{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+								Group:    "addon.open-cluster-management.io",
+								Resource: "addondeploymentconfigs",
+							},
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{Name: "test1"},
+								SpecHash:       "f97b3f6af1f786ec6f3273e2d6fc8717e45cb7bc9797ba7533663a7de84a5538",
+							},
+						},
+					},
+				},
+			},
+			expectNil:   false,
+			expectError: false,
+		},
+		{
+			name: "config ref with empty spec hash - error",
+			getter: newTestAddOnDeploymentConfigGetter(
+				&addonapiv1beta1.AddOnDeploymentConfig{
+					ObjectMeta: metav1.ObjectMeta{Name: "test1"},
+				}),
+			addon: &addonapiv1beta1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{Name: "test1", Namespace: "cluster1"},
+				Status: addonapiv1beta1.ManagedClusterAddOnStatus{
+					ConfigReferences: []addonapiv1beta1.ConfigReference{
+						{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+								Group:    "addon.open-cluster-management.io",
+								Resource: "addondeploymentconfigs",
+							},
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{Name: "test1"},
+							},
+						},
+					},
+				},
+			},
+			expectNil:   true,
+			expectError: true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			config, err := GetDesiredAddOnDeploymentConfig(c.addon, c.getter)
+			if c.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			if c.expectNil {
+				assert.Nil(t, config)
+			} else {
+				assert.NotNil(t, config)
+			}
 		})
 	}
 }
