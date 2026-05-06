@@ -267,19 +267,65 @@ func toServerConfig() (*genericapiserver.Config, error) {
 
 	servingOptions := genericapiserveroptions.NewSecureServingOptions()
 	servingOptions.BindPort = 8443
-	temporaryCertDir, err := os.MkdirTemp("", "serving-cert")
-	if err != nil {
-		return nil, err
+
+	certPath := "/var/run/secrets/serving-cert/tls.crt"
+	keyPath := "/var/run/secrets/serving-cert/tls.key"
+
+	_, certErr := os.Stat(certPath)
+	_, keyErr := os.Stat(keyPath)
+	certsExist := certErr == nil && keyErr == nil
+
+	if certsExist {
+		servingOptions.ServerCert.CertKey.CertFile = certPath
+		servingOptions.ServerCert.CertKey.KeyFile = keyPath
+	} else {
+		// Non-FIPS fallback
+		tempDir, err := os.MkdirTemp("", "serving-cert")
+		if err != nil {
+			return nil, fmt.Errorf("failed to create temp cert directory: %w", err)
+		}
+		servingOptions.ServerCert.CertDirectory = tempDir
+		servingOptions.ServerCert.PairName = "tls"
 	}
-	servingOptions.ServerCert.CertDirectory = temporaryCertDir
-	servingOptions.ServerCert.PairName = "tls"
+
+	// This is safe if certsExist is true
 	if err := servingOptions.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
 		return nil, err
 	}
 
-	servingOptionsWithLoopback := servingOptions.WithLoopback()
+	// --- THE BYPASS STRATEGY ---
+	if certsExist {
+		// 1. Manually apply Secure Serving (the server part)
+		if err := servingOptions.ApplyTo(&config.SecureServing); err != nil {
+			return nil, err
+		}
 
-	if err := servingOptionsWithLoopback.ApplyTo(&config.SecureServing, &config.LoopbackClientConfig); err != nil {
+		// 2. Manually construct the Loopback Client (the client part)
+		// This bypasses ApplyTo()'s internal GenerateSelfSignedCertKey logic entirely
+		certData, err := os.ReadFile(certPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read serving cert: %w", err)
+		}
+		keyData, err := os.ReadFile(keyPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read serving key: %w", err)
+		}
+
+		config.LoopbackClientConfig = &rest.Config{
+			Host: config.SecureServing.Listener.Addr().String(),
+			TLSClientConfig: rest.TLSClientConfig{
+				CAData:   certData,
+				CertData: certData,
+				KeyData:  keyData,
+			},
+		}
+
+		// We are done. Return early so we don't hit servingOptionsWithLoopback.ApplyTo()
+		return config, nil
+	}
+
+	// --- FALLBACK FOR NON-FIPS (original logic) ---
+	if err := servingOptions.WithLoopback().ApplyTo(&config.SecureServing, &config.LoopbackClientConfig); err != nil {
 		return nil, err
 	}
 
