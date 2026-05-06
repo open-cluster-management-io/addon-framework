@@ -16,7 +16,7 @@ import (
 	utilflag "k8s.io/component-base/cli/flag"
 	logs "k8s.io/component-base/logs/api/v1"
 	"k8s.io/klog/v2"
-	addonv1alpha1client "open-cluster-management.io/api/client/addon/clientset/versioned"
+	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 
 	"open-cluster-management.io/addon-framework/examples/helloworld"
 	"open-cluster-management.io/addon-framework/examples/helloworld_agent"
@@ -104,7 +104,7 @@ func (c *addManagerConfig) runController(ctx context.Context, kubeConfig *rest.C
 		}
 	}
 
-	addonClient, err := addonv1alpha1client.NewForConfig(kubeConfig)
+	addonClient, err := addonclient.NewForConfig(kubeConfig)
 	if err != nil {
 		return err
 	}
@@ -126,11 +126,6 @@ func (c *addManagerConfig) runController(ctx context.Context, kubeConfig *rest.C
 		kubeConfig,
 		helloworld.AddonName,
 		utilrand.String(5),
-	)
-
-	// Set agent install namespace from addon deployment config if it exists
-	registrationOption.AgentInstallNamespace = utils.AgentInstallNamespaceFromDeploymentConfigFunc(
-		utils.NewAddOnDeploymentConfigGetter(addonClient),
 	)
 
 	agentAddon, err := addonfactory.NewAgentAddonFactory(helloworld.AddonName, helloworld.FS, "manifests/templates").

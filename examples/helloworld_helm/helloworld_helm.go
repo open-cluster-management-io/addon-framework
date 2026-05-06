@@ -10,7 +10,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/agent"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 )
@@ -41,7 +41,7 @@ type userValues struct {
 }
 
 func GetDefaultValues(cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) (addonfactory.Values, error) {
+	addon *addonapiv1beta1.ManagedClusterAddOn) (addonfactory.Values, error) {
 	image := os.Getenv("EXAMPLE_IMAGE_NAME")
 	if len(image) == 0 {
 		image = defaultImage
@@ -66,7 +66,7 @@ func GetDefaultValues(cluster *clusterv1.ManagedCluster,
 func GetImageValues(kubeClient kubernetes.Interface) addonfactory.GetValuesFunc {
 	return func(
 		cluster *clusterv1.ManagedCluster,
-		addon *addonapiv1alpha1.ManagedClusterAddOn,
+		addon *addonapiv1beta1.ManagedClusterAddOn,
 	) (addonfactory.Values, error) {
 		overrideValues := addonfactory.Values{}
 		for _, config := range addon.Status.ConfigReferences {
@@ -88,12 +88,12 @@ func GetImageValues(kubeClient kubernetes.Interface) addonfactory.GetValuesFunc 
 
 			image, ok := configMap.Data["image"]
 			if !ok {
-				return nil, fmt.Errorf("no image in configmap %s/%s", config.Namespace, config.Name)
+				return nil, fmt.Errorf("no image in configmap %s/%s", config.DesiredConfig.Namespace, config.DesiredConfig.Name)
 			}
 
 			imagePullPolicy, ok := configMap.Data["imagePullPolicy"]
 			if !ok {
-				return nil, fmt.Errorf("no imagePullPolicy in configmap %s/%s", config.Namespace, config.Name)
+				return nil, fmt.Errorf("no imagePullPolicy in configmap %s/%s", config.DesiredConfig.Namespace, config.DesiredConfig.Name)
 			}
 
 			userJsonValues := userValues{
@@ -135,7 +135,7 @@ func AgentHealthProber() *agent.HealthProber {
 				},
 			},
 			HealthChecker: func(fields []agent.FieldResult, cluster *clusterv1.ManagedCluster,
-				addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+				addon *addonapiv1beta1.ManagedClusterAddOn) error {
 				if len(fields) == 0 {
 					return fmt.Errorf("no fields found in health checker")
 				}

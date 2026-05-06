@@ -9,6 +9,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net"
+	"open-cluster-management.io/addon-framework/pkg/agent"
 	"time"
 
 	mathrand "math/rand"
@@ -22,7 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
@@ -54,21 +55,20 @@ var _ = ginkgo.Describe("Addon CSR", func() {
 		_, err = hubKubeClient.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-		testAddonImpl.registrations[managedClusterName] = []addonapiv1alpha1.RegistrationConfig{
-			{
-				SignerName: certificatesv1.KubeAPIServerClientSignerName,
-			},
+		testAddonImpl.registrations[managedClusterName] = []agent.RegistrationConfig{
+			&agent.KubeClientRegistration{},
 		}
 
-		addon := &addonapiv1alpha1.ManagedClusterAddOn{
+		addon := &addonapiv1beta1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: testAddonImpl.name,
+				Annotations: map[string]string{
+					addonapiv1beta1.InstallNamespaceAnnotation: "test",
+				},
 			},
-			Spec: addonapiv1alpha1.ManagedClusterAddOnSpec{
-				InstallNamespace: "test",
-			},
+			Spec: addonapiv1beta1.ManagedClusterAddOnSpec{},
 		}
-		addon, err = hubAddonClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Create(context.Background(), addon, metav1.CreateOptions{})
+		addon, err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Create(context.Background(), addon, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		// Set kubeClientDriver to "csr" for CSR-based authentication

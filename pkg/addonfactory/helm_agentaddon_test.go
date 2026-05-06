@@ -1,6 +1,7 @@
 package addonfactory
 
 import (
+	"context"
 	"embed"
 	"fmt"
 	"reflect"
@@ -13,10 +14,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"open-cluster-management.io/addon-framework/pkg/agent"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned/fake"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	clusterv1apha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
 )
 
 //go:embed testmanifests/chart
@@ -38,7 +39,7 @@ type global struct {
 }
 
 func getValues(cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
+	addon *addonapiv1beta1.ManagedClusterAddOn) (Values, error) {
 	userConfig := config{
 		OverrideName: addon.Name,
 		Global: global{
@@ -58,7 +59,7 @@ func getValues(cluster *clusterv1.ManagedCluster,
 
 func TestChartAgentAddon_Manifests(t *testing.T) {
 	testScheme := runtime.NewScheme()
-	_ = clusterv1apha1.Install(testScheme)
+	_ = clusterv1alpha1.Install(testScheme)
 	_ = apiextensionsv1.AddToScheme(testScheme)
 	_ = scheme.AddToScheme(testScheme)
 
@@ -145,7 +146,7 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 			addonName:        "helloworld",
 			installNamespace: "myNs",
 			annotationValues: `{"global": {"nodeSelector":{"host":"ssd"},"imageOverrides":{"testImage":"quay.io/helloworld:2.4"}}}`,
-			getValuesFunc: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
+			getValuesFunc: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) (Values, error) {
 				return Values{
 					"hubKubeConfigSecret":     "external-hub-kubeconfig",
 					"managedKubeConfigSecret": "external-managed-kubeconfig",
@@ -158,19 +159,6 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 			expectedHubKubeConfigSecret:     "external-hub-kubeconfig",
 			expectedManagedKubeConfigSecret: "external-managed-kubeconfig",
 			expectedResourceRequirements:    &defaultResourceReqirements,
-		},
-		{
-			name:                         "template render ok with newer hosting cluster",
-			scheme:                       testScheme,
-			clusterName:                  "cluster1",
-			hostingCluster:               NewFakeManagedCluster("hosting-cluster", "1.25.0"),
-			addonName:                    "helloworld",
-			installNamespace:             "myNs",
-			expectedInstallNamespace:     "myNs",
-			expectedImage:                "quay.io/testimage:test",
-			expectedObjCnt:               5,
-			expectedNamespace:            true,
-			expectedResourceRequirements: &defaultResourceReqirements,
 		},
 		{
 			name:                         "template render ok, getting hosting cluster with client",
@@ -193,10 +181,10 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 			addonName:        "helloworld",
 			installNamespace: "myNs",
 			annotationValues: `{"global": {"nodeSelector":{"host":"ssd"},"imageOverrides":{"testImage":"quay.io/helloworld:2.4"}}}`,
-			getValuesFunc: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) (Values, error) {
-				return ToAddOnResourceRequirementsValues(addonapiv1alpha1.AddOnDeploymentConfig{
-					Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-						ResourceRequirements: []addonapiv1alpha1.ContainerResourceRequirements{
+			getValuesFunc: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) (Values, error) {
+				return ToAddOnResourceRequirementsValues(addonapiv1beta1.AddOnDeploymentConfig{
+					Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+						ResourceRequirements: []addonapiv1beta1.ContainerResourceRequirements{
 							{
 								ContainerID: "*:*:*",
 								Resources:   customResourceReqirements,
@@ -239,16 +227,13 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 			if c.getHostingClusterWithClient && c.hostingCluster != nil {
 				clusterClient := clusterclientset.NewSimpleClientset(c.hostingCluster)
 				factory = factory.WithManagedClusterClient(clusterClient)
-				clusterAddon.Annotations[addonapiv1alpha1.HostingClusterNameAnnotationKey] = c.hostingCluster.Name
-			}
-			if !c.getHostingClusterWithClient && c.hostingCluster != nil {
-				factory = factory.WithHostingCluster(c.hostingCluster)
+				clusterAddon.Annotations[addonapiv1beta1.HostingClusterNameAnnotationKey] = c.hostingCluster.Name
 			}
 			agentAddon, err := factory.BuildHelmAgentAddon()
 			if err != nil {
 				t.Errorf("expected no error, got err %v", err)
 			}
-			objects, err := agentAddon.Manifests(cluster, clusterAddon)
+			objects, err := agentAddon.Manifests(context.TODO(), cluster, clusterAddon)
 			if err != nil {
 				t.Errorf("expected no error, got err %v", err)
 			}
@@ -277,7 +262,7 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 					if !reflect.DeepEqual(&object.Spec.Template.Spec.Containers[0].Resources, c.expectedResourceRequirements) {
 						t.Errorf("expected resource requirements is %v, but got %v", c.expectedResourceRequirements, object.Spec.Template.Spec.Containers[0].Resources)
 					}
-				case *clusterv1apha1.ClusterClaim:
+				case *clusterv1alpha1.ClusterClaim:
 					if object.Spec.Value != c.clusterName {
 						t.Errorf("expected clusterName is %s, but got %s", c.clusterName, object.Spec.Value)
 					}

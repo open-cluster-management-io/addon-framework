@@ -1,6 +1,7 @@
 package helloworld_helm
 
 import (
+	"context"
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -10,7 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	fakekube "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/klog/v2"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 
@@ -34,7 +35,7 @@ func TestManifestAddonAgent(t *testing.T) {
 	cases := []struct {
 		name                   string
 		managedCluster         *clusterv1.ManagedCluster
-		managedClusterAddOn    *addonapiv1alpha1.ManagedClusterAddOn
+		managedClusterAddOn    *addonapiv1beta1.ManagedClusterAddOn
 		configMaps             []runtime.Object
 		addOnDeploymentConfigs []runtime.Object
 		verifyDeployment       func(t *testing.T, objs []runtime.Object)
@@ -67,33 +68,31 @@ func TestManifestAddonAgent(t *testing.T) {
 		{
 			name:           "with image config, addon deployment config and annotation",
 			managedCluster: addontesting.NewManagedCluster("cluster1"),
-			managedClusterAddOn: func() *addonapiv1alpha1.ManagedClusterAddOn {
+			managedClusterAddOn: func() *addonapiv1beta1.ManagedClusterAddOn {
 				addon := addontesting.NewAddon("test", "cluster1")
 				addon.SetAnnotations(map[string]string{
 					"addon.open-cluster-management.io/values": `{"global":{"imagePullSecret":"test-pull-secret","imagePullPolicy":"Never"}}`,
 				})
-				addon.Status.ConfigReferences = []addonapiv1alpha1.ConfigReference{
+				addon.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
 					{
-						ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+						ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 							Group:    "",
 							Resource: "configmaps",
 						},
-						ConfigReferent: addonapiv1alpha1.ConfigReferent{
-							Namespace: "cluster1",
-							Name:      "image-config",
+						DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+							ConfigReferent: addonapiv1beta1.ConfigReferent{
+								Namespace: "cluster1",
+								Name:      "image-config",
+							},
 						},
 					},
 					{
-						ConfigGroupResource: addonapiv1alpha1.ConfigGroupResource{
+						ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
 							Group:    "addon.open-cluster-management.io",
 							Resource: "addondeploymentconfigs",
 						},
-						ConfigReferent: addonapiv1alpha1.ConfigReferent{
-							Namespace: "cluster1",
-							Name:      "deploy-config",
-						},
-						DesiredConfig: &addonapiv1alpha1.ConfigSpecHash{
-							ConfigReferent: addonapiv1alpha1.ConfigReferent{
+						DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+							ConfigReferent: addonapiv1beta1.ConfigReferent{
 								Namespace: "cluster1",
 								Name:      "deploy-config",
 							},
@@ -116,13 +115,13 @@ func TestManifestAddonAgent(t *testing.T) {
 				},
 			},
 			addOnDeploymentConfigs: []runtime.Object{
-				&addonapiv1alpha1.AddOnDeploymentConfig{
+				&addonapiv1beta1.AddOnDeploymentConfig{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "deploy-config",
 						Namespace: "cluster1",
 					},
-					Spec: addonapiv1alpha1.AddOnDeploymentConfigSpec{
-						NodePlacement: &addonapiv1alpha1.NodePlacement{
+					Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+						NodePlacement: &addonapiv1beta1.NodePlacement{
 							Tolerations:  tolerations,
 							NodeSelector: nodeSelector,
 						},
@@ -175,7 +174,7 @@ func TestManifestAddonAgent(t *testing.T) {
 			WithGetValuesFuncs(
 				GetDefaultValues,
 				addonfactory.GetAddOnDeploymentConfigValues(
-					addonfactory.NewAddOnDeploymentConfigGetter(fakeAddonClient),
+					utils.NewAddOnDeploymentConfigGetter(fakeAddonClient),
 					addonfactory.ToAddOnNodePlacementValues,
 				),
 				GetImageValues(fakeKubeClient),
@@ -187,7 +186,7 @@ func TestManifestAddonAgent(t *testing.T) {
 			klog.Fatalf("failed to build agent %v", err)
 		}
 
-		objects, err := agentAddon.Manifests(c.managedCluster, c.managedClusterAddOn)
+		objects, err := agentAddon.Manifests(context.TODO(), c.managedCluster, c.managedClusterAddOn)
 		if err != nil {
 			t.Fatalf("failed to get manifests %v", err)
 		}

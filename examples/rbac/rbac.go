@@ -1,13 +1,14 @@
 package rbac
 
 import (
+	"context"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
@@ -22,7 +23,7 @@ func AddonRBAC(kubeConfig *rest.Config) agent.PermissionConfigFunc {
 		},
 	}
 
-	return func(cluster *clusterv1.ManagedCluster, addon *addonapiv1alpha1.ManagedClusterAddOn) error {
+	return func(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 		kubeclient, err := kubernetes.NewForConfig(kubeConfig)
 		if err != nil {
 			return err
@@ -32,6 +33,6 @@ func AddonRBAC(kubeConfig *rest.Config) agent.PermissionConfigFunc {
 			BindKubeClientRole(role).
 			Build()
 
-		return permissionConfig(cluster, addon)
+		return permissionConfig(ctx, cluster, addon)
 	}
 }

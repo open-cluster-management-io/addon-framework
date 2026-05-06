@@ -7,14 +7,13 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	certificatesv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 )
 
 const (
@@ -38,7 +37,7 @@ var _ = ginkgo.Describe("Token-based addon registration", func() {
 	ginkgo.It("should handle token-based authentication", func() {
 		ginkgo.By("Wait for addon registrations to be populated")
 		gomega.Eventually(func() error {
-			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(
+			addon, err := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(
 				context.Background(), helloworldAddonName, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -53,14 +52,23 @@ var _ = ginkgo.Describe("Token-based addon registration", func() {
 
 		ginkgo.By("Wait for kubeClientDriver to be set to token by agent")
 		gomega.Eventually(func() error {
-			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(
+			addon, err := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(
 				context.Background(), helloworldAddonName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 
-			if addon.Status.KubeClientDriver != "token" {
-				return fmt.Errorf("kubeClientDriver not set to token yet, current: %s", addon.Status.KubeClientDriver)
+			// Find the KubeClient registration and get its driver
+			var driver string
+			for _, reg := range addon.Status.Registrations {
+				if reg.Type == addonapiv1beta1.KubeClient && reg.KubeClient != nil {
+					driver = reg.KubeClient.Driver
+					break
+				}
+			}
+
+			if driver != "token" {
+				return fmt.Errorf("kubeClientDriver not set to token yet, current: %s", driver)
 			}
 
 			return nil
@@ -68,14 +76,14 @@ var _ = ginkgo.Describe("Token-based addon registration", func() {
 
 		ginkgo.By("Verify RegistrationApplied condition becomes true")
 		gomega.Eventually(func() error {
-			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(
+			addon, err := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(
 				context.Background(), helloworldAddonName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 
-			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnRegistrationApplied) {
-				cond := meta.FindStatusCondition(addon.Status.Conditions, addonapiv1alpha1.ManagedClusterAddOnRegistrationApplied)
+			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnRegistrationApplied) {
+				cond := meta.FindStatusCondition(addon.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnRegistrationApplied)
 				return fmt.Errorf("RegistrationApplied condition not true: %v", cond)
 			}
 
@@ -100,7 +108,7 @@ var _ = ginkgo.Describe("Token-based addon registration", func() {
 
 		ginkgo.By("Verify addon becomes available")
 		gomega.Eventually(func() error {
-			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(
+			addon, err := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(
 				context.Background(), helloworldAddonName, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -117,7 +125,7 @@ var _ = ginkgo.Describe("Token-based addon registration", func() {
 	ginkgo.It("should have correct registration subject set by agent", func() {
 		ginkgo.By("Verify registration contains subject with correct format (User only, no Groups)")
 		gomega.Eventually(func() error {
-			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(
+			addon, err := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(
 				context.Background(), helloworldAddonName, metav1.GetOptions{})
 			if err != nil {
 				return err
@@ -125,18 +133,19 @@ var _ = ginkgo.Describe("Token-based addon registration", func() {
 
 			var found bool
 			for _, reg := range addon.Status.Registrations {
-				if reg.SignerName == certificatesv1.KubeAPIServerClientSignerName {
-					if reg.Subject.User == "" {
+				if reg.Type == addonapiv1beta1.KubeClient && reg.KubeClient != nil {
+					// KubeClient type always uses KubeAPIServerClientSignerName
+					if reg.KubeClient.Subject.BaseSubject.User == "" {
 						return fmt.Errorf("subject user is empty")
 					}
 					// Verify subject format - should be a service account for token auth
-					if !strings.HasPrefix(reg.Subject.User, "system:serviceaccount:") {
-						return fmt.Errorf("unexpected user format: %s, expected system:serviceaccount:*", reg.Subject.User)
+					if !strings.HasPrefix(reg.KubeClient.Subject.BaseSubject.User, "system:serviceaccount:") {
+						return fmt.Errorf("unexpected user format: %s, expected system:serviceaccount:*", reg.KubeClient.Subject.BaseSubject.User)
 					}
 					// For token driver, groups should NOT be in registration subject
 					// Groups are implicit in the ServiceAccount token itself
-					if len(reg.Subject.Groups) != 0 {
-						return fmt.Errorf("subject groups should be empty for token driver, got: %v", reg.Subject.Groups)
+					if len(reg.KubeClient.Subject.BaseSubject.Groups) != 0 {
+						return fmt.Errorf("subject groups should be empty for token driver, got: %v", reg.KubeClient.Subject.BaseSubject.Groups)
 					}
 					found = true
 					break
@@ -151,30 +160,31 @@ var _ = ginkgo.Describe("Token-based addon registration", func() {
 	})
 
 	ginkgo.It("should create RBAC with subjects matching registration status", func() {
-		var regSubject *addonapiv1alpha1.Subject
+		var regSubject *addonapiv1beta1.BaseSubject
 
 		ginkgo.By("Get registration subject from addon status")
 		gomega.Eventually(func() error {
-			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(
+			addon, err := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(
 				context.Background(), helloworldAddonName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 
 			for _, reg := range addon.Status.Registrations {
-				if reg.SignerName == certificatesv1.KubeAPIServerClientSignerName {
-					if reg.Subject.User == "" {
+				if reg.Type == addonapiv1beta1.KubeClient && reg.KubeClient != nil {
+					// KubeClient type always uses KubeAPIServerClientSignerName
+					if reg.KubeClient.Subject.BaseSubject.User == "" {
 						return fmt.Errorf("registration subject user not populated yet")
 					}
 					// Verify it's a ServiceAccount for token auth
-					if !strings.HasPrefix(reg.Subject.User, "system:serviceaccount:") {
-						return fmt.Errorf("expected ServiceAccount user, got: %s", reg.Subject.User)
+					if !strings.HasPrefix(reg.KubeClient.Subject.BaseSubject.User, "system:serviceaccount:") {
+						return fmt.Errorf("expected ServiceAccount user, got: %s", reg.KubeClient.Subject.BaseSubject.User)
 					}
 					// For token driver, groups should be empty in registration
-					if len(reg.Subject.Groups) != 0 {
-						return fmt.Errorf("registration subject should not have groups for token driver, got: %v", reg.Subject.Groups)
+					if len(reg.KubeClient.Subject.BaseSubject.Groups) != 0 {
+						return fmt.Errorf("registration subject should not have groups for token driver, got: %v", reg.KubeClient.Subject.BaseSubject.Groups)
 					}
-					regSubject = &reg.Subject
+					regSubject = &reg.KubeClient.Subject.BaseSubject
 					return nil
 				}
 			}
@@ -218,7 +228,7 @@ var _ = ginkgo.Describe("Token-based addon registration", func() {
 	ginkgo.It("should function correctly with token authentication", func() {
 		ginkgo.By("Verify ManifestApplied condition")
 		gomega.Eventually(func() error {
-			addon, err := hubAddOnClient.AddonV1alpha1().ManagedClusterAddOns(managedClusterName).Get(
+			addon, err := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(managedClusterName).Get(
 				context.Background(), helloworldAddonName, metav1.GetOptions{})
 			if err != nil {
 				return err
