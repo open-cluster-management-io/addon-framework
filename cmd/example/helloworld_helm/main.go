@@ -127,7 +127,9 @@ func runController(ctx context.Context, kubeConfig *rest.Config) error {
 			utils.AgentInstallNamespaceFromDeploymentConfigFunc(
 				utils.NewAddOnDeploymentConfigGetter(addonClient),
 			),
-		).WithAgentHealthProber(helloworld_helm.AgentHealthProber()).
+		).
+		WithConfigCheckEnabledOption().
+		WithAgentHealthProber(helloworld_helm.AgentHealthProber()).
 		BuildHelmAgentAddon()
 	if err != nil {
 		klog.Errorf("failed to build agent %v", err)

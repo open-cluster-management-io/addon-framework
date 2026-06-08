@@ -47,11 +47,35 @@ func AgentInstallNamespaceFromDeploymentConfigFunc(
 			return "", fmt.Errorf("failed to get deployment config for addon %s: %v", addon.Name, err)
 		}
 
-		// For now, we have no way of knowing if the addon depleoyment config is not configured, or
+		// For now, we have no way of knowing if the addon deployment config is not configured, or
 		// is configured but not yet been added to the managedclusteraddon status config references,
 		// we expect no error will be returned when the addon deployment config is not configured
 		// so we can use the default namespace.
-		// TODO: Find a way to distinguish between the above two cases
+		//
+		// RACE CONDITION FIX: This function is typically called to get the namespace from addon deployment
+		// config. It's used in several paths:
+		//
+		// 1. Built-in implementations (helm_agentaddon.go, template_agentaddon.go) call this via
+		//    AgentInstallNamespace() inside their Manifests() implementations.
+		// 2. Custom AgentAddon implementations may call AgentInstallNamespace() or this function directly
+		//    in their Manifests() implementations.
+		// 3. Registration controller calls AgentInstallNamespace() directly to set Status.Namespace.
+		//
+		// All these paths are protected by guards in the FRAMEWORK CONTROLLERS (not in addon code):
+		//   - Registration controller: checks ConfigCheckEnabled + Configured before calling AgentInstallNamespace()
+		//   - Deploy/hook syncers: check ConfigCheckEnabled + Configured before calling Manifests()
+		//   - Health checks: wait for ManifestApplied (which requires deploy to succeed first)
+		//
+		// Addons enable this protection by using WithConfigCheckEnabledOption(). The guards wait for the
+		// Configured condition, which is set by OCM's addonconfiguration controller atomically with
+		// Status.ConfigReferences, so Configured=True guarantees ConfigReferences is populated.
+		//
+		// Custom addon implementations (implementing AgentAddon directly) are automatically protected by
+		// these same framework guards - no special code needed in the addon itself.
+		//
+		// WARNING: If calling this function directly outside these protected paths, YOU must check the
+		// Configured condition first, or accept that you may get an empty namespace when config is not
+		// ready yet.
 		if config == nil {
 			klog.V(4).InfoS("Addon deployment config is nil, return an empty string for agent install namespace",
 				"addonNamespace", addon.Namespace, "addonName", addon.Name)

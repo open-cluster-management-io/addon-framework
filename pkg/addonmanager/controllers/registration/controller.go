@@ -220,6 +220,13 @@ func (c *addonRegistrationController) sync(ctx context.Context, syncCtx factory.
 		return nil
 	}
 
+	// If ConfigCheckEnabled, wait for addon config to be ready before proceeding
+	if agentAddon.GetAgentAddonOptions().ConfigCheckEnabled &&
+		!meta.IsStatusConditionTrue(managedClusterAddonCopy.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnConditionConfigured) {
+		klog.InfoS("Addon configured condition is not set, skipping registration", "addonName", addonName)
+		return nil
+	}
+
 	addonPatcher := patcher.NewPatcher[
 		*addonapiv1beta1.ManagedClusterAddOn,
 		addonapiv1beta1.ManagedClusterAddOnSpec,

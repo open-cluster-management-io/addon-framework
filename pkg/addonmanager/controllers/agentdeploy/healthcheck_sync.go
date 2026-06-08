@@ -88,6 +88,11 @@ func (s *healthCheckSyncer) probeWorkAddonStatus(
 	}
 
 	// update Available condition after addon manifestWorks are applied
+	// NOTE: This check indirectly guards against the race where addon config is not yet synced.
+	// ManifestApplied is only set after the deploy syncer successfully applies manifests, and the
+	// deploy syncer checks ConfigCheckEnabled + Configured condition before calling Manifests().
+	// Therefore, by the time we reach this point, the Configured condition is True and
+	// Status.ConfigReferences has been populated by OCM's addonconfiguration controller.
 	if meta.FindStatusCondition(addon.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnManifestApplied) == nil {
 		return nil
 	}
@@ -112,6 +117,11 @@ func (s *healthCheckSyncer) probeWorkloadAvailabilityAddonStatus(
 	}
 
 	// wait for the addon manifest applied
+	// NOTE: This check indirectly guards against the race where addon config is not yet synced.
+	// ManifestApplied is only set after the deploy syncer successfully applies manifests, and the
+	// deploy syncer checks ConfigCheckEnabled + Configured condition before calling Manifests().
+	// Therefore, by the time we reach this point, the Configured condition is True and
+	// Status.ConfigReferences has been populated by OCM's addonconfiguration controller.
 	if meta.FindStatusCondition(addon.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnManifestApplied) == nil {
 		return nil
 	}
