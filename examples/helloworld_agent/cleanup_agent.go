@@ -1,4 +1,4 @@
-package helloworld_agent
+package helloworld_agent //nolint:revive
 
 import (
 	"context"

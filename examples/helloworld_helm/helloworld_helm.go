@@ -1,4 +1,4 @@
-package helloworld_helm
+package helloworld_helm //nolint:revive
 
 import (
 	"context"
