@@ -19,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/klog/v2"
+
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterclientset "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -297,7 +298,7 @@ func (a *HelmAgentAddon) getDefaultValues(
 // only support Capabilities.KubeVersion
 func (a *HelmAgentAddon) capabilities(
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1beta1.ManagedClusterAddOn) *chartutil.Capabilities {
+	_ *addonapiv1beta1.ManagedClusterAddOn) *chartutil.Capabilities {
 	return &chartutil.Capabilities{
 		KubeVersion: chartutil.KubeVersion{Version: cluster.Status.Version.Kubernetes},
 	}
@@ -334,7 +335,7 @@ func sortManifestsByKind(manifests []manifest, ordering releaseutil.KindSortOrde
 	return manifests
 }
 
-func lessByKind(a interface{}, b interface{}, kindA string, kindB string, o releaseutil.KindSortOrder) bool {
+func lessByKind(_ interface{}, _ interface{}, kindA string, kindB string, o releaseutil.KindSortOrder) bool {
 	ordering := make(map[string]int, len(o))
 	for v, k := range o {
 		ordering[k] = v

@@ -3,7 +3,6 @@ package factory
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"net"
 	"os"
 	"strings"
@@ -16,7 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/version"
-	"k8s.io/apiserver/pkg/server"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
 	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
@@ -93,12 +91,11 @@ func (c *ControllerCommandConfig) NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Run: func(cmd *cobra.Command, args []string) {
 			// boiler plate for the "normal" command
-			rand.Seed(time.Now().UTC().UnixNano())
 			logs.InitLogs()
 
-			// handle SIGTERM and SIGINT by cancelling the context.
+			// handle SIGTERM and SIGINT by canceling the context.
 			shutdownCtx, cancel := context.WithCancel(ctx)
-			shutdownHandler := server.SetupSignalHandler()
+			shutdownHandler := genericapiserver.SetupSignalHandler()
 			go func() {
 				defer cancel()
 				<-shutdownHandler
@@ -141,7 +138,7 @@ func (c *ControllerCommandConfig) StartController(ctx context.Context) error {
 	}
 
 	go func() {
-		if err := server.PrepareRun().Run(ctx.Done()); err != nil {
+		if err := server.PrepareRun().RunWithContext(ctx); err != nil {
 			klog.Fatal(err)
 		}
 		klog.Info("server exited")
@@ -180,7 +177,7 @@ func (c *ControllerCommandConfig) getOnStartedLeadingFunc(kubeConfig *rest.Confi
 		select {
 		case <-ctx.Done(): // context closed means the process likely received signal to terminate
 		case <-stoppedCh:
-			// if context was not cancelled (it is not "done"), but the startFunc terminated, it means it terminated prematurely
+			// if context was not canceled (it is not "done"), but the startFunc terminated, it means it terminated prematurely
 			// when this happen, it means the controllers terminated without error.
 			if ctx.Err() == nil {
 				klog.Warningf("graceful termination failed, controllers terminated prematurely")

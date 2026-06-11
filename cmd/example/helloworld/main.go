@@ -4,9 +4,7 @@ import (
 	"context"
 	goflag "flag"
 	"fmt"
-	"math/rand"
 	"os"
-	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -16,6 +14,7 @@ import (
 	utilflag "k8s.io/component-base/cli/flag"
 	logs "k8s.io/component-base/logs/api/v1"
 	"k8s.io/klog/v2"
+
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 
 	"open-cluster-management.io/addon-framework/examples/helloworld"
@@ -30,8 +29,6 @@ import (
 )
 
 func main() {
-	rand.Seed(time.Now().UTC().UnixNano())
-
 	pflag.CommandLine.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
 	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 

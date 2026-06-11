@@ -12,6 +12,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
@@ -41,7 +42,7 @@ func (a *cloudeventsAddonManager) Start(ctx context.Context) error {
 	config := a.GetConfig()
 	addonAgents := a.GetAddonAgents()
 
-	var addonNames []string
+	addonNames := make([]string, 0, len(addonAgents))
 	for key := range addonAgents {
 		addonNames = append(addonNames, key)
 	}
