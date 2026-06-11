@@ -54,9 +54,6 @@ func createClusterManagementAddOn(name, defaultConfigNamespace, defaultConfigNam
 			&addonapiv1alpha1.ClusterManagementAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: name,
-					Annotations: map[string]string{
-						addonapiv1alpha1.AddonLifecycleAnnotationKey: addonapiv1alpha1.AddonLifecycleAddonManagerAnnotationValue,
-					},
 				},
 				Spec: addonapiv1alpha1.ClusterManagementAddOnSpec{
 					SupportedConfigs: []addonapiv1alpha1.ConfigMeta{

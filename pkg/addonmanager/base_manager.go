@@ -20,7 +20,6 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/agentdeploy"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/certificate"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/cmaconfig"
-	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/cmamanagedby"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/registration"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/utils"
@@ -163,16 +162,6 @@ func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 		mcaFilterFunc,
 	)
 
-	// This controller is used during migrating addons to be managed by addon-manager.
-	// This should be removed when the migration is done.
-	// The migration plan refer to https://github.com/open-cluster-management-io/ocm/issues/355.
-	managementAddonController := cmamanagedby.NewCMAManagedByController(
-		addonClient,
-		addonInformers.Addon().V1beta1().ClusterManagementAddOns(),
-		a.addonAgents,
-		utils.FilterByAddonName(a.addonAgents),
-	)
-
 	var addonConfigController, managementAddonConfigController factory.Controller
 	if len(a.addonConfigs) != 0 {
 		// ManagedClusterAddOn filter is intentionally disabled for the addon-config-controller.
@@ -225,7 +214,6 @@ func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 
 	go deployController.Run(ctx, 1)
 	go registrationController.Run(ctx, 1)
-	go managementAddonController.Run(ctx, 1)
 
 	if addonConfigController != nil {
 		go addonConfigController.Run(ctx, 1)
