@@ -1,4 +1,4 @@
-package helloworld_hosted
+package helloworld_hosted //nolint:revive
 
 import (
 	"embed"

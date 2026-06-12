@@ -1,4 +1,4 @@
-package helloworld_helm
+package helloworld_helm //nolint:revive
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
@@ -47,7 +48,7 @@ func GetDefaultValues(cluster *clusterv1.ManagedCluster,
 		image = defaultImage
 	}
 
-	userJsonValues := userValues{
+	userJSONValues := userValues{
 		ClusterNamespace: cluster.GetName(),
 		Global: global{
 			ImagePullPolicy: defaultImagePullPolicy,
@@ -56,7 +57,7 @@ func GetDefaultValues(cluster *clusterv1.ManagedCluster,
 			},
 		},
 	}
-	values, err := addonfactory.JsonStructToValues(userJsonValues)
+	values, err := addonfactory.JsonStructToValues(userJSONValues)
 	if err != nil {
 		return nil, err
 	}
@@ -70,8 +71,8 @@ func GetImageValues(kubeClient kubernetes.Interface) addonfactory.GetValuesFunc 
 	) (addonfactory.Values, error) {
 		overrideValues := addonfactory.Values{}
 		for _, config := range addon.Status.ConfigReferences {
-			if config.ConfigGroupResource.Group != "" ||
-				config.ConfigGroupResource.Resource != "configmaps" {
+			if config.Group != "" ||
+				config.Resource != "configmaps" {
 				continue
 			}
 
@@ -96,7 +97,7 @@ func GetImageValues(kubeClient kubernetes.Interface) addonfactory.GetValuesFunc 
 				return nil, fmt.Errorf("no imagePullPolicy in configmap %s/%s", config.DesiredConfig.Namespace, config.DesiredConfig.Name)
 			}
 
-			userJsonValues := userValues{
+			userJSONValues := userValues{
 				Global: global{
 					ImagePullPolicy: imagePullPolicy,
 					ImageOverrides: map[string]string{
@@ -104,7 +105,7 @@ func GetImageValues(kubeClient kubernetes.Interface) addonfactory.GetValuesFunc 
 					},
 				},
 			}
-			values, err := addonfactory.JsonStructToValues(userJsonValues)
+			values, err := addonfactory.JsonStructToValues(userJSONValues)
 			if err != nil {
 				return nil, err
 			}
