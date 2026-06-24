@@ -11,6 +11,7 @@ env:
   # Common versions
   GO_VERSION: '1.26'
   GO_REQUIRED_MIN_VERSION: ''
+  KUBERNETES_VERSION: 'v1.35.0'
 
 jobs:
   verify:
@@ -18,11 +19,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 1
       - name: install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@be3c94b385c4f180051c996d336f57a34c397495 # v3
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: verify
@@ -33,11 +34,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 1
       - name: install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@be3c94b385c4f180051c996d336f57a34c397495 # v3
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: verify-deps
@@ -48,11 +49,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 1
       - name: install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@be3c94b385c4f180051c996d336f57a34c397495 # v3
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: build
@@ -63,11 +64,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 1
       - name: install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@be3c94b385c4f180051c996d336f57a34c397495 # v3
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: unit
@@ -78,11 +79,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 1
       - name: install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@be3c94b385c4f180051c996d336f57a34c397495 # v3
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: integration
@@ -93,11 +94,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 1
       - name: install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@be3c94b385c4f180051c996d336f57a34c397495 # v3
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: install imagebuilder
@@ -105,10 +106,7 @@ jobs:
       - name: addon-examples-image # will build and tag the examples image
         run: imagebuilder --allow-pull -t quay.io/open-cluster-management/addon-examples:latest -t quay.io/ocm/addon-examples:latest -f ./build/Dockerfile.example .
       - name: setup kind
-        uses: engineerd/setup-kind@v0.6.2
-        with:
-          version: v0.31.0
-          name: cluster1
+        run: kind create cluster --name cluster1 --image kindest/node:${{ env.KUBERNETES_VERSION }} --wait 300s
       - name: Load image on the nodes of the cluster
         run: |
           kind load docker-image --name=cluster1 quay.io/open-cluster-management/addon-examples:latest
@@ -124,11 +122,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 1
       - name: install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@be3c94b385c4f180051c996d336f57a34c397495 # v3
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: install imagebuilder
@@ -136,10 +134,7 @@ jobs:
       - name: addon-examples-image # will build and tag the examples image
         run: imagebuilder --allow-pull -t quay.io/open-cluster-management/addon-examples:latest -t quay.io/ocm/addon-examples:latest -f ./build/Dockerfile.example .
       - name: setup kind
-        uses: engineerd/setup-kind@v0.6.2
-        with:
-          version: v0.31.0
-          name: cluster1
+        run: kind create cluster --name cluster1 --image kindest/node:${{ env.KUBERNETES_VERSION }} --wait 300s
       - name: Load image on the nodes of the cluster
         run: |
           kind load docker-image --name=cluster1 quay.io/open-cluster-management/addon-examples:latest
@@ -155,11 +150,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 1
       - name: install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@be3c94b385c4f180051c996d336f57a34c397495 # v3
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: install imagebuilder
@@ -167,10 +162,7 @@ jobs:
       - name: addon-examples-image # will build and tag the examples image
         run: imagebuilder --allow-pull -t quay.io/open-cluster-management/addon-examples:latest -t quay.io/ocm/addon-examples:latest -f ./build/Dockerfile.example .
       - name: setup kind
-        uses: engineerd/setup-kind@v0.6.2
-        with:
-          version: v0.31.0
-          name: cluster1
+        run: kind create cluster --name cluster1 --image kindest/node:${{ env.KUBERNETES_VERSION }} --wait 300s
       - name: Load image on the nodes of the cluster
         run: |
           kind load docker-image --name=cluster1 quay.io/open-cluster-management/addon-examples:latest
@@ -186,11 +178,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 1
       - name: install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@be3c94b385c4f180051c996d336f57a34c397495 # v3
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: install imagebuilder
@@ -198,10 +190,7 @@ jobs:
       - name: addon-examples-image # will build and tag the examples image
         run: imagebuilder --allow-pull -t quay.io/open-cluster-management/addon-examples:latest -t quay.io/ocm/addon-examples:latest -f ./build/Dockerfile.example .
       - name: setup kind
-        uses: engineerd/setup-kind@v0.6.2
-        with:
-          version: v0.31.0
-          name: cluster1
+        run: kind create cluster --name cluster1 --image kindest/node:${{ env.KUBERNETES_VERSION }} --wait 300s
       - name: Load image on the nodes of the cluster
         run: |
           kind load docker-image --name=cluster1 quay.io/open-cluster-management/addon-examples:latest
@@ -217,11 +206,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 1
       - name: install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@be3c94b385c4f180051c996d336f57a34c397495 # v3
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: install imagebuilder
