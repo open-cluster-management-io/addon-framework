@@ -14,7 +14,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"open-cluster-management.io/addon-framework/pkg/utils"
-	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 )
 
@@ -55,9 +54,6 @@ func createClusterManagementAddOn(name, defaultConfigNamespace, defaultConfigNam
 			&addonapiv1beta1.ClusterManagementAddOn{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: name,
-					Annotations: map[string]string{
-						addonapiv1alpha1.AddonLifecycleAnnotationKey: addonapiv1alpha1.AddonLifecycleAddonManagerAnnotationValue,
-					},
 				},
 				Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
 					DefaultConfigs: []addonapiv1beta1.AddOnConfig{
