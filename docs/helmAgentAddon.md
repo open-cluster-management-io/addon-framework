@@ -45,6 +45,8 @@ Helm Chart built-in values
 
 In the list of `GetValuesFuncs`, the values from the big index Func will override the one from low index Func.
 The built-in values will override the values got from the list of `GetValuesFuncs`.
+The values returned by `GetValuesFuncs` may contain typed Go values such as `map[string]string` or structs with json tags; they are normalized to JSON-compatible types before merging.
+Values that cannot be marshaled to JSON will make the manifest rendering fail.
 
 The Variable names in Values should begin with lowercase. So the best practice is to define a json struct for the values, and convert it to Values using the `JsonStructToValues`.
 
@@ -52,4 +54,3 @@ The Variable names in Values should begin with lowercase. So the best practice i
 We support a helper `GetValuesFunc` named `GetValuesFromAddonAnnotation` which can get values from annotation of ManagedClusterAddon.
 The key of the Helm Chart values in annotation is `addon.open-cluster-management.io/values`,
 and the value should be a valid json string which has key-value format.
-

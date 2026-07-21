@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$comment": "exercises helm schema validation; typed Go values that are not normalized to JSON-compatible types fail this validation",
+  "type": "object",
+  "properties": {
+    "tolerations": {
+      "type": "array"
+    }
+  }
+}

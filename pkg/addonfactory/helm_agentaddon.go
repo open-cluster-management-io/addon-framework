@@ -187,8 +187,15 @@ func (a *HelmAgentAddon) getValues(
 				return overrideValues, err
 			}
 
-			klog.V(4).Infof("index=%d, user values: %v", i, userValues)
-			overrideValues = MergeValues(overrideValues, userValues)
+			// MergeValues deep-merges only map[string]interface{} values, so typed Go
+			// maps and structs must be normalized to JSON-compatible types beforehand.
+			normalizedUserValues, err := JsonStructToValues(userValues)
+			if err != nil {
+				return overrideValues, fmt.Errorf("failed to normalize Helm values: %w", err)
+			}
+
+			klog.V(4).Infof("index=%d, user values: %v", i, normalizedUserValues)
+			overrideValues = MergeValues(overrideValues, normalizedUserValues)
 			klog.V(4).Infof("index=%d, override values: %v", i, overrideValues)
 		}
 	}
