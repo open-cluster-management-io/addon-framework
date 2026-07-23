@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -81,6 +82,13 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 		},
 	}
 
+	customTolerations := []corev1.Toleration{{
+		Key:      "dedicated",
+		Operator: corev1.TolerationOpEqual,
+		Value:    "addon",
+		Effect:   corev1.TaintEffectNoSchedule,
+	}}
+
 	cases := []struct {
 		name                            string
 		scheme                          *runtime.Scheme
@@ -93,12 +101,14 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 		getValuesFunc                   GetValuesFunc
 		expectedInstallNamespace        string
 		expectedNodeSelector            map[string]string
+		expectedTolerations             []corev1.Toleration
 		expectedImage                   string
 		expectedObjCnt                  int
 		expectedHubKubeConfigSecret     string
 		expectedManagedKubeConfigSecret string
 		expectedNamespace               bool
 		expectedResourceRequirements    *corev1.ResourceRequirements
+		expectedError                   string
 	}{
 		{
 			name:                         "template render ok with annotation values",
@@ -161,6 +171,31 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 			expectedResourceRequirements:    &defaultResourceReqirements,
 		},
 		{
+			name:             "template render ok with concrete Go collection values and preserves merged values",
+			scheme:           testScheme,
+			clusterName:      "cluster1",
+			addonName:        "helloworld",
+			installNamespace: "myNs",
+			annotationValues: `{"global":{"nodeSelector":{"existing":"preserved"}}}`,
+			getValuesFunc: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) (Values, error) {
+				return Values{
+					"global": map[string]interface{}{
+						"nodeSelector": map[string]string{"kubernetes.io/os": "linux"},
+					},
+					"tolerations": customTolerations,
+				}, nil
+			},
+			expectedInstallNamespace: "myNs",
+			expectedNodeSelector: map[string]string{
+				"existing":         "preserved",
+				"kubernetes.io/os": "linux",
+			},
+			expectedTolerations:          customTolerations,
+			expectedImage:                "quay.io/testimage:test",
+			expectedObjCnt:               4,
+			expectedResourceRequirements: &defaultResourceReqirements,
+		},
+		{
 			name:                         "template render ok, getting hosting cluster with client",
 			scheme:                       testScheme,
 			clusterName:                  "cluster1",
@@ -199,6 +234,17 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 			expectedObjCnt:               4,
 			expectedResourceRequirements: &customResourceReqirements,
 		},
+		{
+			name:             "template render failed with values unsupported by json",
+			scheme:           testScheme,
+			clusterName:      "cluster1",
+			addonName:        "helloworld",
+			installNamespace: "myNs",
+			getValuesFunc: func(cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) (Values, error) {
+				return Values{"unsupported": make(chan string)}, nil
+			},
+			expectedError: "failed to normalize Helm values: json: unsupported type: chan string",
+		},
 	}
 
 	for _, c := range cases {
@@ -234,6 +280,10 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 				t.Errorf("expected no error, got err %v", err)
 			}
 			objects, err := agentAddon.Manifests(context.TODO(), cluster, clusterAddon)
+			if len(c.expectedError) > 0 {
+				assert.ErrorContains(t, err, c.expectedError)
+				return
+			}
 			if err != nil {
 				t.Errorf("expected no error, got err %v", err)
 			}
@@ -253,6 +303,9 @@ func TestChartAgentAddon_Manifests(t *testing.T) {
 						if nodeSelector[k] != v {
 							t.Errorf("expected nodeSelector is %v, but got %v", c.expectedNodeSelector, nodeSelector)
 						}
+					}
+					if c.expectedTolerations != nil {
+						assert.Equal(t, c.expectedTolerations, object.Spec.Template.Spec.Tolerations, "expected tolerations to match")
 					}
 
 					if object.Spec.Template.Spec.Containers[0].Image != c.expectedImage {
