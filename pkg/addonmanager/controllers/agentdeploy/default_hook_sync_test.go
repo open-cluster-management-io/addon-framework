@@ -304,6 +304,115 @@ func TestDefaultHookReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "deploy hook manifest for a deleting addon with finalizer, failed, recreate to retry",
+			key:  "cluster1/test",
+			addon: []runtime.Object{
+				addontesting.SetAddonFinalizers(
+					addontesting.SetAddonDeletionTimestamp(
+						addontesting.NewAddonWithConditions("test", "cluster1", registrationAppliedCondition),
+						time.Now()),
+					addonapiv1beta1.AddonPreDeleteHookFinalizer),
+			},
+			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			testaddon: &testAgent{name: "test", objects: []runtime.Object{
+				addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
+				addontesting.NewHookJob("test", "default")}},
+			existingWork: []runtime.Object{
+				getDeployWork(),
+				func() *workapiv1.ManifestWork {
+					work := addontesting.NewManifestWork(
+						constants.PreDeleteHookWorkName("test"),
+						"cluster1",
+						addontesting.NewHookJob("test", "default"),
+					)
+					work.SetLabels(map[string]string{addonapiv1beta1.AddonLabelKey: "test"})
+					pTrue := true
+					work.SetOwnerReferences([]metav1.OwnerReference{
+						{
+							APIVersion:         "addon.open-cluster-management.io/v1beta1",
+							Kind:               "ManagedClusterAddOn",
+							Name:               "test",
+							UID:                "",
+							Controller:         &pTrue,
+							BlockOwnerDeletion: &pTrue,
+						},
+					})
+					work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
+						{
+							ResourceIdentifier: workapiv1.ResourceIdentifier{
+								Group:     "batch",
+								Resource:  "jobs",
+								Name:      "test",
+								Namespace: "default",
+							},
+							FeedbackRules: []workapiv1.FeedbackRule{
+								{
+									Type: workapiv1.WellKnownStatusType,
+								},
+							},
+						},
+					}
+					work.Status.Conditions = []metav1.Condition{
+						{
+							Type:   workapiv1.WorkApplied,
+							Status: metav1.ConditionTrue,
+						},
+						{
+							Type:   workapiv1.WorkAvailable,
+							Status: metav1.ConditionTrue,
+						},
+					}
+					work.Status.ResourceStatus = workapiv1.ManifestResourceStatus{
+						Manifests: []workapiv1.ManifestCondition{
+							{
+								ResourceMeta: workapiv1.ManifestResourceMeta{
+									Group:     "batch",
+									Version:   "v1",
+									Resource:  "jobs",
+									Name:      "test",
+									Namespace: "default",
+								},
+								StatusFeedbacks: workapiv1.StatusFeedbackResult{
+									Values: []workapiv1.FeedbackValue{
+										{
+											Name: "JobFailed",
+											Value: workapiv1.FieldValue{
+												Type:   workapiv1.String,
+												String: pointer.String("True"),
+											},
+										},
+									},
+								},
+							},
+						},
+					}
+					return work
+				}(),
+			},
+			validateWorkActions: func(t *testing.T, actions []clienttesting.Action) {
+				// the failed hook work is deleted so it will be recreated to retry.
+				addontesting.AssertActions(t, actions, "delete")
+				deleteAction := actions[0].(clienttesting.DeleteActionImpl)
+				if deleteAction.Namespace != "cluster1" || deleteAction.Name != constants.PreDeleteHookWorkName("test") {
+					t.Errorf("the deleted hookWork %v/%v is incorrect.", deleteAction.Namespace, deleteAction.Name)
+				}
+			},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				// Only a status patch is expected. The absence of an "update"
+				// action means the pre-delete hook finalizer is NOT removed, so
+				// deletion stays blocked until the hook succeeds.
+				addontesting.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchActionImpl).Patch
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
+				if err := json.Unmarshal(patch, addOn); err != nil {
+					t.Fatal(err)
+				}
+				if !meta.IsStatusConditionFalse(addOn.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnHookManifestCompleted) {
+					t.Errorf("HookManifestCompleted condition should be false while retrying.")
+				}
+			},
+		},
+		{
 			name: "deploy hook manifest for a deleting addon without finalizer, completed",
 			key:  "cluster1/test",
 			addon: []runtime.Object{
