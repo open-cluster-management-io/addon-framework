@@ -11,6 +11,7 @@ env:
   # Common versions
   GO_VERSION: '1.25'
   GO_REQUIRED_MIN_VERSION: ''
+  KUBERNETES_VERSION: 'v1.35.0'
 
 jobs:
   verify:
@@ -105,10 +106,7 @@ jobs:
       - name: addon-examples-image # will build and tag the examples image
         run: imagebuilder --allow-pull -t quay.io/open-cluster-management/addon-examples:latest -t quay.io/ocm/addon-examples:latest -f ./build/Dockerfile.example .
       - name: setup kind
-        uses: engineerd/setup-kind@v0.6.2
-        with:
-          version: v0.31.0
-          name: cluster1
+        run: kind create cluster --name cluster1 --image kindest/node:${{ env.KUBERNETES_VERSION }} --wait 300s
       - name: Load image on the nodes of the cluster
         run: |
           kind load docker-image --name=cluster1 quay.io/open-cluster-management/addon-examples:latest
@@ -136,10 +134,7 @@ jobs:
       - name: addon-examples-image # will build and tag the examples image
         run: imagebuilder --allow-pull -t quay.io/open-cluster-management/addon-examples:latest -t quay.io/ocm/addon-examples:latest -f ./build/Dockerfile.example .
       - name: setup kind
-        uses: engineerd/setup-kind@v0.6.2
-        with:
-          version: v0.31.0
-          name: cluster1
+        run: kind create cluster --name cluster1 --image kindest/node:${{ env.KUBERNETES_VERSION }} --wait 300s
       - name: Load image on the nodes of the cluster
         run: |
           kind load docker-image --name=cluster1 quay.io/open-cluster-management/addon-examples:latest
@@ -167,10 +162,7 @@ jobs:
       - name: addon-examples-image # will build and tag the examples image
         run: imagebuilder --allow-pull -t quay.io/open-cluster-management/addon-examples:latest -t quay.io/ocm/addon-examples:latest -f ./build/Dockerfile.example .
       - name: setup kind
-        uses: engineerd/setup-kind@v0.6.2
-        with:
-          version: v0.31.0
-          name: cluster1
+        run: kind create cluster --name cluster1 --image kindest/node:${{ env.KUBERNETES_VERSION }} --wait 300s
       - name: Load image on the nodes of the cluster
         run: |
           kind load docker-image --name=cluster1 quay.io/open-cluster-management/addon-examples:latest
@@ -198,10 +190,7 @@ jobs:
       - name: addon-examples-image # will build and tag the examples image
         run: imagebuilder --allow-pull -t quay.io/open-cluster-management/addon-examples:latest -t quay.io/ocm/addon-examples:latest -f ./build/Dockerfile.example .
       - name: setup kind
-        uses: engineerd/setup-kind@v0.6.2
-        with:
-          version: v0.31.0
-          name: cluster1
+        run: kind create cluster --name cluster1 --image kindest/node:${{ env.KUBERNETES_VERSION }} --wait 300s
       - name: Load image on the nodes of the cluster
         run: |
           kind load docker-image --name=cluster1 quay.io/open-cluster-management/addon-examples:latest
