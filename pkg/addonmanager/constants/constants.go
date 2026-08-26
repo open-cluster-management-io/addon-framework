@@ -35,17 +35,22 @@ func PreDeleteHookHostingWorkName(addonNamespace, addonName string) string {
 	return fmt.Sprintf("%s-hosting-%s", PreDeleteHookWorkName(addonName), addonNamespace)
 }
 
-// GetHostedModeInfo returns addon installation mode and hosting cluster name.
+// GetHostedModeInfo returns addon installation mode and hosting cluster name. A declared
+// hosting-cluster-name always wins; absent that, the install-mode annotation alone still means
+// Hosted, just with an empty hosting cluster name pending resolution (e.g. by an auto-discovery
+// resolver) - callers must handle that empty value rather than treating it as Default.
 func GetHostedModeInfo(addon *addonv1beta1.ManagedClusterAddOn, _ *clusterv1.ManagedCluster) (string, string) {
 	if len(addon.Annotations) == 0 {
 		return InstallModeDefault, ""
 	}
-	hostingClusterName, ok := addon.Annotations[addonv1beta1.HostingClusterNameAnnotationKey]
-	if !ok {
-		return InstallModeDefault, ""
+	if hostingClusterName, ok := addon.Annotations[addonv1beta1.HostingClusterNameAnnotationKey]; ok {
+		return InstallModeHosted, hostingClusterName
+	}
+	if addon.Annotations[addonv1beta1.InstallModeAnnotationKey] == InstallModeHosted {
+		return InstallModeHosted, ""
 	}
 
-	return InstallModeHosted, hostingClusterName
+	return InstallModeDefault, ""
 }
 
 // GetHostedManifestLocation returns the location of the manifest in Hosted mode, if it is invalid will return error
