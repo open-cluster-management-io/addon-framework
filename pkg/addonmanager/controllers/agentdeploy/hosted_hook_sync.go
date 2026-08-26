@@ -51,6 +51,12 @@ func (s *hostedHookSyncer) sync(ctx context.Context,
 		return addon, nil
 	}
 
+	// hosting cluster not yet resolved (auto-discovery pending, or awaiting a human-set value):
+	// nothing to do until hosted_sync resolves it or install-mode reverts to Default.
+	if len(hostingClusterName) == 0 {
+		return addon, nil
+	}
+
 	// Get Hosting Cluster, check whether the hosting cluster is a managed cluster of the hub
 	// TODO: check whether the hosting cluster of the addon is the same hosting cluster of the klusterlet
 	hostingCluster, err := s.getCluster(hostingClusterName)

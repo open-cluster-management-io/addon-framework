@@ -125,6 +125,216 @@ func TestHostingReconcile(t *testing.T) {
 			}},
 		},
 		{
+			name: "install-mode hosted but hosting cluster not resolved yet",
+			key:  "cluster1/test",
+			addon: []runtime.Object{&addonapiv1beta1.ManagedClusterAddOn{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test",
+					Namespace:   "cluster1",
+					Annotations: map[string]string{addonapiv1beta1.InstallModeAnnotationKey: "Hosted"},
+				},
+				Status: addonapiv1beta1.ManagedClusterAddOnStatus{Conditions: []metav1.Condition{registrationAppliedCondition}},
+			}},
+			cluster:      []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			existingWork: []runtime.Object{},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchActionImpl).Patch
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
+				if err := json.Unmarshal(patch, addOn); err != nil {
+					t.Fatal(err)
+				}
+				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnHostingClusterValidity)
+				if addOnCond == nil {
+					t.Fatal("condition should not be nil")
+				}
+				if addOnCond.Reason != addonapiv1beta1.HostingClusterValidityReasonAutoDiscoveryPending {
+					t.Errorf("Condition Reason is not correct: %v", addOnCond.Reason)
+				}
+			},
+			validateWorkActions: func(t *testing.T, actions []clienttesting.Action) {
+				// the default (non-hosted) syncer still deploys the manifest to the managed
+				// cluster regardless of hosted-mode validity - unrelated to this reconciler.
+				addontesting.AssertActions(t, actions, "create")
+			},
+			testaddon: &testHostedAgent{name: "test", objects: []runtime.Object{
+				addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
+			}},
+		},
+		{
+			name: "hosting cluster mismatch on a never-deployed addon is held back",
+			key:  "cluster1/test",
+			addon: []runtime.Object{addontesting.NewHostedModeAddon("test", "cluster1", "cluster2",
+				registrationAppliedCondition)},
+			cluster: []runtime.Object{
+				func() *clusterv1.ManagedCluster {
+					c := addontesting.NewManagedCluster("cluster1")
+					c.Status.ClusterClaims = []clusterv1.ManagedClusterClaim{
+						{Name: hostingClusterClaimName, Value: "cluster3"},
+					}
+					return c
+				}(),
+				addontesting.NewManagedCluster("cluster2"),
+			},
+			existingWork: []runtime.Object{},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchActionImpl).Patch
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
+				if err := json.Unmarshal(patch, addOn); err != nil {
+					t.Fatal(err)
+				}
+				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnHostingClusterValidity)
+				if addOnCond == nil {
+					t.Fatal("condition should not be nil")
+				}
+				if addOnCond.Reason != addonapiv1beta1.HostingClusterValidityReasonMismatch {
+					t.Errorf("Condition Reason is not correct: %v", addOnCond.Reason)
+				}
+			},
+			validateWorkActions: addontesting.AssertNoActions,
+			testaddon: &testHostedAgent{name: "test", objects: []runtime.Object{
+				addontesting.NewHostingUnstructured("v1", "ConfigMap", "default", "test"),
+			}},
+		},
+		{
+			// "already-deployed" means a hosting ManifestWork actually exists - not merely that the
+			// finalizer is present (see the next case for why that distinction matters). Reconciling
+			// this addon should keep the existing work as-is (it already matches what the addon
+			// would build), never recreate it from scratch.
+			name: "hosting cluster mismatch on an already-deployed addon keeps running",
+			key:  "cluster1/test",
+			addon: []runtime.Object{addontesting.NewHostedModeAddonWithFinalizer("test", "cluster1", "cluster2",
+				registrationAppliedCondition)},
+			cluster: []runtime.Object{
+				func() *clusterv1.ManagedCluster {
+					c := addontesting.NewManagedCluster("cluster1")
+					c.Status.ClusterClaims = []clusterv1.ManagedClusterClaim{
+						{Name: hostingClusterClaimName, Value: "cluster3"},
+					}
+					return c
+				}(),
+				addontesting.NewManagedCluster("cluster2"),
+			},
+			testaddon: &testHostedAgent{name: "test", objects: []runtime.Object{
+				addontesting.NewHostingUnstructured("v1", "ConfigMap", "default", "test"),
+			}},
+			existingWork: []runtime.Object{func() *workapiv1.ManifestWork {
+				work := addontesting.NewManifestWork(
+					constants.DeployHostingWorkNamePrefix("cluster1", "test"),
+					"cluster2",
+					addontesting.NewHostingUnstructured("v1", "ConfigMap", "default", "test"),
+				)
+				work.SetLabels(map[string]string{
+					addonapiv1beta1.AddonLabelKey:          "test",
+					addonapiv1beta1.AddonNamespaceLabelKey: "cluster1",
+				})
+				work.Status.Conditions = []metav1.Condition{
+					{
+						Type:   workapiv1.WorkApplied,
+						Status: metav1.ConditionTrue,
+					},
+				}
+				return work
+			}()},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchActionImpl).Patch
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
+				if err := json.Unmarshal(patch, addOn); err != nil {
+					t.Fatal(err)
+				}
+				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnHostingClusterValidity)
+				if addOnCond == nil {
+					t.Fatal("condition should not be nil")
+				}
+				if addOnCond.Reason != addonapiv1beta1.HostingClusterValidityReasonMismatch {
+					t.Errorf("Condition Reason is not correct: %v", addOnCond.Reason)
+				}
+			},
+			validateWorkActions: func(t *testing.T, actions []clienttesting.Action) {
+				// mismatch never blocks an already-deployed addon: reconciliation continues against
+				// the existing work, which already matches, rather than recreating it.
+				addontesting.AssertNoActions(t, actions)
+			},
+		},
+		{
+			// The finalizer alone is not "already deployed": addonAddFinalizer returns immediately
+			// on the reconcile that adds it, so there's a real window where the finalizer is present
+			// but buildWorks/applyWork has never run. A mismatch discovered in exactly that window
+			// must still hold the addon back, the same as if the finalizer weren't there at all.
+			name: "hosting cluster mismatch with finalizer but no work yet is still held back",
+			key:  "cluster1/test",
+			addon: []runtime.Object{addontesting.NewHostedModeAddonWithFinalizer("test", "cluster1", "cluster2",
+				registrationAppliedCondition)},
+			cluster: []runtime.Object{
+				func() *clusterv1.ManagedCluster {
+					c := addontesting.NewManagedCluster("cluster1")
+					c.Status.ClusterClaims = []clusterv1.ManagedClusterClaim{
+						{Name: hostingClusterClaimName, Value: "cluster3"},
+					}
+					return c
+				}(),
+				addontesting.NewManagedCluster("cluster2"),
+			},
+			existingWork: []runtime.Object{},
+			testaddon: &testHostedAgent{name: "test", objects: []runtime.Object{
+				addontesting.NewHostingUnstructured("v1", "ConfigMap", "default", "test"),
+			}},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch")
+				patch := actions[0].(clienttesting.PatchActionImpl).Patch
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
+				if err := json.Unmarshal(patch, addOn); err != nil {
+					t.Fatal(err)
+				}
+				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnHostingClusterValidity)
+				if addOnCond == nil {
+					t.Fatal("condition should not be nil")
+				}
+				if addOnCond.Reason != addonapiv1beta1.HostingClusterValidityReasonMismatch {
+					t.Errorf("Condition Reason is not correct: %v", addOnCond.Reason)
+				}
+			},
+			validateWorkActions: addontesting.AssertNoActions,
+		},
+		{
+			// Same finalizer-but-no-work state as above, but the addon is also being deleted: the
+			// mismatch hold must not block that deletion, or the finalizer would never come off and
+			// the object would be stuck forever - see KEP-188 Non-Goals ("an addon already being
+			// deleted is never held back by a mismatch").
+			name: "hosting cluster mismatch with finalizer but no work yet does not block deletion",
+			key:  "cluster1/test",
+			addon: []runtime.Object{addontesting.SetAddonDeletionTimestamp(
+				addontesting.NewHostedModeAddonWithFinalizer("test", "cluster1", "cluster2",
+					registrationAppliedCondition),
+				time.Now(),
+			)},
+			cluster: []runtime.Object{
+				func() *clusterv1.ManagedCluster {
+					c := addontesting.NewManagedCluster("cluster1")
+					c.Status.ClusterClaims = []clusterv1.ManagedClusterClaim{
+						{Name: hostingClusterClaimName, Value: "cluster3"},
+					}
+					return c
+				}(),
+				addontesting.NewManagedCluster("cluster2"),
+			},
+			existingWork: []runtime.Object{},
+			testaddon: &testHostedAgent{name: "test", objects: []runtime.Object{
+				addontesting.NewHostingUnstructured("v1", "ConfigMap", "default", "test"),
+			}},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "update")
+				update := actions[0].(clienttesting.UpdateActionImpl).Object
+				addOn := update.(*addonapiv1beta1.ManagedClusterAddOn)
+				if addonHasFinalizer(addOn, addonapiv1beta1.AddonHostingManifestFinalizer) {
+					t.Errorf("expected hosting manifest finalizer to be removed so deletion can proceed")
+				}
+			},
+			validateWorkActions: addontesting.AssertNoActions,
+		},
+		{
 			name: "add finalizer",
 			key:  "cluster1/test",
 			addon: []runtime.Object{addontesting.NewHostedModeAddon("test", "cluster1", "cluster2",
