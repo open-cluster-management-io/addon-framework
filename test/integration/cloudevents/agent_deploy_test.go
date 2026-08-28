@@ -746,10 +746,8 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 // The addon owner controller exist in general addon manager.
 // This is for integration testing to assume that addon manager has already added the OwnerReferences.
 func createManagedClusterAddOnwithOwnerRefs(namespace string, addon *addonapiv1beta1.ManagedClusterAddOn, cma *addonapiv1beta1.ClusterManagementAddOn) {
-	addon, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(namespace).Create(context.Background(), addon, metav1.CreateOptions{})
+	_, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(namespace).Create(context.Background(), addon, metav1.CreateOptions{})
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-	addonCopy := addon.DeepCopy()
 
 	// This is to assume that addon-manager has already added the OwnerReferences.
 	owner := metav1.NewControllerRef(cma, schema.GroupVersionKind{
@@ -757,9 +755,17 @@ func createManagedClusterAddOnwithOwnerRefs(namespace string, addon *addonapiv1b
 		Version: addonapiv1beta1.GroupVersion.Version,
 		Kind:    "ClusterManagementAddOn",
 	})
-	modified := utils.MergeOwnerRefs(&addonCopy.OwnerReferences, *owner, false)
-	if modified {
-		_, err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(addonCopy.Namespace).Update(context.Background(), addonCopy, metav1.UpdateOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-	}
+	gomega.Eventually(func() error {
+		current, err := hubAddonClient.AddonV1beta1().ManagedClusterAddOns(namespace).Get(
+			context.Background(), addon.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if !utils.MergeOwnerRefs(&current.OwnerReferences, *owner, false) {
+			return nil
+		}
+		_, err = hubAddonClient.AddonV1beta1().ManagedClusterAddOns(namespace).Update(
+			context.Background(), current, metav1.UpdateOptions{})
+		return err
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 }
