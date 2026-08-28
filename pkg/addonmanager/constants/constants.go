@@ -13,6 +13,8 @@ const (
 	InstallModeBuiltinValueKey = "InstallMode"
 	InstallModeHosted          = "Hosted"
 	InstallModeDefault         = "Default"
+	// HostingClusterClaimName is the reserved ClusterClaim used to self-report a cluster's host.
+	HostingClusterClaimName = "hosting-cluster.open-cluster-management.io"
 )
 
 // DeployWorkNamePrefix returns the prefix of the work name for the addon
@@ -35,10 +37,9 @@ func PreDeleteHookHostingWorkName(addonNamespace, addonName string) string {
 	return fmt.Sprintf("%s-hosting-%s", PreDeleteHookWorkName(addonName), addonNamespace)
 }
 
-// GetHostedModeInfo returns addon installation mode and hosting cluster name. A declared
-// hosting-cluster-name always wins; absent that, the install-mode annotation alone still means
-// Hosted, just with an empty hosting cluster name pending resolution (e.g. by an auto-discovery
-// resolver) - callers must handle that empty value rather than treating it as Default.
+// GetHostedModeInfo returns addon installation mode and hosting cluster name. Hosted mode is
+// selected by a resolved hosting cluster. The install-mode annotation is handled by the
+// auto-discovery resolver and does not opt addon implementations into Hosted mode by itself.
 func GetHostedModeInfo(addon *addonv1beta1.ManagedClusterAddOn, _ *clusterv1.ManagedCluster) (string, string) {
 	if len(addon.Annotations) == 0 {
 		return InstallModeDefault, ""
@@ -46,10 +47,6 @@ func GetHostedModeInfo(addon *addonv1beta1.ManagedClusterAddOn, _ *clusterv1.Man
 	if hostingClusterName, ok := addon.Annotations[addonv1beta1.HostingClusterNameAnnotationKey]; ok {
 		return InstallModeHosted, hostingClusterName
 	}
-	if addon.Annotations[addonv1beta1.InstallModeAnnotationKey] == InstallModeHosted {
-		return InstallModeHosted, ""
-	}
-
 	return InstallModeDefault, ""
 }
 
