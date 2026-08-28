@@ -9,9 +9,11 @@ import (
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 
 	addonclient "open-cluster-management.io/api/client/addon/clientset/versioned"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
+	clusterclient "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	clusterv1informers "open-cluster-management.io/api/client/cluster/informers/externalversions"
 	workclientset "open-cluster-management.io/api/client/work/clientset/versioned"
 	workv1informers "open-cluster-management.io/api/client/work/informers/externalversions/work/v1"
@@ -22,6 +24,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/cmaconfig"
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/controllers/registration"
 	"open-cluster-management.io/addon-framework/pkg/agent"
+	"open-cluster-management.io/addon-framework/pkg/index"
 	"open-cluster-management.io/addon-framework/pkg/utils"
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 )
@@ -144,7 +147,30 @@ func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 		}
 	}
 
-	deployController := agentdeploy.NewAddonDeployController(
+	var deployOptions []agentdeploy.AddonDeployControllerOption
+	if a.hasHostedModeEnabledAgent() {
+		clusterClient, err := clusterclient.NewForConfig(a.config)
+		if err != nil {
+			return err
+		}
+		if err := addonInformers.Addon().V1beta1().ManagedClusterAddOns().Informer().AddIndexers(cache.Indexers{
+			index.ManagedClusterAddonByName:       index.IndexManagedClusterAddonByName,
+			index.ManagedClusterAddonByHostedMode: index.IndexManagedClusterAddonByHostedMode,
+		}); err != nil {
+			return err
+		}
+		if err := clusterInformers.Cluster().V1().ManagedClusters().Informer().AddIndexers(cache.Indexers{
+			index.ManagedClusterByHostingCluster: index.IndexManagedClusterByHostingCluster,
+		}); err != nil {
+			return err
+		}
+		deployOptions = append(deployOptions, agentdeploy.WithHostedModeAutoDiscovery(
+			addonInformers.Addon().V1beta1().ClusterManagementAddOns(),
+			clusterClient,
+		))
+	}
+
+	deployController, err := agentdeploy.NewAddonDeployControllerWithOptions(
 		workClient,
 		addonClient,
 		clusterInformers.Cluster().V1().ManagedClusters(),
@@ -152,7 +178,11 @@ func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 		workInformers,
 		a.addonAgents,
 		mcaFilterFunc,
+		deployOptions...,
 	)
+	if err != nil {
+		return err
+	}
 
 	registrationController := registration.NewAddonRegistrationController(
 		addonClient,
@@ -224,4 +254,13 @@ func (a *BaseAddonManagerImpl) StartWithInformers(ctx context.Context,
 	go csrApproveController.Run(ctx, 1)
 	go csrSignController.Run(ctx, 1)
 	return nil
+}
+
+func (a *BaseAddonManagerImpl) hasHostedModeEnabledAgent() bool {
+	for _, addonAgent := range a.addonAgents {
+		if addonAgent.GetAgentAddonOptions().HostedModeEnabled {
+			return true
+		}
+	}
+	return false
 }

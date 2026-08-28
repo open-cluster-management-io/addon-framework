@@ -22,7 +22,7 @@
       resources: ["signers"]
       verbs: ["approve"]
     - apiGroups: ["cluster.open-cluster-management.io"]
-      resources: ["managedclusters"]
+      resources: ["managedclusters", "managedclustersets"]
       verbs: ["get", "list", "watch"]
     - apiGroups: ["work.open-cluster-management.io"]
       resources: ["manifestworks"]

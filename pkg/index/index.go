@@ -7,13 +7,19 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	workapiv1 "open-cluster-management.io/api/work/v1"
 
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 )
 
 const (
-	ManagedClusterAddonByNamespace = "managedClusterAddonByNamespace"
+	ManagedClusterAddonByNamespace              = "managedClusterAddonByNamespace"
+	ManagedClusterAddonByName                   = "managedClusterAddonByName"
+	ManagedClusterAddonByHostedMode             = "managedClusterAddonByHostedMode"
+	ManagedClusterAddonByDeclaredHostingCluster = "managedClusterAddonByDeclaredHostingCluster"
+	ManagedClusterByHostingCluster              = "managedClusterByHostingCluster"
+	HostedModeIndexKey                          = "Hosted"
 )
 
 //nolint:revive
@@ -25,6 +31,60 @@ func IndexManagedClusterAddonByNamespace(obj interface{}) ([]string, error) {
 	}
 
 	return []string{mca.Namespace}, nil
+}
+
+//nolint:revive
+func IndexManagedClusterAddonByName(obj interface{}) ([]string, error) {
+	mca, ok := obj.(*addonv1beta1.ManagedClusterAddOn)
+	if !ok {
+		return nil, fmt.Errorf("obj %T is not a ManagedClusterAddon", obj)
+	}
+
+	return []string{mca.Name}, nil
+}
+
+//nolint:revive
+func IndexManagedClusterAddonByHostedMode(obj interface{}) ([]string, error) {
+	mca, ok := obj.(*addonv1beta1.ManagedClusterAddOn)
+	if !ok {
+		return nil, fmt.Errorf("obj %T is not a ManagedClusterAddon", obj)
+	}
+
+	if mca.Annotations[addonv1beta1.InstallModeAnnotationKey] != constants.InstallModeHosted {
+		return nil, nil
+	}
+
+	return []string{HostedModeIndexKey}, nil
+}
+
+//nolint:revive
+func IndexManagedClusterAddonByDeclaredHostingCluster(obj interface{}) ([]string, error) {
+	mca, ok := obj.(*addonv1beta1.ManagedClusterAddOn)
+	if !ok {
+		return nil, fmt.Errorf("obj %T is not a ManagedClusterAddon", obj)
+	}
+
+	hostingClusterName := mca.Annotations[addonv1beta1.HostingClusterNameAnnotationKey]
+	if hostingClusterName == "" {
+		return nil, nil
+	}
+	return []string{hostingClusterName}, nil
+}
+
+//nolint:revive
+func IndexManagedClusterByHostingCluster(obj interface{}) ([]string, error) {
+	cluster, ok := obj.(*clusterv1.ManagedCluster)
+	if !ok {
+		return nil, fmt.Errorf("obj %T is not a ManagedCluster", obj)
+	}
+
+	for _, claim := range cluster.Status.ClusterClaims {
+		if claim.Name == constants.HostingClusterClaimName && claim.Value != "" {
+			return []string{claim.Value}, nil
+		}
+	}
+
+	return nil, nil
 }
 
 const (

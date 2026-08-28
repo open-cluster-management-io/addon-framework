@@ -3,6 +3,7 @@ package agentdeploy
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -18,11 +19,7 @@ import (
 	"open-cluster-management.io/sdk-go/pkg/basecontroller/factory"
 )
 
-// hostingClusterClaimName is the reserved ClusterClaim a klusterlet self-reports its actual
-// hosting (management) cluster under. Mirrors api/cluster/v1alpha1.ReservedClusterClaimNames;
-// re-declared here (unexported) rather than shared, since addon-framework has no dependency on
-// that package today.
-const hostingClusterClaimName = "hosting-cluster.open-cluster-management.io"
+const hostingClusterClaimName = constants.HostingClusterClaimName
 
 // selfReportedHostingCluster reads the reserved hosting-cluster ClusterClaim off the target
 // managed cluster's status, and whether a non-empty value was found at all. Absence is never an
@@ -30,7 +27,7 @@ const hostingClusterClaimName = "hosting-cluster.open-cluster-management.io"
 // hasn't reconciled yet.
 func selfReportedHostingCluster(cluster *clusterv1.ManagedCluster) (string, bool) {
 	for _, claim := range cluster.Status.ClusterClaims {
-		if claim.Name == hostingClusterClaimName {
+		if claim.Name == constants.HostingClusterClaimName {
 			return claim.Value, len(claim.Value) > 0
 		}
 	}
@@ -71,20 +68,8 @@ func (s *hostedSyncer) sync(ctx context.Context,
 			return addon, err
 		}
 		addonRemoveFinalizer(addon, addonapiv1beta1.AddonHostingManifestFinalizer)
-		return addon, nil
-	}
-
-	// install-mode is Hosted but no hosting cluster has been declared or auto-discovered yet.
-	// Hold back a never-deployed addon; an already-deployed one (finalizer present - shouldn't
-	// normally happen here, since a resolved value is never un-resolved) is left untouched either
-	// way, since nothing in this reconciler ever tears anything down.
-	if len(hostingClusterName) == 0 {
-		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
-			Type:    addonapiv1beta1.ManagedClusterAddOnHostingClusterValidity,
-			Status:  metav1.ConditionFalse,
-			Reason:  addonapiv1beta1.HostingClusterValidityReasonAutoDiscoveryPending,
-			Message: "install-mode is Hosted but no hosting cluster has been resolved yet",
-		})
+		meta.RemoveStatusCondition(&addon.Status.Conditions,
+			addonapiv1beta1.ManagedClusterAddOnHostingClusterValidity)
 		return addon, nil
 	}
 
@@ -119,6 +104,21 @@ func (s *hostedSyncer) sync(ctx context.Context,
 	if err != nil {
 		return addon, err
 	}
+	declaredHostingWorks := deployWorksInHostingCluster(currentWorks, hostingClusterName, addon)
+
+	// A hosting-cluster annotation change must not silently relocate a running addon. Works from
+	// another namespace are retained until explicit deletion, but they are never passed to the
+	// builder as if they belonged to the newly declared hosting cluster.
+	if len(currentWorks) > 0 && len(declaredHostingWorks) == 0 &&
+		addon.DeletionTimestamp.IsZero() && hostingCluster.DeletionTimestamp.IsZero() {
+		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
+			Type:    addonapiv1beta1.ManagedClusterAddOnHostingClusterValidity,
+			Status:  metav1.ConditionFalse,
+			Reason:  addonapiv1beta1.HostingClusterValidityReasonMismatch,
+			Message: fmt.Sprintf("declared hosting cluster %s does not match the existing addon deployment", hostingClusterName),
+		})
+		return addon, nil
+	}
 
 	// Validate the declared/resolved hosting cluster against whatever the target's klusterlet
 	// self-reports (if anything). A mismatch is always just a condition, never a teardown: an
@@ -135,7 +135,7 @@ func (s *hostedSyncer) sync(ctx context.Context,
 		// Hold back only while nothing is deleting: an explicit delete of the addon or the hosting
 		// cluster must never be blocked by a mismatch, no matter how far deployment got - falling
 		// through here lets the deletion handling below run and strip the finalizer.
-		if len(currentWorks) == 0 && addon.DeletionTimestamp.IsZero() && hostingCluster.DeletionTimestamp.IsZero() {
+		if len(declaredHostingWorks) == 0 && addon.DeletionTimestamp.IsZero() && hostingCluster.DeletionTimestamp.IsZero() {
 			return addon, nil
 		}
 		// already deployed, or being deleted with nothing left to hold back: condition is loud, but
@@ -179,7 +179,7 @@ func (s *hostedSyncer) sync(ctx context.Context,
 		return addon, nil
 	}
 
-	deployWorks, deleteWorks, err := s.buildWorks(ctx, hostingClusterName, cluster, currentWorks, addon)
+	deployWorks, deleteWorks, err := s.buildWorks(ctx, hostingClusterName, cluster, declaredHostingWorks, addon)
 	if err != nil {
 		return addon, err
 	}
@@ -224,4 +224,19 @@ func (s *hostedSyncer) cleanupDeployWork(ctx context.Context,
 	}
 
 	return utilerrors.NewAggregate(errs)
+}
+
+func deployWorksInHostingCluster(
+	works []*workapiv1.ManifestWork,
+	hostingClusterName string,
+	addon *addonapiv1beta1.ManagedClusterAddOn,
+) []*workapiv1.ManifestWork {
+	prefix := constants.DeployHostingWorkNamePrefix(addon.Namespace, addon.Name)
+	var matched []*workapiv1.ManifestWork
+	for _, work := range works {
+		if work.Namespace == hostingClusterName && strings.HasPrefix(work.Name, prefix) {
+			matched = append(matched, work)
+		}
+	}
+	return matched
 }

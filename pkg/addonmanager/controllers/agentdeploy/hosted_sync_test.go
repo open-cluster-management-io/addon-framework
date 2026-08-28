@@ -50,6 +50,32 @@ func (t *testHostedAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
 	}
 }
 
+func TestCleanupDeployWorkRequiresFinalizer(t *testing.T) {
+	workLookupCalled := false
+	workDeleteCalled := false
+	syncer := &hostedSyncer{
+		getWorkByAddon: func(_, _ string) ([]*workapiv1.ManifestWork, error) {
+			workLookupCalled = true
+			return []*workapiv1.ManifestWork{{}}, nil
+		},
+		deleteWork: func(context.Context, string, string) error {
+			workDeleteCalled = true
+			return nil
+		},
+	}
+
+	err := syncer.cleanupDeployWork(context.Background(), &addonapiv1beta1.ManagedClusterAddOn{})
+	if err != nil {
+		t.Fatalf("cleanupDeployWork returned an error: %v", err)
+	}
+	if workLookupCalled {
+		t.Error("cleanupDeployWork looked up ManifestWorks without the hosting manifest finalizer")
+	}
+	if workDeleteCalled {
+		t.Error("cleanupDeployWork deleted a ManifestWork without the hosting manifest finalizer")
+	}
+}
+
 func TestHostingReconcile(t *testing.T) {
 	cases := []struct {
 		name                 string
@@ -135,23 +161,9 @@ func TestHostingReconcile(t *testing.T) {
 				},
 				Status: addonapiv1beta1.ManagedClusterAddOnStatus{Conditions: []metav1.Condition{registrationAppliedCondition}},
 			}},
-			cluster:      []runtime.Object{addontesting.NewManagedCluster("cluster1")},
-			existingWork: []runtime.Object{},
-			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "patch")
-				patch := actions[0].(clienttesting.PatchActionImpl).Patch
-				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
-				if err := json.Unmarshal(patch, addOn); err != nil {
-					t.Fatal(err)
-				}
-				addOnCond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnHostingClusterValidity)
-				if addOnCond == nil {
-					t.Fatal("condition should not be nil")
-				}
-				if addOnCond.Reason != addonapiv1beta1.HostingClusterValidityReasonAutoDiscoveryPending {
-					t.Errorf("Condition Reason is not correct: %v", addOnCond.Reason)
-				}
-			},
+			cluster:              []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			existingWork:         []runtime.Object{},
+			validateAddonActions: addontesting.AssertNoActions,
 			validateWorkActions: func(t *testing.T, actions []clienttesting.Action) {
 				// the default (non-hosted) syncer still deploys the manifest to the managed
 				// cluster regardless of hosted-mode validity - unrelated to this reconciler.

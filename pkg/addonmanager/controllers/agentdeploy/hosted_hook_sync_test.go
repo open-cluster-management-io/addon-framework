@@ -46,6 +46,32 @@ func getHostedDeployWork() *workapiv1.ManifestWork {
 	return work
 }
 
+func TestCleanupHookWorkRequiresFinalizer(t *testing.T) {
+	workLookupCalled := false
+	workDeleteCalled := false
+	syncer := &hostedHookSyncer{
+		getWorkByAddon: func(_, _ string) ([]*workapiv1.ManifestWork, error) {
+			workLookupCalled = true
+			return []*workapiv1.ManifestWork{{}}, nil
+		},
+		deleteWork: func(context.Context, string, string) error {
+			workDeleteCalled = true
+			return nil
+		},
+	}
+
+	err := syncer.cleanupHookWork(context.Background(), &addonapiv1beta1.ManagedClusterAddOn{})
+	if err != nil {
+		t.Fatalf("cleanupHookWork returned an error: %v", err)
+	}
+	if workLookupCalled {
+		t.Error("cleanupHookWork looked up ManifestWorks without the hosting pre-delete hook finalizer")
+	}
+	if workDeleteCalled {
+		t.Error("cleanupHookWork deleted a ManifestWork without the hosting pre-delete hook finalizer")
+	}
+}
+
 func TestHostingHookReconcile(t *testing.T) {
 	cases := []struct {
 		name                 string
