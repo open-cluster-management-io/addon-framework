@@ -18,8 +18,10 @@ export GOHOSTARCH  ?=$(shell go env GOHOSTARCH)
 # Tools for deploy
 export KUBECONFIG ?= ./.kubeconfig
 export MANAGED_CLUSTER_NAME ?= hub
+export HOSTING_KUBECONFIG ?=
 export HOSTED_MANAGED_CLUSTER_NAME ?= managed
 export HOSTED_MANAGED_KLUSTERLET_NAME ?= managed
+export HOSTED_MANAGED_KUBECONFIG ?=
 export HOSTED_MANAGED_KUBECONFIG_SECRET_NAME ?= e2e-hosted-managed-kubeconfig
 
 KUBECTL?=kubectl
