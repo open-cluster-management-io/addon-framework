@@ -11,189 +11,414 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
+	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
+	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
+
+	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 )
 
 const (
 	helloWorldHostedAddonName = "helloworldhosted"
+	hostedE2EClusterSetName   = "hosted-addon-e2e"
 
 	eventuallyTimeout  = 300 // seconds
 	eventuallyInterval = 1   // seconds
 )
 
+// addonAgentNamespace is the namespace the hosted addon agent is installed into on the hosting
+// cluster.
+func addonAgentNamespace() string {
+	return fmt.Sprintf("klusterlet-%s-agent-addon", hostingClusterName)
+}
+
 var _ = ginkgo.Describe("install/uninstall helloworld hosted addons in Hosted mode", func() {
-	var addonAgentNamespace string
 	ginkgo.BeforeEach(func() {
-		addonAgentNamespace = fmt.Sprintf("klusterlet-%s-agent-addon", hostingClusterName)
+		for _, clusterName := range []string{hostedManagedClusterName, hostingClusterName} {
+			_, err := hubClusterClient.ClusterV1().ManagedClusters().Get(
+				context.Background(), clusterName, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			_, err = hubKubeClient.CoreV1().Namespaces().Get(
+				context.Background(), clusterName, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		}
 
-		_, err := hubClusterClient.ClusterV1().ManagedClusters().Get(
-			context.Background(), hostedManagedClusterName, metav1.GetOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-		_, err = hubKubeClient.CoreV1().Namespaces().Get(
-			context.Background(), hostedManagedClusterName, metav1.GetOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-		_, err = hubClusterClient.ClusterV1().ManagedClusters().Get(
-			context.Background(), hostingClusterName, metav1.GetOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-		_, err = hubKubeClient.CoreV1().Namespaces().Get(
-			context.Background(), hostingClusterName, metav1.GetOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		deleteManagedClusterAddon()
+		deleteConsumerHostingClusterClaim()
+		cleanupClusterSetGuard()
+		enableAutoDiscovery()
 	})
 
-	ginkgo.It("Install/uninstall addon in hosted mode and make sure it is available", func() {
-		gomega.Eventually(func() error {
-			addon, err := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(hostedManagedClusterName).Get(
-				context.Background(), helloWorldHostedAddonName, metav1.GetOptions{})
-			if err != nil {
-				if errors.IsNotFound(err) {
-					_, cerr := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(hostedManagedClusterName).Create(
-						context.Background(),
-						&addonapiv1beta1.ManagedClusterAddOn{
-							ObjectMeta: metav1.ObjectMeta{
-								Namespace: hostedManagedClusterName,
-								Name:      helloWorldHostedAddonName,
-								Annotations: map[string]string{
-									addonapiv1beta1.HostingClusterNameAnnotationKey: hostingClusterName,
-									addonapiv1beta1.InstallNamespaceAnnotation:      addonAgentNamespace,
-								},
-							},
-							Spec: addonapiv1beta1.ManagedClusterAddOnSpec{},
-						},
-						metav1.CreateOptions{})
-					if cerr != nil {
-						return cerr
-					}
-				}
-				return err
-			}
+	ginkgo.AfterEach(func() {
+		deleteManagedClusterAddon()
+		deleteConsumerHostingClusterClaim()
+		cleanupClusterSetGuard()
+	})
 
-			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnHostingClusterValidity) {
-				return fmt.Errorf("addon hosting cluster should be valid, but get condition %v",
-					addon.Status.Conditions)
-			}
-			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+	ginkgo.It("discovers the host only after the ClusterSet guard and runs the addon", func() {
+		setConsumerHostingClusterClaim(hostingClusterName)
+		setClusterSetLabels(hostedE2EClusterSetName)
+		createManagedClusterAddon("")
 
-		// provide the managed cluster kubeconfig
-		klusterletSecret, err := hubKubeClient.CoreV1().Secrets(hostedKlusterletName).Get(
-			context.Background(), "external-managed-kubeconfig", metav1.GetOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		waitForValidityReason(addonapiv1beta1.HostingClusterValidityReasonAutoDiscoveryPending,
+			metav1.ConditionFalse)
+		assertHostingWorkAbsent(hostingClusterName)
 
-		addonSecret := corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: addonAgentNamespace,
-				Name:      fmt.Sprintf("%s-managed-kubeconfig", helloWorldHostedAddonName),
-			},
-			Data: klusterletSecret.Data,
-		}
-		gomega.Eventually(func() error {
-			_, err = hubKubeClient.CoreV1().Secrets(addonAgentNamespace).Create(
-				context.Background(), &addonSecret, metav1.CreateOptions{})
-			if err != nil {
-				if errors.IsAlreadyExists(err) {
-					return nil
-				}
-				return err
-			}
-			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		createClusterSetGuard()
+		waitForDiscoveredHostingCluster()
+		provideManagedClusterKubeconfig()
+		waitForAddonAvailable()
 
-		gomega.Eventually(func() error {
-			addon, err := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(hostedManagedClusterName).Get(
-				context.Background(), helloWorldHostedAddonName, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			if !meta.IsStatusConditionTrue(addon.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnHostingManifestApplied) {
-				return fmt.Errorf("addon should be applied to hosting cluster, but get condition %v",
-					addon.Status.Conditions)
-			}
-
-			if !meta.IsStatusConditionTrue(addon.Status.Conditions, "Available") {
-				return fmt.Errorf("addon should be available on hosting cluster, but get condition %v",
-					addon.Status.Conditions)
-			}
-			return nil
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
-
-		// Ensure helloworld addo is functioning.
 		configmap := &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("config-%s", rand.String(6)),
 				Namespace: hostedManagedClusterName,
 			},
-			Data: map[string]string{
-				"key1": rand.String(6),
-				"key2": rand.String(6),
-			},
+			Data: map[string]string{"key1": rand.String(6), "key2": rand.String(6)},
 		}
-
-		_, err = hubKubeClient.CoreV1().ConfigMaps(hostedManagedClusterName).Create(
+		_, err := hubKubeClient.CoreV1().ConfigMaps(hostedManagedClusterName).Create(
 			context.Background(), configmap, metav1.CreateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		gomega.Eventually(func() error {
-			// the configmap should be copied to the managed cluster
-			copyiedConfig, err := hostedManagedKubeClient.CoreV1().ConfigMaps(addonAgentNamespace).Get(
+			copiedConfig, err := hostedManagedKubeClient.CoreV1().ConfigMaps(addonAgentNamespace()).Get(
 				context.Background(), configmap.Name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
-
-			if !apiequality.Semantic.DeepEqual(copyiedConfig.Data, configmap.Data) {
-				return fmt.Errorf("expected configmap is not correct, %v", copyiedConfig.Data)
+			if !apiequality.Semantic.DeepEqual(copiedConfig.Data, configmap.Data) {
+				return fmt.Errorf("copied configmap data is %v", copiedConfig.Data)
 			}
 			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 
-		// remove addon
-		err = hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(hostedManagedClusterName).Delete(
-			context.Background(), helloWorldHostedAddonName, metav1.DeleteOptions{})
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-		// delete addon CR, the pre-delete job should clean up the configmap.
-		gomega.Eventually(func() error {
-			_, err := hostedManagedKubeClient.CoreV1().ConfigMaps(addonAgentNamespace).Get(
-				context.Background(), configmap.Name, metav1.GetOptions{})
-			if err != nil {
-				if errors.IsNotFound(err) {
-					return nil
-				}
-				return err
-			}
-
-			return fmt.Errorf("the configmap should be deleted")
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		deleteManagedClusterAddon()
 		gomega.Eventually(func() bool {
-			_, err := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(hostedManagedClusterName).Get(
-				context.Background(), helloWorldHostedAddonName, metav1.GetOptions{})
+			_, err := hostedManagedKubeClient.CoreV1().ConfigMaps(addonAgentNamespace()).Get(
+				context.Background(), configmap.Name, metav1.GetOptions{})
 			return errors.IsNotFound(err)
 		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+		waitForDeployWorksDeleted()
 
-		// all mainfestWorks in hosted/hosting cluster ns should be deleted
+		err = hubKubeClient.CoreV1().ConfigMaps(hostedManagedClusterName).Delete(
+			context.Background(), configmap.Name, metav1.DeleteOptions{})
+		gomega.Expect(err == nil || errors.IsNotFound(err)).To(gomega.BeTrue())
+	})
+
+	ginkgo.It("holds back a new deployment when the declared host disagrees with the target", func() {
+		setConsumerHostingClusterClaim(hostingClusterName)
+		createManagedClusterAddon(hostedManagedClusterName)
+
+		waitForValidityReason(addonapiv1beta1.HostingClusterValidityReasonMismatch,
+			metav1.ConditionFalse)
+		gomega.Consistently(func() bool {
+			_, err := hubWorkClient.WorkV1().ManifestWorks(hostedManagedClusterName).Get(
+				context.Background(), hostingDeployWorkName(), metav1.GetOptions{})
+			return errors.IsNotFound(err)
+		}, 10, eventuallyInterval).Should(gomega.BeTrue())
+		assertHostingWorkAbsent(hostingClusterName)
+
+		deleteManagedClusterAddon()
+		assertHostingWorkAbsent(hostedManagedClusterName)
+	})
+
+	ginkgo.It("keeps an existing deployment in place when the reported host changes", func() {
+		setConsumerHostingClusterClaim(hostingClusterName)
+		setClusterSetLabels(hostedE2EClusterSetName)
+		createClusterSetGuard()
+		createManagedClusterAddon("")
+		waitForDiscoveredHostingCluster()
+		provideManagedClusterKubeconfig()
+		waitForAddonAvailable()
+
+		work, err := hubWorkClient.WorkV1().ManifestWorks(hostingClusterName).Get(
+			context.Background(), hostingDeployWorkName(), metav1.GetOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		originalWorkUID := work.UID
+
+		setConsumerHostingClusterClaim(hostedManagedClusterName)
+		waitForValidityReason(addonapiv1beta1.HostingClusterValidityReasonMismatch,
+			metav1.ConditionFalse)
 		gomega.Eventually(func() error {
-			workName := fmt.Sprintf("%s-%v", constants.DeployWorkNamePrefix(helloWorldHostedAddonName), 0)
-			_, err = hubWorkClient.WorkV1().ManifestWorks(hostedManagedClusterName).Get(
-				context.Background(), workName, metav1.GetOptions{})
-			if errors.IsNotFound(err) {
-				return nil
+			addon, err := getManagedClusterAddon()
+			if err != nil {
+				return err
 			}
-			return fmt.Errorf("the manifsetWork is not deleted. err:%v", err)
-		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
-		gomega.Eventually(func() error {
-			workName := fmt.Sprintf("%s-%v",
-				constants.DeployHostingWorkNamePrefix(hostedManagedClusterName, helloWorldHostedAddonName), 0)
-			_, err = hubWorkClient.WorkV1().ManifestWorks(hostingClusterName).Get(
-				context.Background(), workName, metav1.GetOptions{})
-			if errors.IsNotFound(err) {
-				return nil
+			if !meta.IsStatusConditionTrue(addon.Status.Conditions, "Available") {
+				return fmt.Errorf("addon is not available: %v", addon.Status.Conditions)
 			}
-			return fmt.Errorf("the manifsetWork is not deleted. err:%v", err)
+			work, err := hubWorkClient.WorkV1().ManifestWorks(hostingClusterName).Get(
+				context.Background(), hostingDeployWorkName(), metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if work.UID != originalWorkUID {
+				return fmt.Errorf("hosting work was relocated or recreated: got UID %s, want %s",
+					work.UID, originalWorkUID)
+			}
+			return nil
 		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+		assertHostingWorkAbsent(hostedManagedClusterName)
+
+		deleteManagedClusterAddon()
+		waitForDeployWorksDeleted()
 	})
 })
+
+func enableAutoDiscovery() {
+	gomega.Eventually(func() error {
+		cma, err := hubAddOnClient.AddonV1beta1().ClusterManagementAddOns().Get(
+			context.Background(), helloWorldHostedAddonName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		cma.Spec.HostedModeAutoDiscovery = &addonapiv1beta1.HostedModeAutoDiscoveryConfig{
+			Mode: addonapiv1beta1.HostedModeAutoDiscoveryModeEnable,
+		}
+		_, err = hubAddOnClient.AddonV1beta1().ClusterManagementAddOns().Update(
+			context.Background(), cma, metav1.UpdateOptions{})
+		return err
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+}
+
+func createManagedClusterAddon(hostingCluster string) {
+	annotations := map[string]string{
+		addonapiv1beta1.InstallModeAnnotationKey:   constants.InstallModeHosted,
+		addonapiv1beta1.InstallNamespaceAnnotation: addonAgentNamespace(),
+	}
+	if hostingCluster != "" {
+		annotations[addonapiv1beta1.HostingClusterNameAnnotationKey] = hostingCluster
+	}
+	_, err := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(hostedManagedClusterName).Create(
+		context.Background(), &addonapiv1beta1.ManagedClusterAddOn{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:   hostedManagedClusterName,
+				Name:        helloWorldHostedAddonName,
+				Annotations: annotations,
+			},
+		}, metav1.CreateOptions{})
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+}
+
+func getManagedClusterAddon() (*addonapiv1beta1.ManagedClusterAddOn, error) {
+	return hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(hostedManagedClusterName).Get(
+		context.Background(), helloWorldHostedAddonName, metav1.GetOptions{})
+}
+
+func deleteManagedClusterAddon() {
+	err := hubAddOnClient.AddonV1beta1().ManagedClusterAddOns(hostedManagedClusterName).Delete(
+		context.Background(), helloWorldHostedAddonName, metav1.DeleteOptions{})
+	gomega.Expect(err == nil || errors.IsNotFound(err)).To(gomega.BeTrue())
+	if errors.IsNotFound(err) {
+		return
+	}
+	gomega.Eventually(func() bool {
+		_, err := getManagedClusterAddon()
+		return errors.IsNotFound(err)
+	}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+}
+
+// setConsumerHostingClusterClaim seeds the producer output for this framework-owned consumer
+// suite. The Klusterlet fixture intentionally does not enable reportHostingCluster, so no producer
+// races this test for ownership of the reserved claim.
+func setConsumerHostingClusterClaim(value string) {
+	gomega.Eventually(func() error {
+		claims := hostedManagedClusterClient.ClusterV1alpha1().ClusterClaims()
+		claim, err := claims.Get(context.Background(), constants.HostingClusterClaimName, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			_, err = claims.Create(context.Background(), &clusterv1alpha1.ClusterClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: constants.HostingClusterClaimName},
+				Spec:       clusterv1alpha1.ClusterClaimSpec{Value: value},
+			}, metav1.CreateOptions{})
+			return err
+		}
+		if err != nil {
+			return err
+		}
+		claim.Spec.Value = value
+		_, err = claims.Update(context.Background(), claim, metav1.UpdateOptions{})
+		return err
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+	waitForReportedHostingCluster(value)
+}
+
+func deleteConsumerHostingClusterClaim() {
+	err := hostedManagedClusterClient.ClusterV1alpha1().ClusterClaims().Delete(
+		context.Background(), constants.HostingClusterClaimName, metav1.DeleteOptions{})
+	gomega.Expect(err == nil || errors.IsNotFound(err)).To(gomega.BeTrue())
+	if err == nil {
+		waitForReportedHostingCluster("")
+	}
+}
+
+func waitForReportedHostingCluster(expected string) {
+	gomega.Eventually(func() string {
+		cluster, err := hubClusterClient.ClusterV1().ManagedClusters().Get(
+			context.Background(), hostedManagedClusterName, metav1.GetOptions{})
+		if err != nil {
+			return ""
+		}
+		for _, claim := range cluster.Status.ClusterClaims {
+			if claim.Name == constants.HostingClusterClaimName {
+				return claim.Value
+			}
+		}
+		return ""
+	}, eventuallyTimeout, eventuallyInterval).Should(gomega.Equal(expected))
+}
+
+func setClusterSetLabels(value string) {
+	for _, clusterName := range []string{hostedManagedClusterName, hostingClusterName} {
+		clusterName := clusterName
+		gomega.Eventually(func() error {
+			cluster, err := hubClusterClient.ClusterV1().ManagedClusters().Get(
+				context.Background(), clusterName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if cluster.Labels == nil {
+				cluster.Labels = map[string]string{}
+			}
+			if value == "" {
+				delete(cluster.Labels, clusterv1beta2.ClusterSetLabel)
+			} else {
+				cluster.Labels[clusterv1beta2.ClusterSetLabel] = value
+			}
+			_, err = hubClusterClient.ClusterV1().ManagedClusters().Update(
+				context.Background(), cluster, metav1.UpdateOptions{})
+			return err
+		}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+	}
+}
+
+func createClusterSetGuard() {
+	_, err := hubClusterClient.ClusterV1beta2().ManagedClusterSets().Create(context.Background(),
+		&clusterv1beta2.ManagedClusterSet{
+			ObjectMeta: metav1.ObjectMeta{Name: hostedE2EClusterSetName},
+			Spec: clusterv1beta2.ManagedClusterSetSpec{ClusterSelector: clusterv1beta2.ManagedClusterSelector{
+				SelectorType: clusterv1beta2.ExclusiveClusterSetLabel,
+			}},
+		}, metav1.CreateOptions{})
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+}
+
+func cleanupClusterSetGuard() {
+	setClusterSetLabels("")
+	err := hubClusterClient.ClusterV1beta2().ManagedClusterSets().Delete(
+		context.Background(), hostedE2EClusterSetName, metav1.DeleteOptions{})
+	gomega.Expect(err == nil || errors.IsNotFound(err)).To(gomega.BeTrue())
+	if err == nil {
+		gomega.Eventually(func() bool {
+			_, err := hubClusterClient.ClusterV1beta2().ManagedClusterSets().Get(
+				context.Background(), hostedE2EClusterSetName, metav1.GetOptions{})
+			return errors.IsNotFound(err)
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+	}
+}
+
+func waitForValidityReason(reason string, status metav1.ConditionStatus) {
+	gomega.Eventually(func() string {
+		addon, err := getManagedClusterAddon()
+		if err != nil {
+			return err.Error()
+		}
+		condition := meta.FindStatusCondition(addon.Status.Conditions,
+			addonapiv1beta1.ManagedClusterAddOnHostingClusterValidity)
+		if condition == nil || condition.Status != status {
+			return ""
+		}
+		return condition.Reason
+	}, eventuallyTimeout, eventuallyInterval).Should(gomega.Equal(reason))
+}
+
+func waitForDiscoveredHostingCluster() {
+	gomega.Eventually(func() error {
+		addon, err := getManagedClusterAddon()
+		if err != nil {
+			return err
+		}
+		if !meta.IsStatusConditionTrue(addon.Status.Conditions,
+			addonapiv1beta1.ManagedClusterAddOnHostingClusterValidity) {
+			return fmt.Errorf("hosting cluster is not valid: %v", addon.Status.Conditions)
+		}
+		if addon.Annotations[addonapiv1beta1.HostingClusterNameAnnotationKey] != hostingClusterName ||
+			addon.Annotations[addonapiv1beta1.HostingClusterNameManagedByAnnotationKey] !=
+				addonapiv1beta1.HostingClusterNameManagedByAutoDiscoveryValue {
+			return fmt.Errorf("hosting cluster was not auto-discovered: %v", addon.Annotations)
+		}
+		return nil
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+}
+
+func provideManagedClusterKubeconfig() {
+	gomega.Eventually(func() error {
+		klusterletSecret, err := hostingKubeClient.CoreV1().Secrets(hostedKlusterletName).Get(
+			context.Background(), "external-managed-kubeconfig", metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		namespace := addonAgentNamespace()
+		secrets := hostingKubeClient.CoreV1().Secrets(namespace)
+		secretName := fmt.Sprintf("%s-managed-kubeconfig", helloWorldHostedAddonName)
+		secret, err := secrets.Get(context.Background(), secretName, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			_, err = secrets.Create(context.Background(), &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: secretName},
+				Data:       klusterletSecret.Data,
+			}, metav1.CreateOptions{})
+			return err
+		}
+		if err != nil {
+			return err
+		}
+		secret.Data = klusterletSecret.Data
+		_, err = secrets.Update(context.Background(), secret, metav1.UpdateOptions{})
+		return err
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+}
+
+func waitForAddonAvailable() {
+	gomega.Eventually(func() error {
+		addon, err := getManagedClusterAddon()
+		if err != nil {
+			return err
+		}
+		if !meta.IsStatusConditionTrue(addon.Status.Conditions,
+			addonapiv1beta1.ManagedClusterAddOnHostingManifestApplied) {
+			return fmt.Errorf("hosting manifest is not applied: %v", addon.Status.Conditions)
+		}
+		if !meta.IsStatusConditionTrue(addon.Status.Conditions, "Available") {
+			return fmt.Errorf("addon is not available: %v", addon.Status.Conditions)
+		}
+		return nil
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
+}
+
+func hostingDeployWorkName() string {
+	return fmt.Sprintf("%s-0",
+		constants.DeployHostingWorkNamePrefix(hostedManagedClusterName, helloWorldHostedAddonName))
+}
+
+func assertHostingWorkAbsent(namespace string) {
+	_, err := hubWorkClient.WorkV1().ManifestWorks(namespace).Get(
+		context.Background(), hostingDeployWorkName(), metav1.GetOptions{})
+	gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
+}
+
+func waitForDeployWorksDeleted() {
+	works := []types.NamespacedName{
+		{Namespace: hostedManagedClusterName,
+			Name: fmt.Sprintf("%s-0", constants.DeployWorkNamePrefix(helloWorldHostedAddonName))},
+		{Namespace: hostingClusterName, Name: hostingDeployWorkName()},
+	}
+	for _, work := range works {
+		work := work
+		gomega.Eventually(func() bool {
+			_, err := hubWorkClient.WorkV1().ManifestWorks(work.Namespace).Get(
+				context.Background(), work.Name, metav1.GetOptions{})
+			return errors.IsNotFound(err)
+		}, eventuallyTimeout, eventuallyInterval).Should(gomega.BeTrue())
+	}
+}

@@ -32,19 +32,26 @@ var (
 	hubAddOnClient     addonclient.Interface
 	hubClusterClient   clusterclient.Interface
 	hubWorkClient      workclient.Interface
+	hostingKubeClient  kubernetes.Interface
 
 	hostedKlusterletName              string // name of the hosted mode klusterlet
 	hostedManagedKubeconfigSecretName string // name of the secret for the managed cluster in hosted mode
 	hostedManagedClusterName          string // name of the managed cluster in hosted mode
 	hostingClusterName                string // name of the hosting cluster in hosted mode
 	hostedManagedKubeClient           kubernetes.Interface
+	hostedManagedClusterClient        clusterclient.Interface
 )
 
 // This suite is sensitive to the following environment variables:
 //
-// - MANAGED_CLUSTER_NAME sets the name of the cluster
-// - HOSTED_MANAGED_CLUSTER_NAME sets the name of the hosted managed cluster, only useful in Hosted mode
-// - KUBECONFIG is the location of the kubeconfig file to use
+//   - MANAGED_CLUSTER_NAME sets the name of the cluster
+//   - HOSTED_MANAGED_CLUSTER_NAME sets the name of the hosted managed cluster, only useful in Hosted mode
+//   - KUBECONFIG is the location of the hub kubeconfig file to use
+//   - HOSTING_KUBECONFIG is the location of the hosting cluster kubeconfig file to use. When unset,
+//     the hub is also used as the hosting cluster for backward compatibility.
+//   - HOSTED_MANAGED_KUBECONFIG is the location of the hosted managed cluster kubeconfig file to use.
+//     When unset, the kubeconfig is loaded from HOSTED_MANAGED_KUBECONFIG_SECRET_NAME on the hosting
+//     cluster.
 var _ = ginkgo.BeforeSuite(func() {
 	kubeconfig := os.Getenv("KUBECONFIG")
 	managedClusterName = os.Getenv("MANAGED_CLUSTER_NAME")
@@ -67,38 +74,61 @@ var _ = ginkgo.BeforeSuite(func() {
 
 	err := func() error {
 		var err error
-		clusterCfg, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+		hubConfig, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 		if err != nil {
 			return err
 		}
 
-		hubKubeClient, err = kubernetes.NewForConfig(clusterCfg)
+		hubKubeClient, err = kubernetes.NewForConfig(hubConfig)
 		if err != nil {
 			return err
 		}
 
-		hubAddOnClient, err = addonclient.NewForConfig(clusterCfg)
+		hubAddOnClient, err = addonclient.NewForConfig(hubConfig)
 		if err != nil {
 			return err
 		}
 
-		hubClusterClient, err = clusterclient.NewForConfig(clusterCfg)
+		hubClusterClient, err = clusterclient.NewForConfig(hubConfig)
 		if err != nil {
 			return err
 		}
 
-		hubWorkClient, err = workclient.NewForConfig(clusterCfg)
+		hubWorkClient, err = workclient.NewForConfig(hubConfig)
 		if err != nil {
 			return err
 		}
 
-		hostedManagedKubeConfig, err := getHostedManagedKubeConfig(
-			context.Background(), hubKubeClient, hostedKlusterletName, hostedManagedKubeconfigSecretName)
+		hostingConfig := hubConfig
+		if hostingKubeconfig := os.Getenv("HOSTING_KUBECONFIG"); hostingKubeconfig != "" {
+			hostingConfig, err = clientcmd.BuildConfigFromFlags("", hostingKubeconfig)
+			if err != nil {
+				return err
+			}
+		}
+		hostingKubeClient, err = kubernetes.NewForConfig(hostingConfig)
+		if err != nil {
+			return err
+		}
+
+		var hostedManagedKubeConfig *rest.Config
+		if hostedManagedKubeconfig := os.Getenv("HOSTED_MANAGED_KUBECONFIG"); hostedManagedKubeconfig != "" {
+			hostedManagedKubeConfig, err = clientcmd.BuildConfigFromFlags("", hostedManagedKubeconfig)
+		} else {
+			hostedManagedKubeConfig, err = getHostedManagedKubeConfig(
+				context.Background(), hostingKubeClient, hostedKlusterletName,
+				hostedManagedKubeconfigSecretName)
+		}
 		if err != nil {
 			return err
 		}
 
 		hostedManagedKubeClient, err = kubernetes.NewForConfig(hostedManagedKubeConfig)
+		if err != nil {
+			return err
+		}
+
+		hostedManagedClusterClient, err = clusterclient.NewForConfig(hostedManagedKubeConfig)
 
 		return err
 	}()

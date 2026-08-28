@@ -133,6 +133,8 @@ metadata:
 spec:
   deployOption:
     mode: Hosted
+    hosted:
+      managementClusterName: ${MANAGED_CLUSTER_NAME}
   registrationImagePullSpec: quay.io/open-cluster-management/registration
   workImagePullSpec: quay.io/open-cluster-management/work
   clusterName: ${HOSTED_MANAGED_CLUSTER_NAME}
