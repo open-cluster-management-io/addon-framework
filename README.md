@@ -59,6 +59,7 @@ For comprehensive documentation on OCM addons, refer to:
 - [Design Documentation](https://github.com/open-cluster-management-io/enhancements/tree/main/enhancements/sig-architecture/8-addon-framework)
 - [Helm Agent Addon Guide](docs/helmAgentAddon.md)
 - [Template Agent Addon Guide](docs/templateAgentAddon.md)
+- [Hosted Mode Guide](docs/hostedMode.md)
 - [Pre-delete Hook Guide](docs/preDeleteHook.md)
 
 ## Examples

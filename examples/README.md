@@ -89,6 +89,17 @@ Note: when installing the addon in Hosted mode, the klusterlet installation mode
 in Hosted mode. here we should specify the HOSTING_CLUSTER_NAME, it should be a managed cluster of the hub and the same
 hosting cluster of the klustelet.
 
+To let the framework discover the hosting cluster from the klusterlet, enable
+`spec.hostedModeAutoDiscovery.mode: Enable` on the
+`helloworldhosted` ClusterManagementAddOn, set
+`spec.deployOption.reportHostingCluster: Enable` on the target Klusterlet, configure
+`spec.deployOption.hosted.managementClusterName` when the Klusterlet itself runs in Hosted mode,
+and create the ManagedClusterAddOn with
+`addon.open-cluster-management.io/install-mode: Hosted` but without the
+`hosting-cluster-name` annotation. The target and reported hosting clusters must be selected by the
+same non-default ManagedClusterSet. See the [Hosted Mode Guide](../docs/hostedMode.md) for the full
+configuration and lifecycle rules.
+
 ```sh
 export MANAGED_CLUSTER_NAME=<managed-cluster-name> && \
 export HOSTING_CLUSTER_NAME=<hosting-cluster-name> && \
