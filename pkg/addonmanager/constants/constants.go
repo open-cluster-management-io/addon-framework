@@ -15,6 +15,9 @@ const (
 	InstallModeDefault         = "Default"
 	// HostingClusterClaimName is the reserved ClusterClaim used to self-report a cluster's host.
 	HostingClusterClaimName = "hosting-cluster.open-cluster-management.io"
+	// HostedModeAutoDiscoveryAnnotationKey is a fallback for hubs that don't round-trip
+	// spec.hostedModeAutoDiscovery yet (see autoDiscoveryEnabled).
+	HostedModeAutoDiscoveryAnnotationKey = "addon.open-cluster-management.io/hosted-mode-auto-discovery"
 )
 
 // DeployWorkNamePrefix returns the prefix of the work name for the addon

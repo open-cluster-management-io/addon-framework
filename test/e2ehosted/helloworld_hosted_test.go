@@ -177,6 +177,12 @@ func enableAutoDiscovery() {
 		cma.Spec.HostedModeAutoDiscovery = &addonapiv1beta1.HostedModeAutoDiscoveryConfig{
 			Mode: addonapiv1beta1.HostedModeAutoDiscoveryModeEnable,
 		}
+		// Fallback for hubs that don't round-trip the typed field yet.
+		if cma.Annotations == nil {
+			cma.Annotations = map[string]string{}
+		}
+		cma.Annotations[constants.HostedModeAutoDiscoveryAnnotationKey] =
+			string(addonapiv1beta1.HostedModeAutoDiscoveryModeEnable)
 		_, err = hubAddOnClient.AddonV1beta1().ClusterManagementAddOns().Update(
 			context.Background(), cma, metav1.UpdateOptions{})
 		return err

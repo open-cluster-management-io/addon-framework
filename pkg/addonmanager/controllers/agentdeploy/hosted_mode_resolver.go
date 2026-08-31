@@ -210,11 +210,17 @@ func (r *hostedModeResolver) managedClusterSetCacheSynced() bool {
 
 func (r *hostedModeResolver) autoDiscoveryEnabled(addonName string) bool {
 	cma, err := r.clusterManagementAddonLister.Get(addonName)
-	if err != nil || cma.Spec.HostedModeAutoDiscovery == nil {
+	if err != nil {
 		return false
 	}
 
-	return cma.Spec.HostedModeAutoDiscovery.Mode == addonapiv1beta1.HostedModeAutoDiscoveryModeEnable
+	if cma.Spec.HostedModeAutoDiscovery != nil {
+		return cma.Spec.HostedModeAutoDiscovery.Mode == addonapiv1beta1.HostedModeAutoDiscoveryModeEnable
+	}
+
+	// Fallback for hubs that don't round-trip the typed field yet.
+	return cma.Annotations[constants.HostedModeAutoDiscoveryAnnotationKey] ==
+		string(addonapiv1beta1.HostedModeAutoDiscoveryModeEnable)
 }
 
 func (r *hostedModeResolver) shouldOnlyCleanup(
@@ -322,8 +328,13 @@ func (c *addonDeployController) setHostedModeDiscoveryAddonHandler(
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			oldCMA, oldOK := oldObj.(*addonapiv1beta1.ClusterManagementAddOn)
 			newCMA, newOK := newObj.(*addonapiv1beta1.ClusterManagementAddOn)
-			if oldOK && newOK && !equality.Semantic.DeepEqual(
-				oldCMA.Spec.HostedModeAutoDiscovery, newCMA.Spec.HostedModeAutoDiscovery) {
+			if !oldOK || !newOK {
+				return
+			}
+			if !equality.Semantic.DeepEqual(
+				oldCMA.Spec.HostedModeAutoDiscovery, newCMA.Spec.HostedModeAutoDiscovery) ||
+				oldCMA.Annotations[constants.HostedModeAutoDiscoveryAnnotationKey] !=
+					newCMA.Annotations[constants.HostedModeAutoDiscoveryAnnotationKey] {
 				c.enqueueAddonsByName(newCMA.Name)
 			}
 		},

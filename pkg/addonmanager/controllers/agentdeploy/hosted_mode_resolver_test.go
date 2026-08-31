@@ -56,6 +56,18 @@ func TestHostedModeResolver(t *testing.T) {
 			wantHost:      "hosting",
 		},
 		{
+			name:          "resolves via the annotation fallback when the typed field never round-trips",
+			addon:         autoDiscoveryAddon(),
+			target:        claimedCluster("target", "hosting", map[string]string{clusterv1beta2.ClusterSetLabel: "production"}),
+			hosting:       claimedCluster("hosting", "", map[string]string{clusterv1beta2.ClusterSetLabel: "production"}),
+			cma:           autoDiscoveryCMAViaAnnotation(),
+			clusterSets:   []*clusterv1beta2.ManagedClusterSet{exclusiveClusterSet("production")},
+			hostedEnabled: true,
+			wantStop:      true,
+			wantUpdate:    true,
+			wantHost:      "hosting",
+		},
+		{
 			name:          "resolves through label selector cluster set",
 			addon:         autoDiscoveryAddon(),
 			target:        claimedCluster("target", "hosting", map[string]string{"environment": "production"}),
@@ -491,6 +503,18 @@ func autoDiscoveryCMA(enabled bool) *addonapiv1beta1.ClusterManagementAddOn {
 		ObjectMeta: metav1.ObjectMeta{Name: "test"},
 		Spec: addonapiv1beta1.ClusterManagementAddOnSpec{
 			HostedModeAutoDiscovery: &addonapiv1beta1.HostedModeAutoDiscoveryConfig{Mode: mode},
+		},
+	}
+}
+
+// autoDiscoveryCMAViaAnnotation sets only the fallback annotation, not the typed field.
+func autoDiscoveryCMAViaAnnotation() *addonapiv1beta1.ClusterManagementAddOn {
+	return &addonapiv1beta1.ClusterManagementAddOn{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test",
+			Annotations: map[string]string{
+				constants.HostedModeAutoDiscoveryAnnotationKey: string(addonapiv1beta1.HostedModeAutoDiscoveryModeEnable),
+			},
 		},
 	}
 }
