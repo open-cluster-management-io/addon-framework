@@ -98,6 +98,12 @@ ${KUBECTL} -n open-cluster-management-hub scale --replicas=0 deployment/cluster-
 # scale replicas to save resources
 ${KUBECTL} -n open-cluster-management scale --replicas=1 deployment/klusterlet
 
+# TODO workaround for hostedModeAutoDiscovery (KEP-188) until ocm ships a release with the matching hub-side support.
+echo "###### upgrading ClusterManagementAddOn CRD for hostedModeAutoDiscovery (KEP-188)"
+${KUBECTL} apply -f "${REPO_DIR}/vendor/open-cluster-management.io/api/addon/v1beta1/0000_00_addon.open-cluster-management.io_clustermanagementaddons.crd.yaml"
+${KUBECTL} wait --for condition=established --timeout=60s \
+  crd/clustermanagementaddons.addon.open-cluster-management.io
+
 ${CLUSTERADM} accept --clusters ${MANAGED_CLUSTER_NAME} --wait
 
 echo "###### prepare bootstrap hub secret"
@@ -133,8 +139,6 @@ metadata:
 spec:
   deployOption:
     mode: Hosted
-    hosted:
-      managementClusterName: ${MANAGED_CLUSTER_NAME}
   registrationImagePullSpec: quay.io/open-cluster-management/registration
   workImagePullSpec: quay.io/open-cluster-management/work
   clusterName: ${HOSTED_MANAGED_CLUSTER_NAME}
