@@ -260,19 +260,25 @@ func deleteConsumerHostingClusterClaim() {
 }
 
 func waitForReportedHostingCluster(expected string) {
-	gomega.Eventually(func() string {
+	gomega.Eventually(func() error {
 		cluster, err := hubClusterClient.ClusterV1().ManagedClusters().Get(
 			context.Background(), hostedManagedClusterName, metav1.GetOptions{})
 		if err != nil {
-			return ""
+			return err
 		}
 		for _, claim := range cluster.Status.ClusterClaims {
 			if claim.Name == constants.HostingClusterClaimName {
-				return claim.Value
+				if claim.Value != expected {
+					return fmt.Errorf("hosting cluster claim = %q, want %q", claim.Value, expected)
+				}
+				return nil
 			}
 		}
-		return ""
-	}, eventuallyTimeout, eventuallyInterval).Should(gomega.Equal(expected))
+		if expected == "" {
+			return nil
+		}
+		return fmt.Errorf("hosting cluster claim was not reported")
+	}, eventuallyTimeout, eventuallyInterval).ShouldNot(gomega.HaveOccurred())
 }
 
 func setClusterSetLabels(value string) {
