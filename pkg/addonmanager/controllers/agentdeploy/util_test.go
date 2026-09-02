@@ -539,3 +539,226 @@ func TestMergeFeedbackRule(t *testing.T) {
 		})
 	}
 }
+
+func hookWorkWith(resource, feedbackName, feedbackValue string, available bool) *workapiv1.ManifestWork {
+	work := &workapiv1.ManifestWork{}
+	work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
+		{
+			ResourceIdentifier: workapiv1.ResourceIdentifier{
+				Resource:  resource,
+				Name:      "test",
+				Namespace: "default",
+			},
+		},
+	}
+	if available {
+		work.Status.Conditions = []metav1.Condition{
+			{Type: workapiv1.WorkAvailable, Status: metav1.ConditionTrue},
+		}
+	}
+	if feedbackName != "" {
+		v := feedbackValue
+		work.Status.ResourceStatus = workapiv1.ManifestResourceStatus{
+			Manifests: []workapiv1.ManifestCondition{
+				{
+					ResourceMeta: workapiv1.ManifestResourceMeta{
+						Resource:  resource,
+						Name:      "test",
+						Namespace: "default",
+					},
+					StatusFeedbacks: workapiv1.StatusFeedbackResult{
+						Values: []workapiv1.FeedbackValue{
+							{
+								Name: feedbackName,
+								Value: workapiv1.FieldValue{
+									Type:   workapiv1.String,
+									String: &v,
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+	}
+	return work
+}
+
+func TestHookWorkIsFailed(t *testing.T) {
+	cases := []struct {
+		name     string
+		work     *workapiv1.ManifestWork
+		expected bool
+	}{
+		{
+			name:     "nil work",
+			work:     nil,
+			expected: false,
+		},
+		{
+			name:     "work not available yet",
+			work:     hookWorkWith("pods", "PodPhase", "Failed", false),
+			expected: false,
+		},
+		{
+			name:     "evicted pod (phase Failed) is failed",
+			work:     hookWorkWith("pods", "PodPhase", "Failed", true),
+			expected: true,
+		},
+		{
+			name:     "pod with unknown phase is failed",
+			work:     hookWorkWith("pods", "PodPhase", "Unknown", true),
+			expected: true,
+		},
+		{
+			name:     "running pod is not failed",
+			work:     hookWorkWith("pods", "PodPhase", "Running", true),
+			expected: false,
+		},
+		{
+			name:     "succeeded pod is not failed",
+			work:     hookWorkWith("pods", "PodPhase", "Succeeded", true),
+			expected: false,
+		},
+		{
+			name:     "pod without reported phase is not failed",
+			work:     hookWorkWith("pods", "", "", true),
+			expected: false,
+		},
+		{
+			name:     "job with Failed condition true is failed",
+			work:     hookWorkWith("jobs", "JobFailed", "True", true),
+			expected: true,
+		},
+		{
+			name:     "job with Failed condition false is not failed",
+			work:     hookWorkWith("jobs", "JobFailed", "False", true),
+			expected: false,
+		},
+		{
+			name:     "job without failure feedback is not failed",
+			work:     hookWorkWith("jobs", "JobComplete", "True", true),
+			expected: false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			assert.Equal(t, c.expected, hookWorkIsFailed(c.work))
+		})
+	}
+}
+
+func TestHookWorkIsCompleted(t *testing.T) {
+	cases := []struct {
+		name     string
+		work     *workapiv1.ManifestWork
+		expected bool
+	}{
+		{
+			name:     "nil work",
+			work:     nil,
+			expected: false,
+		},
+		{
+			name:     "succeeded pod is completed",
+			work:     hookWorkWith("pods", "PodPhase", "Succeeded", true),
+			expected: true,
+		},
+		{
+			name:     "failed pod is not completed",
+			work:     hookWorkWith("pods", "PodPhase", "Failed", true),
+			expected: false,
+		},
+		{
+			name:     "unknown pod is not completed",
+			work:     hookWorkWith("pods", "PodPhase", "Unknown", true),
+			expected: false,
+		},
+		{
+			name:     "complete job is completed",
+			work:     hookWorkWith("jobs", "JobComplete", "True", true),
+			expected: true,
+		},
+		{
+			name:     "failed job is not completed",
+			work:     hookWorkWith("jobs", "JobFailed", "True", true),
+			expected: false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			assert.Equal(t, c.expected, hookWorkIsCompleted(c.work))
+		})
+	}
+}
+
+// TestHookWorkIsFailedWithUnreportedFirstManifest is a regression test for a
+// hook work whose first manifest has no feedback values reported yet (e.g. the
+// work-agent has not observed it) followed by a second hook resource that has
+// terminally failed. The failure of the later resource must still be detected.
+func TestHookWorkIsFailedWithUnreportedFirstManifest(t *testing.T) {
+	failedValue := "Failed"
+	work := &workapiv1.ManifestWork{}
+	work.Spec.ManifestConfigs = []workapiv1.ManifestConfigOption{
+		{
+			ResourceIdentifier: workapiv1.ResourceIdentifier{
+				Resource:  "pods",
+				Name:      "hook-1",
+				Namespace: "default",
+			},
+		},
+		{
+			ResourceIdentifier: workapiv1.ResourceIdentifier{
+				Resource:  "pods",
+				Name:      "hook-2",
+				Namespace: "default",
+			},
+		},
+	}
+	work.Status.Conditions = []metav1.Condition{
+		{Type: workapiv1.WorkAvailable, Status: metav1.ConditionTrue},
+	}
+	work.Status.ResourceStatus = workapiv1.ManifestResourceStatus{
+		Manifests: []workapiv1.ManifestCondition{
+			{
+				// First manifest has no feedback values reported yet.
+				ResourceMeta: workapiv1.ManifestResourceMeta{
+					Resource:  "pods",
+					Name:      "hook-1",
+					Namespace: "default",
+				},
+				StatusFeedbacks: workapiv1.StatusFeedbackResult{},
+			},
+			{
+				// Second manifest has terminally failed (evicted).
+				ResourceMeta: workapiv1.ManifestResourceMeta{
+					Resource:  "pods",
+					Name:      "hook-2",
+					Namespace: "default",
+				},
+				StatusFeedbacks: workapiv1.StatusFeedbackResult{
+					Values: []workapiv1.FeedbackValue{
+						{
+							Name: "PodPhase",
+							Value: workapiv1.FieldValue{
+								Type:   workapiv1.String,
+								String: &failedValue,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if !hookWorkIsFailed(work) {
+		t.Errorf("expected the failed second hook resource to be detected even though the first manifest has no feedback reported")
+	}
+	// FindManifestValue must locate the failed pod's phase directly.
+	v := FindManifestValue(work.Status.ResourceStatus, work.Spec.ManifestConfigs[1].ResourceIdentifier, "PodPhase")
+	if v.String == nil || *v.String != "Failed" {
+		t.Errorf("expected FindManifestValue to return PodPhase=Failed for the second manifest, got %+v", v)
+	}
+}
