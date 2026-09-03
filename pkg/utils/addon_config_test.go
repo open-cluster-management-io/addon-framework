@@ -23,6 +23,136 @@ func newTestAddOnDeploymentConfigGetter(adc *addonapiv1beta1.AddOnDeploymentConf
 	return &testadcGetter{adc: adc}
 }
 
+func TestGetAddOnConfigRef(t *testing.T) {
+	cases := []struct {
+		name             string
+		configReferences []addonapiv1beta1.ConfigReference
+		group            string
+		resource         string
+		expectedFound    bool
+		expectedName     string
+	}{
+		{
+			name:             "no config references",
+			configReferences: []addonapiv1beta1.ConfigReference{},
+			group:            "addon.open-cluster-management.io",
+			resource:         "addondeploymentconfigs",
+			expectedFound:    false,
+			expectedName:     "",
+		},
+		{
+			name: "no matching group+resource",
+			configReferences: []addonapiv1beta1.ConfigReference{
+				{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+						Group: "addon.open-cluster-management.io", Resource: "addontemplates",
+					},
+					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{Name: "my-template"},
+						SpecHash:       "hash1",
+					},
+				},
+			},
+			group:         "addon.open-cluster-management.io",
+			resource:      "addondeploymentconfigs",
+			expectedFound: false,
+			expectedName:  "",
+		},
+		{
+			name: "single match",
+			configReferences: []addonapiv1beta1.ConfigReference{
+				{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+						Group: "addon.open-cluster-management.io", Resource: "addondeploymentconfigs",
+					},
+					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{Name: "only-one"},
+						SpecHash:       "hash1",
+					},
+				},
+			},
+			group:         "addon.open-cluster-management.io",
+			resource:      "addondeploymentconfigs",
+			expectedFound: true,
+			expectedName:  "only-one",
+		},
+		{
+			name: "multiple matches returns last",
+			configReferences: []addonapiv1beta1.ConfigReference{
+				{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+						Group: "addon.open-cluster-management.io", Resource: "addondeploymentconfigs",
+					},
+					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{Name: "first-adc"},
+						SpecHash:       "hash1",
+					},
+				},
+				{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+						Group: "addon.open-cluster-management.io", Resource: "addondeploymentconfigs",
+					},
+					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{Name: "second-adc"},
+						SpecHash:       "hash2",
+					},
+				},
+			},
+			group:         "addon.open-cluster-management.io",
+			resource:      "addondeploymentconfigs",
+			expectedFound: true,
+			expectedName:  "second-adc",
+		},
+		{
+			name: "multiple matches with interleaved types returns last of target type",
+			configReferences: []addonapiv1beta1.ConfigReference{
+				{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+						Group: "addon.open-cluster-management.io", Resource: "addondeploymentconfigs",
+					},
+					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{Name: "global-defaults"},
+						SpecHash:       "hash1",
+					},
+				},
+				{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+						Group: "addon.open-cluster-management.io", Resource: "addontemplates",
+					},
+					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{Name: "my-template"},
+						SpecHash:       "hash2",
+					},
+				},
+				{
+					ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+						Group: "addon.open-cluster-management.io", Resource: "addondeploymentconfigs",
+					},
+					DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+						ConfigReferent: addonapiv1beta1.ConfigReferent{Name: "per-cluster-override"},
+						SpecHash:       "hash3",
+					},
+				},
+			},
+			group:         "addon.open-cluster-management.io",
+			resource:      "addondeploymentconfigs",
+			expectedFound: true,
+			expectedName:  "per-cluster-override",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			found, ref := GetAddOnConfigRef(c.configReferences, c.group, c.resource)
+			assert.Equal(t, c.expectedFound, found, "found mismatch")
+			if c.expectedFound {
+				assert.Equal(t, c.expectedName, ref.DesiredConfig.ConfigReferent.Name,
+					"should return the last matching config reference")
+			}
+		})
+	}
+}
+
 func TestAgentInstallNamespaceFromDeploymentConfigFunc(t *testing.T) {
 
 	cases := []struct {
