@@ -141,6 +141,7 @@ func (c *addManagerConfig) runController(ctx context.Context, kubeConfig *rest.C
 				utils.NewAddOnDeploymentConfigGetter(addonClient),
 			),
 		).
+		WithConfigCheckEnabledOption().
 		WithAgentHealthProber(helloworld.AgentHealthProber()).
 		BuildTemplateAgentAddon()
 	if err != nil {
