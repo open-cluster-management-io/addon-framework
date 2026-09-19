@@ -10,6 +10,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
+	clienttesting "k8s.io/client-go/testing"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	v1 "open-cluster-management.io/api/cluster/v1"
@@ -563,4 +564,108 @@ func TestBuildSubjectsFromRegistration_FilterSystemAuthenticated(t *testing.T) {
 			assert.False(t, foundFiltered, "group %s should have been filtered out but was found", tt.shouldNotContain)
 		})
 	}
+}
+
+func actionVerbs(actions []clienttesting.Action) []string {
+	verbs := make([]string, len(actions))
+	for i, action := range actions {
+		verbs[i] = action.GetVerb()
+	}
+	return verbs
+}
+
+func TestApplyClusterRoleBinding_RoleRefChanged(t *testing.T) {
+	existing := &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{Name: "binding1", UID: "binding1"},
+		RoleRef:    rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "ClusterRole", Name: "old-role"},
+		Subjects:   []rbacv1.Subject{{Kind: "ServiceAccount", Name: "sa1", Namespace: "ns1"}},
+	}
+	required := &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{Name: "binding1"},
+		RoleRef:    rbacv1.RoleRef{Kind: "ClusterRole", Name: "new-role"},
+		Subjects:   []rbacv1.Subject{{Kind: "ServiceAccount", Name: "sa1", Namespace: "ns1"}},
+	}
+	fakeKubeClient := fake.NewSimpleClientset(existing)
+
+	actual, updated, err := ApplyClusterRoleBinding(context.TODO(), fakeKubeClient.RbacV1(), required)
+	assert.NoError(t, err)
+	assert.True(t, updated)
+	assert.Equal(t, "new-role", actual.RoleRef.Name)
+
+	verbs := actionVerbs(fakeKubeClient.Actions())
+	assert.Contains(t, verbs, "delete")
+	assert.Contains(t, verbs, "create")
+	assert.NotContains(t, verbs, "update")
+}
+
+func TestApplyClusterRoleBinding_SubjectsChangedOnly(t *testing.T) {
+	existing := &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{Name: "binding1", UID: "binding1"},
+		RoleRef:    rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "ClusterRole", Name: "role1"},
+		Subjects:   []rbacv1.Subject{{Kind: "ServiceAccount", Name: "sa1", Namespace: "ns1"}},
+	}
+	required := &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{Name: "binding1"},
+		RoleRef:    rbacv1.RoleRef{Kind: "ClusterRole", Name: "role1"},
+		Subjects:   []rbacv1.Subject{{Kind: "ServiceAccount", Name: "sa2", Namespace: "ns1"}},
+	}
+	fakeKubeClient := fake.NewSimpleClientset(existing)
+
+	actual, updated, err := ApplyClusterRoleBinding(context.TODO(), fakeKubeClient.RbacV1(), required)
+	assert.NoError(t, err)
+	assert.True(t, updated)
+	assert.Equal(t, existing.UID, actual.UID)
+	assert.Equal(t, "sa2", actual.Subjects[0].Name)
+
+	verbs := actionVerbs(fakeKubeClient.Actions())
+	assert.Contains(t, verbs, "update")
+	assert.NotContains(t, verbs, "delete")
+}
+
+func TestApplyRoleBinding_RoleRefChanged(t *testing.T) {
+	existing := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{Name: "binding1", Namespace: "ns1", UID: "binding1"},
+		RoleRef:    rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "Role", Name: "old-role"},
+		Subjects:   []rbacv1.Subject{{Kind: "ServiceAccount", Name: "sa1", Namespace: "ns1"}},
+	}
+	required := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{Name: "binding1", Namespace: "ns1"},
+		RoleRef:    rbacv1.RoleRef{Kind: "Role", Name: "new-role"},
+		Subjects:   []rbacv1.Subject{{Kind: "ServiceAccount", Name: "sa1", Namespace: "ns1"}},
+	}
+	fakeKubeClient := fake.NewSimpleClientset(existing)
+
+	actual, updated, err := ApplyRoleBinding(context.TODO(), fakeKubeClient.RbacV1(), required)
+	assert.NoError(t, err)
+	assert.True(t, updated)
+	assert.Equal(t, "new-role", actual.RoleRef.Name)
+
+	verbs := actionVerbs(fakeKubeClient.Actions())
+	assert.Contains(t, verbs, "delete")
+	assert.Contains(t, verbs, "create")
+	assert.NotContains(t, verbs, "update")
+}
+
+func TestApplyRoleBinding_SubjectsChangedOnly(t *testing.T) {
+	existing := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{Name: "binding1", Namespace: "ns1", UID: "binding1"},
+		RoleRef:    rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "Role", Name: "role1"},
+		Subjects:   []rbacv1.Subject{{Kind: "ServiceAccount", Name: "sa1", Namespace: "ns1"}},
+	}
+	required := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{Name: "binding1", Namespace: "ns1"},
+		RoleRef:    rbacv1.RoleRef{Kind: "Role", Name: "role1"},
+		Subjects:   []rbacv1.Subject{{Kind: "ServiceAccount", Name: "sa2", Namespace: "ns1"}},
+	}
+	fakeKubeClient := fake.NewSimpleClientset(existing)
+
+	actual, updated, err := ApplyRoleBinding(context.TODO(), fakeKubeClient.RbacV1(), required)
+	assert.NoError(t, err)
+	assert.True(t, updated)
+	assert.Equal(t, existing.UID, actual.UID)
+	assert.Equal(t, "sa2", actual.Subjects[0].Name)
+
+	verbs := actionVerbs(fakeKubeClient.Actions())
+	assert.Contains(t, verbs, "update")
+	assert.NotContains(t, verbs, "delete")
 }
