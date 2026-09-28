@@ -37,11 +37,13 @@ func (s *defaultHookSyncer) sync(ctx context.Context,
 		return addon, nil
 	}
 
-	if addonAddFinalizer(addon, addonapiv1alpha1.AddonPreDeleteHookFinalizer) {
+	if addon.DeletionTimestamp.IsZero() {
+		addonAddFinalizer(addon, addonapiv1alpha1.AddonPreDeleteHookFinalizer)
 		return addon, nil
 	}
 
-	if addon.DeletionTimestamp.IsZero() {
+	if !addonHasFinalizer(addon, addonapiv1alpha1.AddonPreDeleteHookFinalizer) &&
+		!addonHasFinalizer(addon, addonapiv1alpha1.AddonDeprecatedPreDeleteHookFinalizer) {
 		return addon, nil
 	}
 

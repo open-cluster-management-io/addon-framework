@@ -133,6 +133,30 @@ func TestDefaultHookReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "deploy hook manifest for a deleting addon with legacy finalizer",
+			key:  "cluster1/test",
+			addon: []runtime.Object{
+				func() runtime.Object {
+					addon := addontesting.NewAddonWithConditions("test", "cluster1", registrationAppliedCondition)
+					addon.SetFinalizers([]string{addonapiv1alpha1.AddonDeprecatedPreDeleteHookFinalizer})
+					addon.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+					return addon
+				}(),
+			},
+			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			testaddon: &testAgent{name: "test", objects: []runtime.Object{
+				addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
+				addontesting.NewHookJob("default", "test"),
+			}},
+			existingWork: []runtime.Object{getDeployWork()},
+			validateWorkActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "create")
+			},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch")
+			},
+		},
+		{
 			name: "deploy hook manifest for a deleting addon with finalizer, not completed, updated deploy work",
 			key:  "cluster1/test",
 			addon: []runtime.Object{
@@ -304,7 +328,7 @@ func TestDefaultHookReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "deploy hook manifest for a deleting addon without finalizer, completed",
+			name: "deleting addon without a recognized finalizer skips hook cleanup",
 			key:  "cluster1/test",
 			addon: []runtime.Object{
 				addontesting.SetAddonDeletionTimestamp(
@@ -373,11 +397,8 @@ func TestDefaultHookReconcile(t *testing.T) {
 					return work
 				}(),
 			},
-			validateWorkActions: addontesting.AssertNoActions,
-			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				// add finalizer
-				addontesting.AssertActions(t, actions, "update")
-			},
+			validateWorkActions:  addontesting.AssertNoActions,
+			validateAddonActions: addontesting.AssertNoActions,
 		},
 		{
 			name:    "deploy hook manifest when ConfigCheckEnabled is true",
