@@ -17,6 +17,7 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/addonmanager/constants"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	"open-cluster-management.io/addon-framework/pkg/index"
+	addonapiv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	fakeaddon "open-cluster-management.io/api/client/addon/clientset/versioned/fake"
 	addoninformers "open-cluster-management.io/api/client/addon/informers/externalversions"
@@ -130,6 +131,30 @@ func TestDefaultHookReconcile(t *testing.T) {
 				if !meta.IsStatusConditionFalse(addOn.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnHookManifestCompleted) {
 					t.Errorf("HookManifestCompleted condition should be false,but got true.")
 				}
+			},
+		},
+		{
+			name: "deploy hook manifest for a deleting addon with legacy finalizer",
+			key:  "cluster1/test",
+			addon: []runtime.Object{
+				func() runtime.Object {
+					addon := addontesting.NewAddonWithConditions("test", "cluster1", registrationAppliedCondition)
+					addon.SetFinalizers([]string{addonapiv1alpha1.AddonDeprecatedPreDeleteHookFinalizer})
+					addon.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+					return addon
+				}(),
+			},
+			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			testaddon: &testAgent{name: "test", objects: []runtime.Object{
+				addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
+				addontesting.NewHookJob("default", "test"),
+			}},
+			existingWork: []runtime.Object{getDeployWork()},
+			validateWorkActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "create")
+			},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch")
 			},
 		},
 		{
@@ -413,7 +438,7 @@ func TestDefaultHookReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "deploy hook manifest for a deleting addon without finalizer, completed",
+			name: "deleting addon without a recognized finalizer skips hook cleanup",
 			key:  "cluster1/test",
 			addon: []runtime.Object{
 				addontesting.SetAddonDeletionTimestamp(
@@ -482,11 +507,8 @@ func TestDefaultHookReconcile(t *testing.T) {
 					return work
 				}(),
 			},
-			validateWorkActions: addontesting.AssertNoActions,
-			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
-				// add finalizer
-				addontesting.AssertActions(t, actions, "update")
-			},
+			validateWorkActions:  addontesting.AssertNoActions,
+			validateAddonActions: addontesting.AssertNoActions,
 		},
 		{
 			name:    "deploy hook manifest when ConfigCheckEnabled is true",
