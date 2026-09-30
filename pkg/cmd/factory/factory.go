@@ -261,6 +261,8 @@ func toServerConfig() (*genericapiserver.Config, error) {
 	scheme := runtime.NewScheme()
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
 	config := genericapiserver.NewConfig(serializer.NewCodecFactory(scheme))
+	config.EnableProfiling = false
+	config.EnableMetrics = false
 
 	servingOptions := genericapiserveroptions.NewSecureServingOptions()
 	servingOptions.BindPort = 8443
