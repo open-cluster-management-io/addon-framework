@@ -28,6 +28,7 @@ type testAgent struct {
 	registrations         []agent.RegistrationConfig
 	agentInstallNamespace func(ctx context.Context, addon *addonapiv1beta1.ManagedClusterAddOn) (string, error)
 	permissionConfig      agent.PermissionConfigFunc
+	configCheckEnabled    bool
 }
 
 func (t *testAgent) Manifests(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error) {
@@ -37,11 +38,13 @@ func (t *testAgent) Manifests(ctx context.Context, cluster *clusterv1.ManagedClu
 func (t *testAgent) GetAgentAddonOptions() agent.AgentAddonOptions {
 	if len(t.registrations) == 0 {
 		return agent.AgentAddonOptions{
-			AddonName: t.name,
+			AddonName:          t.name,
+			ConfigCheckEnabled: t.configCheckEnabled,
 		}
 	}
 	agentOption := agent.AgentAddonOptions{
-		AddonName: t.name,
+		AddonName:          t.name,
+		ConfigCheckEnabled: t.configCheckEnabled,
 		Registration: &agent.RegistrationOption{
 			Configurations: func(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) ([]agent.RegistrationConfig, error) {
 				return t.registrations, nil
@@ -462,6 +465,94 @@ func TestReconcile(t *testing.T) {
 				},
 				permissionConfig: func(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonapiv1beta1.ManagedClusterAddOn) error {
 					return fmt.Errorf("permission config failed")
+				},
+			},
+		},
+		{
+			name:    "config check enabled but configured condition is false",
+			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			addon: []runtime.Object{func() *addonapiv1beta1.ManagedClusterAddOn {
+				addon := addontesting.NewAddon("test", "cluster1", metav1.OwnerReference{
+					Kind: "ClusterManagementAddOn",
+					Name: "test"})
+				// Set Configured condition to False
+				meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
+					Type:   addonapiv1beta1.ManagedClusterAddOnConditionConfigured,
+					Status: metav1.ConditionFalse,
+					Reason: "ConfigNotReady",
+				})
+				return addon
+			}()},
+			validateAddonActions: addontesting.AssertNoActions, // Should skip registration when config not ready
+			testaddon: &testAgent{
+				name:               "test",
+				namespace:          "test-ns",
+				configCheckEnabled: true,
+				registrations: []agent.RegistrationConfig{
+					&agent.KubeClientRegistration{},
+				},
+			},
+		},
+		{
+			name:    "config check enabled and configured condition is true",
+			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			addon: []runtime.Object{func() *addonapiv1beta1.ManagedClusterAddOn {
+				addon := addontesting.NewAddon("test", "cluster1", metav1.OwnerReference{
+					Kind: "ClusterManagementAddOn",
+					Name: "test"})
+				// Set Configured condition to True
+				meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
+					Type:   addonapiv1beta1.ManagedClusterAddOnConditionConfigured,
+					Status: metav1.ConditionTrue,
+					Reason: "ConfigReady",
+				})
+				return addon
+			}()},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch")
+				actual := actions[0].(clienttesting.PatchActionImpl).Patch
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
+				err := json.Unmarshal(actual, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !meta.IsStatusConditionTrue(addOn.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnRegistrationApplied) {
+					t.Errorf("Unexpected status condition patch, got %s", string(actual))
+				}
+			},
+			testaddon: &testAgent{
+				name:               "test",
+				namespace:          "test-ns",
+				configCheckEnabled: true,
+				registrations: []agent.RegistrationConfig{
+					&agent.KubeClientRegistration{},
+				},
+			},
+		},
+		{
+			name:    "config check disabled, no configured condition check",
+			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+			addon: []runtime.Object{addontesting.NewAddon("test", "cluster1", metav1.OwnerReference{
+				Kind: "ClusterManagementAddOn",
+				Name: "test"})},
+			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+				addontesting.AssertActions(t, actions, "patch")
+				actual := actions[0].(clienttesting.PatchActionImpl).Patch
+				addOn := &addonapiv1beta1.ManagedClusterAddOn{}
+				err := json.Unmarshal(actual, addOn)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !meta.IsStatusConditionTrue(addOn.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnRegistrationApplied) {
+					t.Errorf("Unexpected status condition patch, got %s", string(actual))
+				}
+			},
+			testaddon: &testAgent{
+				name:               "test",
+				namespace:          "test-ns",
+				configCheckEnabled: false,
+				registrations: []agent.RegistrationConfig{
+					&agent.KubeClientRegistration{},
 				},
 			},
 		},
