@@ -4,8 +4,17 @@ metadata:
   name: deploy-config
 spec:
   nodePlacement:
-    nodeSelector:
-      "kubernetes.io/os": "linux"
+    # affinity and nodeSelector are both required by the scheduler, so a nodeSelector is left
+    # out here: the agent then prefers an infrastructure node and falls back to any other node
+    # on clusters that have none, such as single-node or compact clusters.
+    affinity:
+      nodeAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 80
+          preference:
+            matchExpressions:
+            - key: node-role.kubernetes.io/infra
+              operator: Exists
     tolerations:
     - effect: NoSchedule
       key: node-role.kubernetes.io/infra

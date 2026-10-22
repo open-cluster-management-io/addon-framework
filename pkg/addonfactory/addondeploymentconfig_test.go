@@ -21,6 +21,40 @@ import (
 var (
 	nodeSelector = map[string]string{"kubernetes.io/os": "linux"}
 	tolerations  = []corev1.Toleration{{Key: "foo", Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoExecute}}
+	affinity     = &corev1.Affinity{
+		NodeAffinity: &corev1.NodeAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: []corev1.PreferredSchedulingTerm{
+				{
+					Weight: 80,
+					Preference: corev1.NodeSelectorTerm{
+						MatchExpressions: []corev1.NodeSelectorRequirement{
+							{
+								Key:      "node-role.kubernetes.io/infra",
+								Operator: corev1.NodeSelectorOpExists,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	affinityValues = map[string]interface{}{
+		"nodeAffinity": map[string]interface{}{
+			"preferredDuringSchedulingIgnoredDuringExecution": []interface{}{
+				map[string]interface{}{
+					"weight": float64(80),
+					"preference": map[string]interface{}{
+						"matchExpressions": []interface{}{
+							map[string]interface{}{
+								"key":      "node-role.kubernetes.io/infra",
+								"operator": "Exists",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
 )
 
 func TestGetAddOnDeploymentConfigValues(t *testing.T) {
@@ -99,6 +133,48 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 			},
 		},
 		{
+			// A config that sets affinity alone, without a nodeSelector, must still be applied.
+			name:          "to addon node placement with only affinity",
+			toValuesFuncs: []AddOnDeploymentConfigToValuesFunc{ToAddOnNodePlacementValues},
+			addOnObjs: []runtime.Object{
+				func() *addonapiv1beta1.ManagedClusterAddOn {
+					addon := addontesting.NewAddon("test", "cluster1")
+					addon.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
+						{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+								Group:    "addon.open-cluster-management.io",
+								Resource: "addondeploymentconfigs",
+							},
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
+									Namespace: "cluster1",
+									Name:      "config",
+								},
+								SpecHash: "dummy",
+							},
+						},
+					}
+					return addon
+				}(),
+				&addonapiv1beta1.AddOnDeploymentConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "config",
+						Namespace: "cluster1",
+					},
+					Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+						NodePlacement: &addonapiv1beta1.NodePlacement{
+							Affinity: affinity,
+						},
+					},
+				},
+			},
+			expectedValues: Values{
+				"global":      map[string]interface{}{"nodeSelector": nil},
+				"tolerations": nil,
+				"affinity":    affinityValues,
+			},
+		},
+		{
 			name:          "multiple toValuesFuncs",
 			toValuesFuncs: []AddOnDeploymentConfigToValuesFunc{ToAddOnNodePlacementValues, ToAddOnCustomizedVariableValues},
 			addOnObjs: []runtime.Object{
@@ -146,6 +222,49 @@ func TestGetAddOnDeploymentConfigValues(t *testing.T) {
 					map[string]interface{}{"effect": "NoExecute", "key": "foo", "operator": "Exists"},
 				},
 				"managedKubeConfigSecret": "external-managed-kubeconfig",
+			},
+		},
+		{
+			name:          "to addon deployment config node placement",
+			toValuesFuncs: []AddOnDeploymentConfigToValuesFunc{ToAddOnDeploymentConfigValues},
+			addOnObjs: []runtime.Object{
+				func() *addonapiv1beta1.ManagedClusterAddOn {
+					addon := addontesting.NewAddon("test", "cluster1")
+					addon.Status.ConfigReferences = []addonapiv1beta1.ConfigReference{
+						{
+							ConfigGroupResource: addonapiv1beta1.ConfigGroupResource{
+								Group:    "addon.open-cluster-management.io",
+								Resource: "addondeploymentconfigs",
+							},
+							DesiredConfig: &addonapiv1beta1.ConfigSpecHash{
+								ConfigReferent: addonapiv1beta1.ConfigReferent{
+									Namespace: "cluster1",
+									Name:      "config",
+								},
+								SpecHash: "dummy",
+							},
+						},
+					}
+					return addon
+				}(),
+				&addonapiv1beta1.AddOnDeploymentConfig{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "config",
+						Namespace: "cluster1",
+					},
+					Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
+						NodePlacement: &addonapiv1beta1.NodePlacement{
+							NodeSelector: nodeSelector,
+							Tolerations:  tolerations,
+							Affinity:     affinity,
+						},
+					},
+				},
+			},
+			expectedValues: Values{
+				"NodeSelector": nodeSelector,
+				"Tolerations":  tolerations,
+				"Affinity":     affinity,
 			},
 		},
 		{
