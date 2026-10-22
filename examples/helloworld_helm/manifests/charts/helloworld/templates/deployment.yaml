@@ -38,6 +38,9 @@ spec:
       {{- if .Values.global.nodeSelector }}
       nodeSelector: {{ toYaml .Values.global.nodeSelector | nindent 8 }}
       {{- end }}
+      {{- if .Values.affinity }}
+      affinity: {{ toYaml .Values.affinity | nindent 8 }}
+      {{- end }}
       containers:
       {{- $containerName := printf "%s-agent" (include "helloworldhelm.name" .) }}
       - name: {{ $containerName }}
