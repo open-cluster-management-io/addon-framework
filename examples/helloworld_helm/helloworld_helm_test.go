@@ -29,6 +29,23 @@ const (
 var (
 	nodeSelector = map[string]string{"kubernetes.io/os": "linux"}
 	tolerations  = []corev1.Toleration{{Key: "foo", Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoExecute}}
+	affinity     = &corev1.Affinity{
+		NodeAffinity: &corev1.NodeAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: []corev1.PreferredSchedulingTerm{
+				{
+					Weight: 80,
+					Preference: corev1.NodeSelectorTerm{
+						MatchExpressions: []corev1.NodeSelectorRequirement{
+							{
+								Key:      "node-role.kubernetes.io/infra",
+								Operator: corev1.NodeSelectorOpExists,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
 )
 
 func TestManifestAddonAgent(t *testing.T) {
@@ -124,6 +141,7 @@ func TestManifestAddonAgent(t *testing.T) {
 						NodePlacement: &addonapiv1beta1.NodePlacement{
 							Tolerations:  tolerations,
 							NodeSelector: nodeSelector,
+							Affinity:     affinity,
 						},
 					},
 				},
@@ -160,6 +178,10 @@ func TestManifestAddonAgent(t *testing.T) {
 
 				if !equality.Semantic.DeepEqual(deployment.Spec.Template.Spec.Tolerations, tolerations) {
 					t.Errorf("unexpected tolerations %v", deployment.Spec.Template.Spec.Tolerations)
+				}
+
+				if !equality.Semantic.DeepEqual(deployment.Spec.Template.Spec.Affinity, affinity) {
+					t.Errorf("unexpected affinity %v", deployment.Spec.Template.Spec.Affinity)
 				}
 			},
 		},
