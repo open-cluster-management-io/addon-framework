@@ -8,6 +8,8 @@ hubKubeConfigSecret: null
 
 tolerations: []
 
+affinity: {}
+
 global:
   imagePullPolicy: IfNotPresent
   imagePullSecret: null
