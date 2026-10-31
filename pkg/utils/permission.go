@@ -368,7 +368,6 @@ func ApplyClusterRole(ctx context.Context, client rbacclientv1.ClusterRolesGette
 }
 
 // ApplyClusterRoleBinding merges objectmeta, requires subjects and role refs
-// TODO on non-matching roleref, delete and recreate
 func ApplyClusterRoleBinding(ctx context.Context,
 	client rbacclientv1.ClusterRoleBindingsGetter,
 	required *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, bool, error) {
@@ -408,8 +407,15 @@ func ApplyClusterRoleBinding(ctx context.Context,
 		return existingCopy, false, nil
 	}
 
+	if !roleRefIsSame {
+		if err := client.ClusterRoleBindings().Delete(ctx, existingCopy.Name, metav1.DeleteOptions{}); err != nil {
+			return nil, false, err
+		}
+		actual, err := client.ClusterRoleBindings().Create(ctx, requiredCopy, metav1.CreateOptions{})
+		return actual, true, err
+	}
+
 	existingCopy.Subjects = requiredCopy.Subjects
-	existingCopy.RoleRef = requiredCopy.RoleRef
 
 	actual, err := client.ClusterRoleBindings().Update(ctx, existingCopy, metav1.UpdateOptions{})
 	return actual, true, err
@@ -442,7 +448,6 @@ func ApplyRole(ctx context.Context, client rbacclientv1.RolesGetter, required *r
 }
 
 // ApplyRoleBinding merges objectmeta, requires subjects and role refs
-// TODO on non-matching roleref, delete and recreate
 func ApplyRoleBinding(ctx context.Context, client rbacclientv1.RoleBindingsGetter, required *rbacv1.RoleBinding) (*rbacv1.RoleBinding, bool, error) {
 	existing, err := client.RoleBindings(required.Namespace).Get(ctx, required.Name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
@@ -480,8 +485,15 @@ func ApplyRoleBinding(ctx context.Context, client rbacclientv1.RoleBindingsGette
 		return existingCopy, false, nil
 	}
 
+	if !roleRefIsSame {
+		if err := client.RoleBindings(existingCopy.Namespace).Delete(ctx, existingCopy.Name, metav1.DeleteOptions{}); err != nil {
+			return nil, false, err
+		}
+		actual, err := client.RoleBindings(requiredCopy.Namespace).Create(ctx, requiredCopy, metav1.CreateOptions{})
+		return actual, true, err
+	}
+
 	existingCopy.Subjects = requiredCopy.Subjects
-	existingCopy.RoleRef = requiredCopy.RoleRef
 
 	actual, err := client.RoleBindings(requiredCopy.Namespace).Update(ctx, existingCopy, metav1.UpdateOptions{})
 	return actual, true, err
