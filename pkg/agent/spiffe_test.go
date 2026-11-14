@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -19,7 +20,9 @@ type fakeAgentAddon struct{ objects []runtime.Object }
 func (f fakeAgentAddon) Manifests(context.Context, *clusterv1.ManagedCluster, *addonapiv1beta1.ManagedClusterAddOn) ([]runtime.Object, error) {
 	return f.objects, nil
 }
-func (f fakeAgentAddon) GetAgentAddonOptions() AgentAddonOptions { return AgentAddonOptions{AddonName: "my-addon"} }
+func (f fakeAgentAddon) GetAgentAddonOptions() AgentAddonOptions {
+	return AgentAddonOptions{AddonName: "my-addon"}
+}
 
 func deployment() *appsv1.Deployment {
 	return &appsv1.Deployment{
@@ -137,5 +140,62 @@ func TestSubjectCarriedBySVID(t *testing.T) {
 		if got := SubjectCarriedBySVID("c1", "a", c.s); got != c.want {
 			t.Errorf("%+v: got %v, want %v", c.s, got, c.want)
 		}
+	}
+}
+
+type registeringAgentAddon struct{ fakeAgentAddon }
+
+func (f registeringAgentAddon) GetAgentAddonOptions() AgentAddonOptions {
+	return AgentAddonOptions{AddonName: "my-addon", Registration: &RegistrationOption{
+		Configurations: KubeClientSignerConfigurations("my-addon", "agent")}}
+}
+
+// TestWithSPIFFEWaitsForTheDriver checks that on a cluster whose Klusterlet uses spiffe, an add-on
+// with a kubeClient registration is not rendered before the registration agent reports the
+// driver: rendered without the spiffe changes, its namespace could never get the dedicated label.
+func TestWithSPIFFEWaitsForTheDriver(t *testing.T) {
+	ns := &corev1.Namespace{TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Namespace"}, ObjectMeta: metav1.ObjectMeta{Name: "my-addon-ns"}}
+	objects := []runtime.Object{deployment(), ns}
+	spiffeCluster := &clusterv1.ManagedCluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster1",
+		Annotations: map[string]string{KlusterletNameAnnotation: "klusterlet"}}}
+	otherCluster := &clusterv1.ManagedCluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster2"}}
+	noStatus := &addonapiv1beta1.ManagedClusterAddOn{ObjectMeta: metav1.ObjectMeta{Name: "my-addon", Namespace: "cluster1"}}
+	noDriver := spiffeAddOn()
+	noDriver.Status.Registrations[0].KubeClient.Driver = ""
+	csr := spiffeAddOn()
+	csr.Status.Registrations[0].KubeClient.Driver = "csr"
+
+	cases := []struct {
+		name    string
+		addon   AgentAddon
+		cluster *clusterv1.ManagedCluster
+		mca     *addonapiv1beta1.ManagedClusterAddOn
+		wait    bool
+		adapted bool
+	}{
+		{"spiffe cluster, no registration in the status yet", registeringAgentAddon{fakeAgentAddon{objects}}, spiffeCluster, noStatus, true, false},
+		{"spiffe cluster, driver not reported yet", registeringAgentAddon{fakeAgentAddon{objects}}, spiffeCluster, noDriver, true, false},
+		{"spiffe cluster, spiffe driver reported", registeringAgentAddon{fakeAgentAddon{objects}}, spiffeCluster, spiffeAddOn(), false, true},
+		{"spiffe cluster, csr driver reported", registeringAgentAddon{fakeAgentAddon{objects}}, spiffeCluster, csr, false, false},
+		{"spiffe cluster, add-on without registration", fakeAgentAddon{objects}, spiffeCluster, noStatus, false, false},
+		{"other cluster, no status yet", registeringAgentAddon{fakeAgentAddon{objects}}, otherCluster, noStatus, false, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			objs, err := WithSPIFFE(c.addon).Manifests(context.TODO(), c.cluster, c.mca)
+			if c.wait {
+				if err == nil || !strings.Contains(err.Error(), "waiting for the registration agent") || objs != nil {
+					t.Fatalf("want to wait, got %d objects, err %v", len(objs), err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			labeled := objs[1].(*corev1.Namespace).Labels[SPIFFEAddOnNamespaceLabel] != ""
+			if labeled != c.adapted {
+				t.Errorf("namespace labeled %v, want %v", labeled, c.adapted)
+			}
+		})
 	}
 }
