@@ -1668,6 +1668,9 @@ open-cluster-management.io/sdk-go/pkg/apis/work/v1/builder
 open-cluster-management.io/sdk-go/pkg/apis/work/v1/validator
 open-cluster-management.io/sdk-go/pkg/basecontroller/events
 open-cluster-management.io/sdk-go/pkg/basecontroller/factory
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1alpha1
+open-cluster-management.io/sdk-go/pkg/cloudevents/clients/addon/v1beta1
 open-cluster-management.io/sdk-go/pkg/cloudevents/clients/common
 open-cluster-management.io/sdk-go/pkg/cloudevents/clients/errors
 open-cluster-management.io/sdk-go/pkg/cloudevents/clients/options

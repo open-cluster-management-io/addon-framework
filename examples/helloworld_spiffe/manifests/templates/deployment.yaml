@@ -1,0 +1,38 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: helloworld-spiffe-agent
+  namespace: {{ .AddonInstallNamespace }}
+  labels:
+    app: helloworld-spiffe-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: helloworld-spiffe-agent
+  template:
+    metadata:
+      labels:
+        app: helloworld-spiffe-agent
+    spec:
+      serviceAccountName: helloworld-spiffe-agent-sa
+      volumes:
+      # On a spiffe cluster the add-on manager turns this into the helloworld-spiffe-spiffe
+      # ConfigMap and adds the SPIRE Workload API volume and the spiffe-role label.
+      - name: hub-config
+        secret:
+          secretName: {{ .HubConfigSecret }}
+      containers:
+      - name: helloworld-spiffe-agent
+        image: {{ .Image }}
+        imagePullPolicy: IfNotPresent
+        args:
+        - "/helloworld_spiffe"
+        - "agent"
+        - "--hub-config-dir=/var/run/hub"
+        - "--cluster-name={{ .ClusterName }}"
+        - "--addon-namespace={{ .AddonInstallNamespace }}"
+        volumeMounts:
+        - name: hub-config
+          mountPath: /var/run/hub
+          readOnly: true

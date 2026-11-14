@@ -1,0 +1,10 @@
+# On the managed cluster: the agent writes one ConfigMap in its own namespace.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: helloworld-spiffe-agent
+  namespace: {{ .AddonInstallNamespace }}
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "create", "update"]
