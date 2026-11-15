@@ -968,7 +968,9 @@ func spiffeCase(name string, reg *agent.KubeClientRegistration, status metav1.Co
 		cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
 		addon:   []runtime.Object{addon},
 		testaddon: &testAgent{name: "test", namespace: "default", registrations: []agent.RegistrationConfig{reg},
-			permissionConfig: func(context.Context, *clusterv1.ManagedCluster, *addonapiv1beta1.ManagedClusterAddOn) error { return nil }},
+			permissionConfig: func(context.Context, *clusterv1.ManagedCluster, *addonapiv1beta1.ManagedClusterAddOn) error {
+				return nil
+			}},
 		validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 			addontesting.AssertActions(t, actions, "patch")
 			addOn := &addonapiv1beta1.ManagedClusterAddOn{}

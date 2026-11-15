@@ -459,6 +459,7 @@ github.com/stretchr/testify/assert
 github.com/stretchr/testify/assert/yaml
 github.com/stretchr/testify/internal/difflib
 github.com/stretchr/testify/internal/spew
+github.com/stretchr/testify/require
 # github.com/x448/float16 v0.8.4
 ## explicit; go 1.11
 github.com/x448/float16
@@ -1706,6 +1707,7 @@ open-cluster-management.io/sdk-go/pkg/cloudevents/server/grpc/heartbeat
 open-cluster-management.io/sdk-go/pkg/logging
 open-cluster-management.io/sdk-go/pkg/patcher
 open-cluster-management.io/sdk-go/pkg/spiffe
+open-cluster-management.io/sdk-go/pkg/testing/fakespire
 open-cluster-management.io/sdk-go/pkg/tls
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.2
 ## explicit; go 1.21

@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -72,22 +73,13 @@ func (o *AgentOptions) RunAgent(ctx context.Context, kubeconfig *rest.Config) er
 	if err != nil {
 		return err
 	}
-	// Opens the local Workload API; the SVID stays in memory and is rotated by SPIRE.
-	grpcOptions, closer, err := spiffeclient.NewGRPCOptions(ctx, o.HubConfigDir)
+	hubAddOnClient, closer, err := newHubAddOnClient(ctx, o.HubConfigDir, o.ClusterName)
 	if err != nil {
 		return err
 	}
 	defer closer.Close()
 	klog.Infof("connecting to the hub at %s as %s", cfg.URL, cfg.AgentSPIFFEID)
 
-	store := cloudeventsstore.NewAgentInformerWatcherStore[*addonapiv1beta1.ManagedClusterAddOn]()
-	hubAddOnClient, err := cloudeventsaddon.ManagedClusterAddOnInterface(ctx,
-		cloudeventsoptions.NewGenericClientOptions(grpcOptions, cloudeventsaddonv1beta1.NewManagedClusterAddOnCodec(),
-			fmt.Sprintf("%s-%s", o.ClusterName, helloworld_spiffe.AddonName)).
-			WithClusterName(o.ClusterName).WithClientWatcherStore(store))
-	if err != nil {
-		return err
-	}
 	// An informer on the add-on client: its first list initiates the client's store, and only then
 	// does the client ask the hub to resync, that is, to send this cluster's ManagedClusterAddOns.
 	addOnInformer := addoninformers.NewSharedInformerFactoryWithOptions(hubAddOnClient, 10*time.Minute,
@@ -109,6 +101,31 @@ func (o *AgentOptions) RunAgent(ctx context.Context, kubeconfig *rest.Config) er
 	return nil
 }
 
+// newHubAddOnClient and addOnInterface are replaceable in tests.
+var (
+	newHubAddOnClient = hubAddOnClient
+	addOnInterface    = cloudeventsaddon.ManagedClusterAddOnInterface
+)
+
+// hubAddOnClient opens the local Workload API, where the agent's SVID stays in memory and is
+// rotated by SPIRE, and builds a ManagedClusterAddOn client over the hub's gRPC service. Close
+// the returned closer when the agent stops.
+func hubAddOnClient(ctx context.Context, dir, clusterName string) (addonclient.Interface, io.Closer, error) {
+	grpcOptions, closer, err := spiffeclient.NewGRPCOptions(ctx, dir)
+	if err != nil {
+		return nil, nil, err
+	}
+	store := cloudeventsstore.NewAgentInformerWatcherStore[*addonapiv1beta1.ManagedClusterAddOn]()
+	client, err := addOnInterface(ctx, cloudeventsoptions.NewGenericClientOptions(grpcOptions,
+		cloudeventsaddonv1beta1.NewManagedClusterAddOnCodec(), fmt.Sprintf("%s-%s", clusterName, helloworld_spiffe.AddonName)).
+		WithClusterName(clusterName).WithClientWatcherStore(store))
+	if err != nil {
+		_ = closer.Close()
+		return nil, nil, err
+	}
+	return client, closer, nil
+}
+
 func (o *AgentOptions) sayHello(ctx context.Context, hub addonclient.Interface,
 	lister addonlisterv1beta1.ManagedClusterAddOnLister, spoke kubernetes.Interface, agentID string) error {
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -128,10 +145,8 @@ func (o *AgentOptions) sayHello(ctx context.Context, hub addonclient.Interface,
 	})
 	// Without this, SetStatusCondition keeps the old time when only the message changes.
 	meta.FindStatusCondition(conditions, helloworld_spiffe.ConditionHello).LastTransitionTime = metav1.Now()
-	patch, err := json.Marshal(map[string]any{"status": map[string]any{"conditions": conditions}})
-	if err != nil {
-		return err
-	}
+	// Conditions always marshal.
+	patch, _ := json.Marshal(map[string]any{"status": map[string]any{"conditions": conditions}})
 	if _, err := addOns.Patch(ctx, addOn.Name, kubetypes.MergePatchType, patch, metav1.PatchOptions{}, "status"); err != nil {
 		return fmt.Errorf("update the ManagedClusterAddOn status on the hub: %w", err)
 	}

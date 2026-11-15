@@ -9,7 +9,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 
-	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/agent"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
@@ -20,15 +19,13 @@ import (
 // namespace, and the agent gets the <addon>-spiffe ConfigMap instead of a hub kubeconfig Secret,
 // the SPIRE Workload API and the spiffe-role addon label.
 func TestManifestsOnSPIFFECluster(t *testing.T) {
-	agentAddon, err := addonfactory.NewAgentAddonFactory(AddonName, FS, "manifests/templates").
-		WithGetValuesFuncs(GetDefaultValues).
-		WithAgentRegistrationOption(NewRegistrationOption(fake.NewSimpleClientset())).
-		WithAgentInstallNamespace(func(context.Context, *addonapiv1beta1.ManagedClusterAddOn) (string, error) {
-			return InstallNamespace, nil
-		}).
-		BuildTemplateAgentAddon()
+	agentAddon, err := NewAgentAddon(fake.NewSimpleClientset())
 	if err != nil {
 		t.Fatal(err)
+	}
+	if prober := agentAddon.GetAgentAddonOptions().HealthProber; prober == nil ||
+		prober.Type != agent.HealthProberTypeDeploymentAvailability {
+		t.Errorf("health prober %+v, want deployment availability", prober)
 	}
 	cluster := &clusterv1.ManagedCluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster2",
 		Annotations: map[string]string{agent.KlusterletNameAnnotation: "klusterlet"}}}

@@ -4,6 +4,7 @@
 package helloworld_spiffe //nolint:revive
 
 import (
+	"context"
 	"embed"
 	"os"
 
@@ -75,4 +76,16 @@ func GetDefaultValues(cluster *clusterv1.ManagedCluster,
 
 func AgentHealthProber() *agent.HealthProber {
 	return &agent.HealthProber{Type: agent.HealthProberTypeDeploymentAvailability}
+}
+
+// NewAgentAddon builds the add-on: its manifests, values, registration and health prober.
+func NewAgentAddon(kubeClient kubernetes.Interface) (agent.AgentAddon, error) {
+	return addonfactory.NewAgentAddonFactory(AddonName, FS, "manifests/templates").
+		WithGetValuesFuncs(GetDefaultValues).
+		WithAgentRegistrationOption(NewRegistrationOption(kubeClient)).
+		WithAgentInstallNamespace(func(context.Context, *addonapiv1beta1.ManagedClusterAddOn) (string, error) {
+			return InstallNamespace, nil
+		}).
+		WithAgentHealthProber(AgentHealthProber()).
+		BuildTemplateAgentAddon()
 }
