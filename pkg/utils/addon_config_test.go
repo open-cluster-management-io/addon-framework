@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 )
 
@@ -268,7 +269,7 @@ func TestAgentInstallNamespaceFromDeploymentConfigFunc(t *testing.T) {
 						Name: "test1",
 					},
 					Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
-						AgentInstallNamespace: "testns",
+						AgentInstallNamespace: ptr.To("testns"),
 					},
 				}),
 			mca: &addonapiv1beta1.ManagedClusterAddOn{
