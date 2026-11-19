@@ -542,7 +542,7 @@ func prepareAddOnDeploymentConfig(namespace string) error {
 						NodeSelector: nodeSelector,
 						Tolerations:  tolerations,
 					},
-					AgentInstallNamespace: addonInstallNamespace,
+					AgentInstallNamespace: new(addonInstallNamespace),
 				},
 			},
 			metav1.CreateOptions{},
@@ -569,7 +569,7 @@ func prepareImageOverrideAddOnDeploymentConfig(namespace string) error {
 				},
 				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
 					Registries:            registries,
-					AgentInstallNamespace: addonInstallNamespace,
+					AgentInstallNamespace: new(addonInstallNamespace),
 				},
 			},
 			metav1.CreateOptions{},
@@ -595,7 +595,7 @@ func prepareProxyConfigAddOnDeploymentConfig(namespace string) error {
 				},
 				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
 					ProxyConfig:           proxyConfig,
-					AgentInstallNamespace: addonInstallNamespace,
+					AgentInstallNamespace: new(addonInstallNamespace),
 				},
 			},
 			metav1.CreateOptions{},
@@ -620,7 +620,7 @@ func prepareResourceRequirementsAddOnDeploymentConfig(namespace string) error {
 					Namespace: namespace,
 				},
 				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
-					AgentInstallNamespace: addonInstallNamespace,
+					AgentInstallNamespace: new(addonInstallNamespace),
 					ResourceRequirements: []addonapiv1beta1.ContainerResourceRequirements{
 						{
 							ContainerID: "*:*:*",
@@ -664,7 +664,7 @@ func prepareAgentInstallNamespaceAddOnDeploymentConfig(namespace string) error {
 					Namespace: namespace,
 				},
 				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
-					AgentInstallNamespace: agentInstallNamespaceConfig,
+					AgentInstallNamespace: new(agentInstallNamespaceConfig),
 				},
 			},
 			metav1.CreateOptions{},

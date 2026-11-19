@@ -268,7 +268,7 @@ func TestAgentInstallNamespaceFromDeploymentConfigFunc(t *testing.T) {
 						Name: "test1",
 					},
 					Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
-						AgentInstallNamespace: "testns",
+						AgentInstallNamespace: new("testns"),
 					},
 				}),
 			mca: &addonapiv1beta1.ManagedClusterAddOn{
