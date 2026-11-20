@@ -139,3 +139,41 @@ func TestWithSPIFFEManifestsErrors(t *testing.T) {
 		t.Error("WithSPIFFE wrapped an already wrapped add-on")
 	}
 }
+
+// The hub kubeconfig Secret as a source of a projected volume becomes the SPIFFE ConfigMap too,
+// the other sources stay, and init containers get the Workload API as the containers do.
+func TestApplySPIFFEToPodProjectedAndInit(t *testing.T) {
+	tpl := corev1.PodTemplateSpec{Spec: corev1.PodSpec{
+		InitContainers: []corev1.Container{{Name: "init"}},
+		Containers: []corev1.Container{{Name: "agent", VolumeMounts: []corev1.VolumeMount{
+			{Name: SPIFFEWorkloadAPIVolume, MountPath: SPIFFEWorkloadAPIMountPath}}}},
+		Volumes: []corev1.Volume{{Name: "hub", VolumeSource: corev1.VolumeSource{Projected: &corev1.ProjectedVolumeSource{
+			Sources: []corev1.VolumeProjection{
+				{Secret: &corev1.SecretProjection{LocalObjectReference: corev1.LocalObjectReference{Name: "my-addon-hub-kubeconfig"},
+					Items: []corev1.KeyToPath{{Key: "kubeconfig", Path: "kubeconfig"}}}},
+				{Secret: &corev1.SecretProjection{LocalObjectReference: corev1.LocalObjectReference{Name: "other"}}},
+				{ConfigMap: &corev1.ConfigMapProjection{LocalObjectReference: corev1.LocalObjectReference{Name: "kept"}}},
+			}}}}},
+	}}
+	applySPIFFEToPod(&tpl, "my-addon")
+
+	sources := tpl.Spec.Volumes[0].Projected.Sources
+	if sources[0].Secret != nil || sources[0].ConfigMap == nil || sources[0].ConfigMap.Name != SPIFFEConfigMapName("my-addon") ||
+		len(sources[0].ConfigMap.Items) != 0 {
+		t.Errorf("the hub Secret source became %+v", sources[0])
+	}
+	if sources[1].Secret == nil || sources[1].Secret.Name != "other" || sources[2].ConfigMap.Name != "kept" {
+		t.Errorf("the other sources changed: %+v", sources[1:])
+	}
+	for _, c := range append(tpl.Spec.InitContainers, tpl.Spec.Containers...) {
+		n := 0
+		for _, m := range c.VolumeMounts {
+			if m.Name == SPIFFEWorkloadAPIVolume {
+				n++
+			}
+		}
+		if n != 1 {
+			t.Errorf("container %s mounts the Workload API %d times, want once", c.Name, n)
+		}
+	}
+}
