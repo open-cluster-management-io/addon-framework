@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/pflag"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
@@ -22,6 +23,11 @@ func TestMainHelp(t *testing.T) {
 	defer func() { exit = os.Exit }()
 	args := os.Args
 	defer func() { os.Args = args }()
+	// main registers its flags on the global FlagSet: give it a fresh one, so the test can run
+	// again in the same process (go test -count=2).
+	flags := pflag.CommandLine
+	pflag.CommandLine = pflag.NewFlagSet(os.Args[0], pflag.ExitOnError)
+	defer func() { pflag.CommandLine = flags }()
 	os.Args = []string{"helloworld_spiffe", "--help"}
 	main()
 	if code != 0 {

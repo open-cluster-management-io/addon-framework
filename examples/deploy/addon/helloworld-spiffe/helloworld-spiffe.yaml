@@ -95,9 +95,9 @@ spec:
       serviceAccountName: helloworld-spiffe-addon-sa
       containers:
       - name: helloworld-spiffe-controller
-        image: quay.io/open-cluster-management/addon-examples:spiffe-e2e
+        image: quay.io/open-cluster-management/addon-examples:latest
         imagePullPolicy: IfNotPresent
         env:
         - name: EXAMPLE_IMAGE_NAME
-          value: quay.io/open-cluster-management/addon-examples:spiffe-e2e
+          value: quay.io/open-cluster-management/addon-examples:latest
         args: ["/helloworld_spiffe", "controller"]

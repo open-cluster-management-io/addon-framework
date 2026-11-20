@@ -47,9 +47,16 @@ func NewRegistrationOption(kubeClient kubernetes.Interface) *agent.RegistrationO
 			BindKubeClientRole(&rbacv1.Role{
 				ObjectMeta: metav1.ObjectMeta{Name: "open-cluster-management:helloworld-spiffe:agent"},
 				Rules: []rbacv1.PolicyRule{{
+					// Its informer lists the add-ons of the cluster namespace.
 					APIGroups: []string{addonapiv1beta1.GroupName},
-					Resources: []string{"managedclusteraddons", "managedclusteraddons/status"},
-					Verbs:     []string{"get", "list", "watch", "update", "patch"},
+					Resources: []string{"managedclusteraddons"},
+					Verbs:     []string{"get", "list", "watch"},
+				}, {
+					// It may change only its own add-on.
+					APIGroups:     []string{addonapiv1beta1.GroupName},
+					Resources:     []string{"managedclusteraddons", "managedclusteraddons/status"},
+					ResourceNames: []string{AddonName},
+					Verbs:         []string{"get", "update", "patch"},
 				}},
 			}).Build(),
 	}

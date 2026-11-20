@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -157,7 +158,9 @@ func TestRunAgentLoop(t *testing.T) {
 	newHubAddOnClient = func(context.Context, string, string) (addonclient.Interface, io.Closer, error) {
 		return hub, nopCloser{}, nil
 	}
+	var spokeCalls atomic.Int32
 	spoke := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		spokeCalls.Add(1)
 		http.Error(w, "spoke down", http.StatusInternalServerError)
 	}))
 	defer spoke.Close()
@@ -168,10 +171,13 @@ func TestRunAgentLoop(t *testing.T) {
 			Interval: 10 * time.Millisecond}
 		done <- o.RunAgent(ctx, &rest.Config{Host: spoke.URL})
 	}()
+	// The hello reaches the hub, and the spoke write that fails is tried again.
+	hello := false
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		got, _ := hub.AddonV1beta1().ManagedClusterAddOns("cluster1").Get(ctx, helloworld_spiffe.AddonName, metav1.GetOptions{})
-		if got != nil && meta.FindStatusCondition(got.Status.Conditions, helloworld_spiffe.ConditionHello) != nil {
+		hello = got != nil && meta.FindStatusCondition(got.Status.Conditions, helloworld_spiffe.ConditionHello) != nil
+		if hello && spokeCalls.Load() >= 2 {
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
@@ -179,6 +185,12 @@ func TestRunAgentLoop(t *testing.T) {
 	cancel()
 	if err := <-done; err != nil {
 		t.Errorf("RunAgent: %v", err)
+	}
+	if !hello {
+		t.Error("no hello reached the hub")
+	}
+	if n := spokeCalls.Load(); n < 2 {
+		t.Errorf("the failed spoke write was tried %d times, want it tried again", n)
 	}
 }
 

@@ -74,3 +74,28 @@ func TestManifestsOnSPIFFECluster(t *testing.T) {
 			pod.Spec.Volumes, agent.SPIFFEConfigMapName(AddonName))
 	}
 }
+
+// The agent reads the add-ons of its cluster namespace but may change only its own.
+func TestAgentRole(t *testing.T) {
+	kube := fake.NewSimpleClientset()
+	cluster := &clusterv1.ManagedCluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster1"}}
+	addon := &addonapiv1beta1.ManagedClusterAddOn{ObjectMeta: metav1.ObjectMeta{Name: AddonName, Namespace: "cluster1"},
+		Status: addonapiv1beta1.ManagedClusterAddOnStatus{Registrations: []addonapiv1beta1.RegistrationConfig{{
+			Type: addonapiv1beta1.KubeClient, KubeClient: &addonapiv1beta1.KubeClientConfig{
+				Subject: addonapiv1beta1.KubeClientSubject{BaseSubject: addonapiv1beta1.BaseSubject{
+					User: "system:open-cluster-management:cluster:cluster1:addon:" + AddonName + ":agent:" + AgentName}}}}}}}
+	if err := NewRegistrationOption(kube).PermissionConfig(context.TODO(), cluster, addon); err != nil {
+		t.Fatal(err)
+	}
+	role, err := kube.RbacV1().Roles("cluster1").Get(context.TODO(), "open-cluster-management:helloworld-spiffe:agent", metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range role.Rules {
+		for _, v := range r.Verbs {
+			if (v == "update" || v == "patch") && (len(r.ResourceNames) != 1 || r.ResourceNames[0] != AddonName) {
+				t.Errorf("rule %+v lets the agent change add-ons other than its own", r)
+			}
+		}
+	}
+}
