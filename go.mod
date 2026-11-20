@@ -151,6 +151,6 @@ require (
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
 
-replace open-cluster-management.io/api => github.com/ssijbabu/api v1.3.1-0.20261113090800-b805cf6c07e4
+replace open-cluster-management.io/api => github.com/ssijbabu/api v1.3.1-0.20261120193913-0adf5a6ae3ae
 
-replace open-cluster-management.io/sdk-go => ../sdk-go
+replace open-cluster-management.io/sdk-go => github.com/ssijbabu/sdk-go v1.4.1-0.20261120194007-076e6d2071ac
