@@ -15,6 +15,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/utils/ptr"
 	addonapiv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 )
 
@@ -542,7 +543,7 @@ func prepareAddOnDeploymentConfig(namespace string) error {
 						NodeSelector: nodeSelector,
 						Tolerations:  tolerations,
 					},
-					AgentInstallNamespace: addonInstallNamespace,
+					AgentInstallNamespace: ptr.To(addonInstallNamespace),
 				},
 			},
 			metav1.CreateOptions{},
@@ -569,7 +570,7 @@ func prepareImageOverrideAddOnDeploymentConfig(namespace string) error {
 				},
 				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
 					Registries:            registries,
-					AgentInstallNamespace: addonInstallNamespace,
+					AgentInstallNamespace: ptr.To(addonInstallNamespace),
 				},
 			},
 			metav1.CreateOptions{},
@@ -595,7 +596,7 @@ func prepareProxyConfigAddOnDeploymentConfig(namespace string) error {
 				},
 				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
 					ProxyConfig:           proxyConfig,
-					AgentInstallNamespace: addonInstallNamespace,
+					AgentInstallNamespace: ptr.To(addonInstallNamespace),
 				},
 			},
 			metav1.CreateOptions{},
@@ -620,7 +621,7 @@ func prepareResourceRequirementsAddOnDeploymentConfig(namespace string) error {
 					Namespace: namespace,
 				},
 				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
-					AgentInstallNamespace: addonInstallNamespace,
+					AgentInstallNamespace: ptr.To(addonInstallNamespace),
 					ResourceRequirements: []addonapiv1beta1.ContainerResourceRequirements{
 						{
 							ContainerID: "*:*:*",
@@ -664,7 +665,7 @@ func prepareAgentInstallNamespaceAddOnDeploymentConfig(namespace string) error {
 					Namespace: namespace,
 				},
 				Spec: addonapiv1beta1.AddOnDeploymentConfigSpec{
-					AgentInstallNamespace: agentInstallNamespaceConfig,
+					AgentInstallNamespace: ptr.To(agentInstallNamespaceConfig),
 				},
 			},
 			metav1.CreateOptions{},
