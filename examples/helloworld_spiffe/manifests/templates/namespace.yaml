@@ -1,0 +1,6 @@
+# A namespace of the add-on's own. On a spiffe cluster the add-on manager adds the dedicated add-on
+# namespace label; it can only be set when the namespace is created.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .AddonInstallNamespace }}

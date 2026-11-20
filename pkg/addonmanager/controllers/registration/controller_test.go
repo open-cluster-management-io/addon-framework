@@ -345,6 +345,12 @@ func TestReconcile(t *testing.T) {
 				},
 			},
 		},
+		spiffeCase("spiffe - default subject is accepted", &agent.KubeClientRegistration{}, metav1.ConditionTrue, ""),
+		spiffeCase("spiffe - a custom subject is refused", &agent.KubeClientRegistration{User: "custom-user"},
+			metav1.ConditionFalse, ReasonSubjectNotSupportedBySPIFFE),
+		spiffeCase("spiffe - extra groups are refused", &agent.KubeClientRegistration{
+			User: agent.DefaultUser("cluster1", "test", "test"), Groups: []string{"system:masters"}},
+			metav1.ConditionFalse, ReasonSubjectNotSupportedBySPIFFE),
 		{
 			name:    "success - permission ready even with empty kubeClientDriver",
 			cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
@@ -936,5 +942,50 @@ func TestBuildRegistrationConfigs(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func spiffeCase(name string, reg *agent.KubeClientRegistration, status metav1.ConditionStatus, reason string) struct {
+	name                 string
+	addon                []runtime.Object
+	cluster              []runtime.Object
+	testaddon            *testAgent
+	validateAddonActions func(t *testing.T, actions []clienttesting.Action)
+	expectError          bool
+} {
+	addon := addontesting.NewAddon("test", "cluster1", metav1.OwnerReference{Kind: "ClusterManagementAddOn", Name: "test"})
+	addon.Status.Registrations = []addonapiv1beta1.RegistrationConfig{{
+		Type: addonapiv1beta1.KubeClient, KubeClient: &addonapiv1beta1.KubeClientConfig{Driver: agent.SPIFFEDriver}}}
+	return struct {
+		name                 string
+		addon                []runtime.Object
+		cluster              []runtime.Object
+		testaddon            *testAgent
+		validateAddonActions func(t *testing.T, actions []clienttesting.Action)
+		expectError          bool
+	}{
+		name:    name,
+		cluster: []runtime.Object{addontesting.NewManagedCluster("cluster1")},
+		addon:   []runtime.Object{addon},
+		testaddon: &testAgent{name: "test", namespace: "default", registrations: []agent.RegistrationConfig{reg},
+			permissionConfig: func(context.Context, *clusterv1.ManagedCluster, *addonapiv1beta1.ManagedClusterAddOn) error {
+				return nil
+			}},
+		validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
+			addontesting.AssertActions(t, actions, "patch")
+			addOn := &addonapiv1beta1.ManagedClusterAddOn{}
+			if err := json.Unmarshal(actions[0].(clienttesting.PatchActionImpl).Patch, addOn); err != nil {
+				t.Fatal(err)
+			}
+			cond := meta.FindStatusCondition(addOn.Status.Conditions, addonapiv1beta1.ManagedClusterAddOnRegistrationApplied)
+			if cond == nil || cond.Status != status || (reason != "" && cond.Reason != reason) {
+				t.Errorf("condition %+v, want %s %s", cond, status, reason)
+			}
+			for _, r := range addOn.Status.Registrations {
+				if r.KubeClient != nil && r.KubeClient.Driver != agent.SPIFFEDriver {
+					t.Errorf("driver %q, want spiffe kept", r.KubeClient.Driver)
+				}
+			}
+		},
 	}
 }

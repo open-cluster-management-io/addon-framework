@@ -1,0 +1,103 @@
+# The hub side of the helloworld-spiffe example add-on: its manager, its RBAC and its
+# ClusterManagementAddOn. The add-on is installed by hand on each cluster (installStrategy Manual):
+# create a ManagedClusterAddOn named helloworld-spiffe in the cluster's namespace.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: helloworld-spiffe-addon-sa
+  namespace: open-cluster-management
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: helloworld-spiffe-addon
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "events"]
+  verbs: ["get", "list", "watch", "create", "update", "delete", "deletecollection", "patch"]
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+# The add-on agent's hub RBAC on its own ManagedClusterAddOn, in each cluster's namespace.
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["roles", "rolebindings"]
+  verbs: ["get", "list", "watch", "create", "update", "delete"]
+- apiGroups: ["authorization.k8s.io"]
+  resources: ["subjectaccessreviews"]
+  verbs: ["get", "create"]
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["managedclusters"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["work.open-cluster-management.io"]
+  resources: ["manifestworks"]
+  verbs: ["create", "update", "get", "list", "watch", "delete", "deletecollection", "patch"]
+- apiGroups: ["addon.open-cluster-management.io"]
+  resources: ["managedclusteraddons/finalizers", "clustermanagementaddons/finalizers"]
+  verbs: ["update"]
+- apiGroups: ["addon.open-cluster-management.io"]
+  resources: ["clustermanagementaddons/status"]
+  verbs: ["update", "patch"]
+- apiGroups: ["addon.open-cluster-management.io"]
+  resources: ["clustermanagementaddons"]
+  verbs: ["get", "list", "watch", "patch"]
+- apiGroups: ["addon.open-cluster-management.io"]
+  resources: ["managedclusteraddons"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["addon.open-cluster-management.io"]
+  resources: ["managedclusteraddons/status"]
+  # get, list and watch too: the manager grants them to the add-on agent on the hub.
+  verbs: ["get", "list", "watch", "update", "patch"]
+- apiGroups: ["addon.open-cluster-management.io"]
+  resources: ["addondeploymentconfigs", "addontemplates"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: helloworld-spiffe-addon
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: helloworld-spiffe-addon
+subjects:
+- kind: ServiceAccount
+  name: helloworld-spiffe-addon-sa
+  namespace: open-cluster-management
+---
+apiVersion: addon.open-cluster-management.io/v1alpha1
+kind: ClusterManagementAddOn
+metadata:
+  name: helloworld-spiffe
+spec:
+  addOnMeta:
+    displayName: helloworld-spiffe
+    description: "An example add-on whose agent uses only its own SPIRE-issued SVID"
+  installStrategy:
+    type: Manual
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: helloworld-spiffe-controller
+  namespace: open-cluster-management
+  labels:
+    app: helloworld-spiffe-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: helloworld-spiffe-controller
+  template:
+    metadata:
+      labels:
+        app: helloworld-spiffe-controller
+    spec:
+      serviceAccountName: helloworld-spiffe-addon-sa
+      containers:
+      - name: helloworld-spiffe-controller
+        image: quay.io/open-cluster-management/addon-examples:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: EXAMPLE_IMAGE_NAME
+          value: quay.io/open-cluster-management/addon-examples:latest
+        args: ["/helloworld_spiffe", "controller"]
